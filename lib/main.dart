@@ -44,7 +44,8 @@ class _SplashScreenState extends State<SplashScreen> {
     Timer(const Duration(milliseconds: 2500), () {
       Navigator.pushReplacement(
         context,
-        MaterialPageRoute(builder: (context) => const DashboardPage()),
+        // DEEP FIX: Yahan se 'const' hata diya gaya hai jisse build fail ho rahi thi
+        MaterialPageRoute(builder: (context) => DashboardPage()), 
       );
     });
   }

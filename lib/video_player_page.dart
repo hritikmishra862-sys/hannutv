@@ -31,23 +31,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   
   bool isVideoPlaying = false;
   bool isCropped = false;
-  
-  // AUTO HIDE CONTROLS
   bool showControls = true;
   Timer? _hideTimer;
 
-  // MULTI-SERVER ARCHITECTURE (Green/Orange/Red Indicator)
+  // MULTI-SERVER ARCHITECTURE (VIP Server Dual Audio Support Karta Hai)
   int activeServerIndex = 0;
   final List<Map<String, dynamic>> servers = [
-    {'name': 'VIP Server (Dual Audio / SuperFast)', 'color': Colors.green, 'type': 'vidlink'},
+    {'name': 'VIP Server (Dual Audio/Fast)', 'color': Colors.green, 'type': 'vidlink'},
     {'name': 'Auto Server (Medium)', 'color': Colors.orange, 'type': 'vidsrc'},
-    {'name': 'Backup Server (English)', 'color': Colors.red, 'type': 'stellar'},
+    {'name': 'Premium Server (English)', 'color': Colors.blue, 'type': 'stellar'},
   ];
 
   @override
   void initState() {
     super.initState();
     
+    // SCREEN FULLSCREEN LANDSCAPE MODE
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
@@ -67,13 +66,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
+    // DIRECT FAST LINKS (VidLink supports Audio track changing inside player)
     if (srv == 'vidlink') return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
     if (srv == 'vidsrc') return isTv ? 'https://vidsrc.to/embed/tv/$id/$s/$e' : 'https://vidsrc.to/embed/movie/$id';
     return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
   }
 
   void _initWebView() {
-    setState(() => isVideoPlaying = false);
+    setState(() {
+      isVideoPlaying = false;
+    });
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -89,22 +91,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // DEEP JAVASCRIPT INJECTION: Kill invisible ads WITHOUT blocking stream[cite: 19]
+            // DEEP FIX: INVISIBLE AD KILLER & FAST BUFFERING
+            // Ye code video chalne dega par touch karne par naya ad wala page nahi khulne dega
             _controller.runJavaScript('''
-              // 1. Silent Ad Killer: Prevents transparent click-overlays
+              // 1. Silent Ad Click Killer
               document.addEventListener('click', function(e) {
                 var a = e.target.closest('a');
-                if (a) { e.preventDefault(); }
+                if (a && a.target === '_blank') { e.preventDefault(); }
               }, true);
               
-              // 2. Kill Popup Windows
+              // 2. Kill Popups
               window.open = function() { return null; };
               
-              // 3. Fast Buffer & State Checker
+              // 3. Fast Buffer and Status Checker
               var checkVideo = setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
-                  vids[0].preload = 'auto'; // Force fast buffering
+                  vids[0].preload = 'auto'; // FAST BUFFER
                   if (vids[0].currentTime > 0.1) {
                     VideoState.postMessage('playing');
                     clearInterval(checkVideo);
@@ -112,13 +115,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 }
               }, 500);
               
-              // 4. Hide unwanted server toasts
+              // 4. Hide server text overlays
               var style = document.createElement('style');
-              style.innerHTML = 'div[style*="z-index"] { display: none !important; }';
+              style.innerHTML = 'div[style*="z-index"] { display: none !important; pointer-events: none !important; }';
               document.head.appendChild(style);
             ''');
           },
-          // DEEP FIX: NO onNavigationRequest BLOCKER (Zero White Screen guaranteed)
         ),
       )
       ..loadRequest(
@@ -126,11 +128,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         headers: {'Referer': 'https://hannutv.app/'},
       );
 
+    // Audio Autoplay Bypass
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // FALLBACK TIMEOUT: App loading max 12 seconds, then reveal player
+    // 12 Second loading timeout - ensures player shows up even if API is slightly slow
     Future.delayed(const Duration(seconds: 12), () {
       if (mounted && !isVideoPlaying) {
         setState(() => isVideoPlaying = true);
@@ -140,9 +143,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    if (mounted) setState(() => showControls = true);
+    if (mounted) {
+      setState(() => showControls = true);
+    }
     _hideTimer = Timer(const Duration(seconds: 3), () {
-      if (mounted) setState(() => showControls = false);
+      if (mounted) {
+        setState(() => showControls = false);
+      }
     });
   }
 
@@ -160,7 +167,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             children: [
               const Text("Select Streaming Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text("Dual Audio tip: Use VIP Server. Click the ⚙️ or CC icon in the player to change language.", style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
+              const Text("Dual Audio tip: Use VIP Server. Click the ⚙️ or CC icon in the player to change language.", style: TextStyle(color: Colors.redAccent, fontSize: 12), textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ...List.generate(servers.length, (index) {
                 final srv = servers[index];
@@ -217,10 +224,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         behavior: HitTestBehavior.translucent,
         child: Stack(
           children: [
-            // 100% DIRECT RAW WEBVIEW[cite: 19]
+            // 1. FAST RAW WEBVIEW PLAYER
             WebViewWidget(controller: _controller),
             
-            // HANNUTV LOADING SCREEN
+            // 2. HANNUTV LOADING SCREEN
             if (!isVideoPlaying)
               Container(
                 color: Colors.black,
@@ -241,89 +248,78 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     const CircularProgressIndicator(color: Colors.red),
                     const SizedBox(height: 15),
                     Text(
-                      "Connecting to ${servers[activeServerIndex]['name']}...",
+                      "Loading ${servers[activeServerIndex]['name']}...",
                       style: const TextStyle(color: Colors.white70, fontSize: 14, letterSpacing: 1),
                     ),
                   ],
                 ),
               ),
               
-            // TOP LEFT: BACK BUTTON (Auto Hides in 3s)
-            AnimatedOpacity(
-              opacity: (isVideoPlaying && showControls) ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: Positioned(
+            // 3. TOP LEFT: BACK BUTTON (Auto Hides in 3s)
+            if (isVideoPlaying && showControls)
+              Positioned(
                 top: 20,
                 left: 20,
                 child: SafeArea(
-                  child: IgnorePointer(
-                    ignoring: !showControls,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.6),
-                        shape: BoxShape.circle,
-                      ),
-                      child: IconButton(
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-                        onPressed: () => Navigator.pop(context),
-                      ),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.6),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                      onPressed: () => Navigator.pop(context),
                     ),
                   ),
                 ),
               ),
-            ),
 
-            // TOP RIGHT: SERVER & CROP BUTTONS (Auto Hides in 3s)
-            AnimatedOpacity(
-              opacity: (isVideoPlaying && showControls) ? 1.0 : 0.0,
-              duration: const Duration(milliseconds: 300),
-              child: Positioned(
+            // 4. TOP RIGHT: SERVER & CROP BUTTONS (Auto Hides in 3s)
+            if (isVideoPlaying && showControls)
+              Positioned(
                 top: 20,
                 right: 20,
                 child: SafeArea(
-                  child: IgnorePointer(
-                    ignoring: !showControls,
-                    child: Row(
-                      children: [
-                        GestureDetector(
-                          onTap: _showServerSelector,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Row(
-                              children: [
-                                Icon(Icons.circle, color: servers[activeServerIndex]['color'], size: 12),
-                                const SizedBox(width: 6),
-                                const Text("Servers", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                              ],
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Container(
+                  child: Row(
+                    children: [
+                      GestureDetector(
+                        onTap: _showServerSelector,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.6),
-                            shape: BoxShape.circle,
+                            borderRadius: BorderRadius.circular(20),
                           ),
-                          child: IconButton(
-                            icon: Icon(
-                              isCropped ? Icons.fullscreen_exit : Icons.crop_free,
-                              color: Colors.white,
-                              size: 24,
-                            ),
-                            onPressed: toggleCrop,
+                          child: Row(
+                            children: [
+                              Icon(Icons.circle, color: servers[activeServerIndex]['color'], size: 12),
+                              const SizedBox(width: 6),
+                              const Text("Servers", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                            ],
                           ),
                         ),
-                      ],
-                    ),
+                      ),
+                      const SizedBox(width: 12),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            isCropped ? Icons.fullscreen_exit : Icons.crop_free,
+                            color: Colors.white,
+                            size: 24,
+                          ),
+                          onPressed: toggleCrop,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
               ),
-            ),
-        ],
+          ],
+        ),
       ),
     );
   }
