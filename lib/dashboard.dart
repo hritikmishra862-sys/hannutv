@@ -5,7 +5,6 @@ import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'video_player_page.dart';
 
-// TMDB API TOKEN
 const String kTmdbToken = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
 
 const Map<String, String> kApiHeaders = {
@@ -13,7 +12,6 @@ const Map<String, String> kApiHeaders = {
   'accept': 'application/json',
 };
 
-// Global list for Continue Watching session
 List<Map> continueWatchingList = [];
 
 class DashboardPage extends StatefulWidget {
@@ -471,7 +469,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // --- NAYA CINESRC API LOGIC ---
+  // --- STELLAR API LOGIC ---
   void launchPlayer(String title, {int? season, int? episode}) {
     if (!continueWatchingList.any((m) => m['id'] == widget.mediaItem['id'])) {
       continueWatchingList.insert(0, widget.mediaItem);
@@ -479,14 +477,16 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     
     final id = widget.mediaItem['id'];
     final type = widget.mediaItem['mediaType'] ?? 'movie';
+    
+    // Stellar Player Options: Theme = Red(E50914), autoPlay = true, language = hi
     String finalUrl = '';
 
     if (type == 'tv' || type == 'series') {
       final s = season ?? 1;
       final e = episode ?? 1;
-      finalUrl = 'https://cinesrc.st/embed/tv/$id?s=$s&e=$e&autoplay=true&autoskip=true';
+      finalUrl = 'https://stellar.rip/hi/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true&nextButton=true&autoNext=true';
     } else {
-      finalUrl = 'https://cinesrc.st/embed/movie/$id?autoplay=true&autoskip=true';
+      finalUrl = 'https://stellar.rip/hi/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
     }
 
     Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
