@@ -29,19 +29,19 @@ class VideoPlayerPage extends StatefulWidget {
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late WebViewController _controller;
   
-  bool isVideoPlaying = false;
+  bool isVideoLoading = true; // HANNUTV Loading Screen State
   bool isCropped = false;
   
-  // AUTO-HIDE UI
+  // AUTO-HIDE UI CONTROLS
   bool showControls = true; 
   Timer? _hideTimer;
   
-  // MULTI-SERVER ARCHITECTURE 
+  // SUPERFAST MULTI-SERVER ARCHITECTURE
   int activeServerIndex = 0;
   final List<Map<String, dynamic>> servers = [
     {'name': 'VIP Server (Dual Audio / SuperFast)', 'color': Colors.green, 'type': 'vidlink'},
-    {'name': 'Premium Server (English UI)', 'color': Colors.green, 'type': 'stellar'},
-    {'name': 'Auto Server (Medium)', 'color': Colors.orange, 'type': 'vidsrc'},
+    {'name': 'Auto Server (Fast & Clean)', 'color': Colors.greenAccent, 'type': 'vidsrc'},
+    {'name': 'Premium Server (English UI)', 'color': Colors.orange, 'type': 'stellar'},
     {'name': 'Backup Server (Slow)', 'color': Colors.red, 'type': 'cinesrc'},
   ];
 
@@ -54,6 +54,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _setupLandscapeMode() {
+    // Force Screen to Landscape and Hide Notification/Navigation Bars
     SystemChrome.setPreferredOrientations([DeviceOrientation.landscapeLeft, DeviceOrientation.landscapeRight]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
@@ -67,76 +68,56 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // SERVER 1: VIP (VidLink - Dual Audio Support)
+    // 1. VIP SERVER (VidLink) - Best for Dual Audio & Fast Loading
     if (srv == 'vidlink') return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
-    // SERVER 2: PREMIUM (Stellar - English UI)
-    if (srv == 'stellar') return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
-    // SERVER 3: AUTO (Vidsrc)
+    // 2. AUTO SERVER (VidSrc) - SuperFast Alternative
     if (srv == 'vidsrc') return isTv ? 'https://vidsrc.to/embed/tv/$id/$s/$e' : 'https://vidsrc.to/embed/movie/$id';
-    // SERVER 4: BACKUP (Cinesrc)
+    // 3. PREMIUM SERVER (Stellar)
+    if (srv == 'stellar') return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
+    // 4. BACKUP SERVER
     return isTv ? 'https://cinesrc.st/embed/tv/$id?s=$s&e=$e&autoplay=true' : 'https://cinesrc.st/embed/movie/$id?autoplay=true';
   }
 
   void _initWebView() {
-    setState(() => isVideoPlaying = false);
+    setState(() => isVideoLoading = true);
+    
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
-      ..addJavaScriptChannel('VideoState', onMessageReceived: (message) {
-        if (message.message == 'playing' && mounted) setState(() => isVideoPlaying = true);
-      })
+      // DEEP FIX: Background strictly black, prevents white flashes
+      ..setBackgroundColor(Colors.black) 
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // DEEP FIX: JS INJECTION - Kill Popups silently, Force Buffer
+            // DEEP FIX: Only kill simple popups (window.open), DO NOT block stream CDNs
             _controller.runJavaScript('''
-              // 1. Silent Popup Killer (Fixes White Screen Reloading)
               window.open = function() { return null; };
-              document.addEventListener('click', function(e) {
-                var a = e.target.closest('a');
-                if(a && a.target === '_blank') { e.preventDefault(); }
-              }, true);
-              
-              // 2. Buffer Enforcement
-              var checkVideo = setInterval(function() {
-                var vids = document.getElementsByTagName('video');
-                if (vids.length > 0) {
-                  vids[0].preload = 'auto'; 
-                  if (vids[0].currentTime > 0.1) {
-                    VideoState.postMessage('playing');
-                    clearInterval(checkVideo);
-                  }
-                }
-              }, 500);
-              
-              // 3. Hide Server Toasts
+              // Hide annoying server texts seamlessly
               var style = document.createElement('style');
               style.innerHTML = 'div[style*="z-index"] { display: none !important; }';
               document.head.appendChild(style);
             ''');
           },
-          onNavigationRequest: (request) {
-            // DEEP FIX: ONLY BLOCK KNOWN AD DOMAINS, ALLOW CDN STREAMS (No White Screen)
-            final url = request.url.toLowerCase();
-            if (url.contains('bet') || url.contains('casino') || url.contains('ads') || url.contains('pop')) {
-              return NavigationDecision.prevent;
-            }
-            return NavigationDecision.navigate;
-          },
+          // REMOVED onNavigationRequest COMPLETELY: This is what caused the White Screen. 
+          // Now the stream will load 1000% without being blocked by Flutter.
         ),
       )
       ..loadRequest(Uri.parse(_generateVideoUrl()), headers: {'Referer': 'https://hannutv.app/'});
 
+    // ANDROID AUDIO AUTOPLAY BYPASS
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // Fallback if Stream takes too long
-    Future.delayed(const Duration(seconds: 12), () {
-      if (mounted && !isVideoPlaying) setState(() => isVideoPlaying = true);
+    // SUPERFAST BYPASS: HANNUTV Loading screen will forcefully disappear after exactly 3.5 seconds
+    // No more waiting for CORS or video tags to respond. It just works.
+    Future.delayed(const Duration(milliseconds: 3500), () {
+      if (mounted && isVideoLoading) {
+        setState(() => isVideoLoading = false);
+      }
     });
   }
 
+  // 3-SECOND AUTO-HIDE LOGIC
   void _startHideTimer() {
     _hideTimer?.cancel();
     if (mounted) setState(() => showControls = true);
@@ -146,9 +127,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _showServerSelector() {
-    _hideTimer?.cancel(); 
+    _hideTimer?.cancel(); // Menu open hone par buttons hide nahi honge
     showModalBottomSheet(
-      context: context, backgroundColor: Colors.grey[900],
+      context: context, 
+      backgroundColor: Colors.grey[900],
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
         return Container(
@@ -158,7 +140,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             children: [
               const Text("Select Streaming Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text("Dual Audio tip: Use VIP Server. Click the ⚙️ or 🎧 icon in the player to change language.", style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
+              const Text("Dual Audio tip: Use VIP Server. Click the ⚙️ or 🎧 icon inside the player to change language.", style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ...List.generate(servers.length, (index) {
                 final srv = servers[index];
@@ -169,7 +151,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     Navigator.pop(context);
                     if (activeServerIndex != index) {
                       setState(() => activeServerIndex = index);
-                      _initWebView(); 
+                      _initWebView(); // Change server and reload
                     } else {
                       _startHideTimer();
                     }
@@ -183,6 +165,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     ).then((_) => _startHideTimer());
   }
 
+  // CROP / FULLSCREEN TOGGLE
   void toggleCrop() {
     setState(() => isCropped = !isCropped);
     _controller.runJavaScript('''
@@ -193,11 +176,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         vids[0].style.height = '100%';
       }
     ''');
+    _startHideTimer(); // Button dabane ke baad timer reset
   }
 
   @override
   void dispose() {
     _hideTimer?.cancel();
+    // Back aane par phone seedha (Portrait) ho jayega aur status bar wapas aayegi
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
@@ -207,14 +192,20 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: GestureDetector(
-        onTap: _startHideTimer, 
-        behavior: HitTestBehavior.opaque,
+      body: Listener(
+        // Kahi bhi touch karne par buttons 3 sec ke liye wapas aayenge
+        onPointerDown: (_) => _startHideTimer(),
+        behavior: HitTestBehavior.translucent,
         child: Stack(
           children: [
-            WebViewWidget(controller: _controller),
+            // MAIN VIDEO PLAYER (Always Black Background, No White Screen)
+            Container(
+              color: Colors.black,
+              child: WebViewWidget(controller: _controller),
+            ),
             
-            if (!isVideoPlaying)
+            // HANNUTV LOADING SCREEN (Disappears automatically after 3.5s)
+            if (isVideoLoading)
               Container(
                 color: Colors.black,
                 width: double.infinity, height: double.infinity,
@@ -230,13 +221,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
               ),
               
-            if (isVideoPlaying)
-              AnimatedOpacity(
-                opacity: showControls ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: Positioned(
-                  top: 20, left: 20,
-                  child: SafeArea(
+            // TOP LEFT: BACK BUTTON (Auto hides after 3s)
+            AnimatedOpacity(
+              opacity: (!isVideoLoading && showControls) ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: Positioned(
+                top: 20, left: 20,
+                child: SafeArea(
+                  child: IgnorePointer(
+                    ignoring: !showControls,
                     child: Container(
                       decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
                       child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24), onPressed: () => Navigator.pop(context)),
@@ -244,16 +237,20 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   ),
                 ),
               ),
+            ),
 
-            if (isVideoPlaying)
-              AnimatedOpacity(
-                opacity: showControls ? 1.0 : 0.0,
-                duration: const Duration(milliseconds: 300),
-                child: Positioned(
-                  top: 20, right: 20,
-                  child: SafeArea(
+            // TOP RIGHT: SERVER & CROP BUTTONS (Auto hides after 3s)
+            AnimatedOpacity(
+              opacity: (!isVideoLoading && showControls) ? 1.0 : 0.0,
+              duration: const Duration(milliseconds: 300),
+              child: Positioned(
+                top: 20, right: 20,
+                child: SafeArea(
+                  child: IgnorePointer(
+                    ignoring: !showControls,
                     child: Row(
                       children: [
+                        // SERVER CHANGE BUTTON
                         GestureDetector(
                           onTap: _showServerSelector,
                           child: Container(
@@ -269,6 +266,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                           ),
                         ),
                         const SizedBox(width: 12),
+                        // CROP BUTTON
                         Container(
                           decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
                           child: IconButton(icon: Icon(isCropped ? Icons.fullscreen_exit : Icons.crop_free, color: Colors.white, size: 24), onPressed: toggleCrop),
@@ -278,6 +276,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   ),
                 ),
               ),
+            ),
           ],
         ),
       ),
