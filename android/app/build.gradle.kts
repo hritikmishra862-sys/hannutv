@@ -6,8 +6,8 @@ plugins {
 android {
     namespace = "com.example.onyxtube"
     
-    // BYPASS FIX: Yahan hardcode kar diya hai taaki purana version OS ko crash na kare
-    compileSdk = 34
+    // Yahan 36 kar diya hai taaki Codemagic error na de
+    compileSdk = 36
     ndkVersion = flutter.ndkVersion
 
     compileOptions {
@@ -18,7 +18,7 @@ android {
     defaultConfig {
         applicationId = "com.example.onyxtube"
         minSdk = 21 // Video player ke liye mandatory
-        targetSdk = 34 // Android 12+ bypass
+        targetSdk = 34 // Android 12+ crash bypass ke liye isko 34 hi rakhna hai
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
