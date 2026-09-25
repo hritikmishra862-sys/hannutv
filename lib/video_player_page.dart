@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
-// Audio fix (Mute bypass) ke liye Android WebView ka explicit import
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 class VideoPlayerPage extends StatefulWidget {
@@ -26,12 +25,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void initState() {
     super.initState();
     
-    // SCREEN ROTATION ALLOW
+    // 1. DEEP FIX: FULLSCREEN IMMERSIVE MODE (Badi Screen)
+    // Jaise hi player khulega, screen tedhi (Landscape) ho jayegi aur system bars chhup jayenge
     SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -40,6 +40,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         NavigationDelegate(
           onPageFinished: (String url) {
             if (mounted) setState(() => isLoading = false);
+          },
+          // 2. DEEP FIX: INVISIBLE AD BLOCKER (Touch / Timeline click fix)
+          onNavigationRequest: (NavigationRequest request) {
+            // Agar link 'stellar.rip' ka nahi hai, matlab wo click-bait Ad hai. Usko block kar do!
+            if (!request.url.contains('stellar.rip')) {
+              return NavigationDecision.prevent; 
+            }
+            return NavigationDecision.navigate;
           },
         ),
       )
@@ -50,8 +58,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         },
       );
 
-    // 1000% DEEP FIX FOR AUDIO AUTOPLAY (Android Policy Bypass)
-    // Ye code ensure karega ki bina touch kiye video aawaz (audio) ke sath chale
+    // Audio Autoplay Mute Bypass
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController)
           .setMediaPlaybackRequiresUserGesture(false);
@@ -60,10 +67,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   @override
   void dispose() {
-    // Back aane par phone wapas seedha ho jayega
+    // Player se wapas aane par screen normal seedhi (Portrait) ho jayegi
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
@@ -71,12 +79,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true, 
-      appBar: AppBar(
-        backgroundColor: Colors.transparent, 
-        elevation: 0,
-        iconTheme: const IconThemeData(color: Colors.white, size: 30),
-      ),
+      // AppBar puri tarah hata diya taaki 100% full screen video chale
       body: Stack(
         children: [
           WebViewWidget(controller: _controller),
@@ -85,6 +88,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             const Center(
               child: CircularProgressIndicator(color: Colors.red),
             ),
+            
+          // CUSTOM BACK BUTTON (Kyunki AppBar nahi hai)
+          Positioned(
+            top: 20,
+            left: 20,
+            child: SafeArea(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: Colors.black.withOpacity(0.5),
+                  shape: BoxShape.circle,
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
+                  onPressed: () => Navigator.pop(context),
+                ),
+              ),
+            ),
+          ),
         ],
       ),
     );

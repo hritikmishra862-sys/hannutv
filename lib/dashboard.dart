@@ -12,7 +12,6 @@ const Map<String, String> kApiHeaders = {
   'accept': 'application/json',
 };
 
-// GLOBAL LIST FOR CONTINUE WATCHING
 List<Map> continueWatchingList = [];
 
 class DashboardPage extends StatefulWidget {
@@ -27,9 +26,7 @@ class DashboardPageState extends State<DashboardPage> {
   bool isSearching = false;
   final TextEditingController searchController = TextEditingController();
   
-  // LIVE SEARCH DEBOUNCER
   Timer? _debounce;
-  
   final PageController _pageController = PageController();
   Timer? _carouselTimer;
   int _currentPage = 0;
@@ -76,12 +73,13 @@ class DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
+  // API LANGUAGE CHANGED TO HINDI (hi-IN)
   Future<void> fetchTmdbData(String query) async {
     setState(() => isLoading = true);
     try {
       final String url = query.isEmpty
-          ? 'https://api.themoviedb.org/3/trending/all/day?language=en-US'
-          : 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(query)}&language=en-US';
+          ? 'https://api.themoviedb.org/3/trending/all/day?language=hi-IN'
+          : 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(query)}&language=hi-IN';
 
       final response = await http.get(Uri.parse(url), headers: kApiHeaders);
       if (response.statusCode == 200) {
@@ -110,7 +108,6 @@ class DashboardPageState extends State<DashboardPage> {
 
   void onSearchChanged(String value) {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    // 300ms SUPERFAST DEBOUNCE - Type karte hi list update hogi
     _debounce = Timer(const Duration(milliseconds: 300), () {
       fetchTmdbData(value);
     });
@@ -125,7 +122,6 @@ class DashboardPageState extends State<DashboardPage> {
 
   void openMediaDetails(Map media) {
     Navigator.push(context, MaterialPageRoute(builder: (context) => MediaDetailScreen(mediaItem: media))).then((_) {
-      // BACK AANE PAR DASHBOARD UPDATE HOGA TAAKI CONTINUE WATCHING DIKHE
       setState(() {}); 
     });
   }
@@ -209,7 +205,7 @@ class DashboardPageState extends State<DashboardPage> {
                                       },
                                     ),
                                   ),
-                                  onChanged: onSearchChanged, // LIVE SEARCH ENABLED
+                                  onChanged: onSearchChanged, 
                                 ),
                               )
                             : Expanded(
@@ -262,14 +258,13 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            // CONTINUE WATCHING SECTION
             if (continueWatchingList.isNotEmpty && !isSearching) ...[
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
                 child: Text('Continue Watching', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               SizedBox(
-                height: 170, // Height thodi badhai taaki S2E4 text aa sake
+                height: 170,
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -298,7 +293,6 @@ class DashboardPageState extends State<DashboardPage> {
                             const SizedBox(height: 4),
                             Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                             
-                            // SHOW SAVED SEASON AND EPISODE ON DASHBOARD
                             if (media['savedSeason'] != null)
                               Text('S${media['savedSeason']} E${media['savedEpisode']}', style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                           ],
@@ -421,7 +415,6 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// ── DETAILS SCREEN ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -443,12 +436,13 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     fetchDetails();
   }
 
+  // API LANGUAGE CHANGED TO HINDI (hi-IN)
   Future<void> fetchDetails() async {
     final mediaType = widget.mediaItem['mediaType'] ?? 'movie';
     final id = widget.mediaItem['id'];
 
     try {
-      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/$mediaType/$id?language=en-US'), headers: kApiHeaders);
+      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/$mediaType/$id?language=hi-IN'), headers: kApiHeaders);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
@@ -460,7 +454,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           };
           isLoadingDetails = false;
           if ((mediaType == 'tv') && details!['seasons'] != null && (details!['seasons'] as List).isNotEmpty) {
-            // DEEP FIX: Resume from exactly where user left off
             selectedSeason = widget.mediaItem['savedSeason'] ?? details!['seasons'][0]['seasonNumber'];
             if (selectedSeason != null) fetchEpisodes(selectedSeason!);
           }
@@ -473,10 +466,11 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
+  // API LANGUAGE CHANGED TO HINDI (hi-IN)
   Future<void> fetchEpisodes(int seasonNumber) async {
     setState(() { isLoadingEpisodes = true; selectedSeason = seasonNumber; });
     try {
-      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.mediaItem['id']}/season/$seasonNumber?language=en-US'), headers: kApiHeaders);
+      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.mediaItem['id']}/season/$seasonNumber?language=hi-IN'), headers: kApiHeaders);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
@@ -497,18 +491,16 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   }
 
   void launchPlayer(String title, {int? season, int? episode}) {
-    final id = widget.mediaItem['id'];
-    final type = widget.mediaItem['mediaType'] ?? 'movie';
-    
-    // REMOVE OLD ENTRY AND ADD NEW ONE TO TOP (WITH SEASON & EPISODE INFO)
-    continueWatchingList.removeWhere((m) => m['id'] == id);
+    continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
+    final type = widget.mediaItem['mediaType'] ?? 'movie';
     if (type == 'tv' || type == 'series') {
       currentMedia['savedSeason'] = season ?? 1;
       currentMedia['savedEpisode'] = episode ?? 1;
     }
     continueWatchingList.insert(0, currentMedia);
 
+    final id = widget.mediaItem['id'];
     String finalUrl = '';
 
     if (type == 'tv' || type == 'series') {
@@ -628,7 +620,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                       title: Text('${ep['episodeNumber']}. ${ep['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                       subtitle: Text(ep['overview'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                       
-                                      // HIGHLIGHT THE SAVED EPISODE
                                       tileColor: (selectedSeason == widget.mediaItem['savedSeason'] && ep['episodeNumber'] == widget.mediaItem['savedEpisode']) ? Colors.grey[850] : null,
                                       
                                       trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32), onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}', season: selectedSeason, episode: ep['episodeNumber'])),
