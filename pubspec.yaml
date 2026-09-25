@@ -12,6 +12,7 @@ dependencies:
   url_launcher: ^6.3.0
   http: ^1.2.2
   webview_flutter: ^4.7.0
+  webview_flutter_android: ^3.16.2  # <--- YEH NAYA ADD KIYA HAI AUDIO FIX KE LIYE
 
 dev_dependencies:
   flutter_test:

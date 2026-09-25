@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+// Audio fix (Mute bypass) ke liye Android WebView ka explicit import
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String videoUrl;
@@ -34,14 +36,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
-      // DEEP FIX FOR AUDIO: Autoplay ke sath audio mute nahi hoga!
-      ..setMediaPlaybackRequiresUserGesture(false) 
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
             if (mounted) setState(() => isLoading = false);
           },
-          // ERROR CHECKER COMPLETELY REMOVED - Ab VPN background blocks pe video band nahi hogi!
         ),
       )
       ..loadRequest(
@@ -50,11 +49,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           'Referer': 'https://hannutv.app/', 
         },
       );
+
+    // 1000% DEEP FIX FOR AUDIO AUTOPLAY (Android Policy Bypass)
+    // Ye code ensure karega ki bina touch kiye video aawaz (audio) ke sath chale
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
   }
 
   @override
   void dispose() {
-    // Back aane par wapas seedha (portrait) kar dega
+    // Back aane par phone wapas seedha ho jayega
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
@@ -65,9 +71,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      extendBodyBehindAppBar: true, // Video ko full screen karne ke liye
+      extendBodyBehindAppBar: true, 
       appBar: AppBar(
-        backgroundColor: Colors.transparent, // Transparent AppBar
+        backgroundColor: Colors.transparent, 
         elevation: 0,
         iconTheme: const IconThemeData(color: Colors.white, size: 30),
       ),
