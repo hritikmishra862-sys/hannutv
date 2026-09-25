@@ -28,7 +28,6 @@ class DashboardPageState extends State<DashboardPage> {
   bool isSearching = false;
   final TextEditingController searchController = TextEditingController();
   
-  // Auto-Slider Variables
   final PageController _pageController = PageController();
   Timer? _carouselTimer;
   int _currentPage = 0;
@@ -472,6 +471,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
+  // --- NAYA CINESRC API LOGIC ---
   void launchPlayer(String title, {int? season, int? episode}) {
     if (!continueWatchingList.any((m) => m['id'] == widget.mediaItem['id'])) {
       continueWatchingList.insert(0, widget.mediaItem);
@@ -484,9 +484,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     if (type == 'tv' || type == 'series') {
       final s = season ?? 1;
       final e = episode ?? 1;
-      finalUrl = 'https://nxsha.screenscape.me/embed?tmdb=$id&type=tv&s=$s&e=$e';
+      finalUrl = 'https://cinesrc.st/embed/tv/$id?s=$s&e=$e&autoplay=true&autoskip=true';
     } else {
-      finalUrl = 'https://nxsha.screenscape.me/embed?tmdb=$id&type=movie';
+      finalUrl = 'https://cinesrc.st/embed/movie/$id?autoplay=true&autoskip=true';
     }
 
     Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
