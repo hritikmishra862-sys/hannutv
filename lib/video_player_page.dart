@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:video_player/video_player.dart';
-import 'package:chewie/chewie.dart';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String videoUrl;
@@ -17,39 +16,23 @@ class VideoPlayerPage extends StatefulWidget {
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
-  late VideoPlayerController _videoPlayerController;
-  ChewieController? _chewieController;
+  late final WebViewController _controller;
+  bool isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    initializePlayer();
-  }
-
-  Future<void> initializePlayer() async {
-    _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-    await _videoPlayerController.initialize();
-    _chewieController = ChewieController(
-      videoPlayerController: _videoPlayerController,
-      autoPlay: true,
-      looping: false,
-      aspectRatio: _videoPlayerController.value.aspectRatio,
-      allowFullScreen: true,
-      materialProgressColors: ChewieProgressColors(
-        playedColor: Colors.red,
-        handleColor: Colors.red,
-        bufferedColor: Colors.redAccent,
-        backgroundColor: Colors.grey,
-      ),
-    );
-    if (mounted) setState(() {});
-  }
-
-  @override
-  void dispose() {
-    _videoPlayerController.dispose();
-    _chewieController?.dispose();
-    super.dispose();
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (String url) {
+            if (mounted) setState(() => isLoading = false);
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse(widget.videoUrl));
   }
 
   @override
@@ -60,49 +43,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         backgroundColor: Colors.black,
         title: Text(widget.movieTitle),
       ),
-      body: Stack(
-        children: [
-          Center(
-            child: _chewieController != null &&
-                    _chewieController!.videoPlayerController.value.isInitialized
-                ? Chewie(controller: _chewieController!)
-                : const CircularProgressIndicator(color: Colors.red),
-          ),
-          Positioned(
-            top: 16,
-            right: 16,
-            child: IgnorePointer(
-              child: Opacity(
-                opacity: 0.8,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.black54,
-                    borderRadius: BorderRadius.circular(6),
-                    border: Border.all(color: Colors.redAccent, width: 1),
-                  ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset(
-                        'assets/logo.png',
-                        height: 20,
-                        errorBuilder: (_, __, ___) => const Text(
-                          'HANNUTV',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
+      body: SafeArea(
+        child: Stack(
+          children: [
+            WebViewWidget(controller: _controller),
+            if (isLoading)
+              const Center(
+                child: CircularProgressIndicator(color: Colors.red),
               ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

@@ -1,16 +1,20 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'video_player_page.dart';
 
-// 👇 TERA API ACCESS TOKEN YAHAN SET HAI
+// TMDB API TOKEN
 const String kTmdbToken = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
 
 const Map<String, String> kApiHeaders = {
   'Authorization': 'Bearer $kTmdbToken',
   'accept': 'application/json',
 };
+
+// Global list for Continue Watching session
+List<Map> continueWatchingList = [];
 
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
@@ -23,6 +27,11 @@ class DashboardPageState extends State<DashboardPage> {
   bool isLoading = true;
   bool isSearching = false;
   final TextEditingController searchController = TextEditingController();
+  
+  // Auto-Slider Variables
+  final PageController _pageController = PageController();
+  Timer? _carouselTimer;
+  int _currentPage = 0;
 
   final List<Map<String, dynamic>> ottPlatforms = [
     {"name": "NETFLIX", "color": Colors.redAccent},
@@ -38,9 +47,33 @@ class DashboardPageState extends State<DashboardPage> {
   void initState() {
     super.initState();
     fetchTmdbData('');
+    _startCarousel();
   }
 
-  // DIRECT TMDB FETCH LOGIC
+  void _startCarousel() {
+    _carouselTimer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
+      if (_pageController.hasClients && movies.isNotEmpty) {
+        _currentPage++;
+        if (_currentPage >= (movies.length > 5 ? 5 : movies.length)) {
+          _currentPage = 0;
+        }
+        _pageController.animateToPage(
+          _currentPage,
+          duration: const Duration(milliseconds: 800),
+          curve: Curves.easeInOut,
+        );
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    _carouselTimer?.cancel();
+    _pageController.dispose();
+    searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> fetchTmdbData(String query) async {
     setState(() => isLoading = true);
     try {
@@ -74,14 +107,16 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _openTelegram() async {
-    final Uri url = Uri.parse('https://t.me/YOUR_TELEGRAM_USERNAME');
+    final Uri url = Uri.parse('https://t.me/HANNUTV');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       debugPrint('Telegram error');
     }
   }
 
   void openMediaDetails(Map media) {
-    Navigator.push(context, MaterialPageRoute(builder: (context) => MediaDetailScreen(mediaItem: media)));
+    Navigator.push(context, MaterialPageRoute(builder: (context) => MediaDetailScreen(mediaItem: media))).then((_) {
+      setState(() {}); 
+    });
   }
 
   @override
@@ -102,33 +137,31 @@ class DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: double.infinity,
-              color: Colors.green.withOpacity(0.2),
-              padding: const EdgeInsets.only(top: 40, bottom: 8, left: 16, right: 16),
-              child: const Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(Icons.verified, color: Colors.green, size: 18),
-                  SizedBox(width: 8),
-                  Text("App Updated to v1.0 (Latest)", style: TextStyle(color: Colors.green, fontWeight: FontWeight.bold)),
-                ],
-              ),
-            ),
             Stack(
               children: [
-                Container(
+                SizedBox(
                   height: 400,
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: NetworkImage(
-                        movies.isNotEmpty && movies[0]['backdropUrl'] != ''
-                            ? movies[0]['backdropUrl']
-                            : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600',
-                      ),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
+                  child: movies.isEmpty
+                      ? Container(color: Colors.black)
+                      : PageView.builder(
+                          controller: _pageController,
+                          itemCount: movies.length > 5 ? 5 : movies.length,
+                          onPageChanged: (index) => _currentPage = index,
+                          itemBuilder: (context, index) {
+                            return Container(
+                              decoration: BoxDecoration(
+                                image: DecorationImage(
+                                  image: NetworkImage(
+                                    movies[index]['backdropUrl'] != ''
+                                        ? movies[index]['backdropUrl']
+                                        : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600',
+                                  ),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
                 ),
                 Container(
                   height: 400,
@@ -183,14 +216,14 @@ class DashboardPageState extends State<DashboardPage> {
                     ),
                   ),
                 ),
-                if (movies.isNotEmpty)
+                if (movies.isNotEmpty && !isSearching)
                   Positioned(
                     bottom: 20, left: 16, right: 16,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          movies[0]['title'] ?? 'Title',
+                          movies[_currentPage]['title'] ?? 'Title',
                           style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
                           maxLines: 2, overflow: TextOverflow.ellipsis,
                         ),
@@ -199,7 +232,7 @@ class DashboardPageState extends State<DashboardPage> {
                           children: [
                             const Icon(Icons.star, color: Colors.amber, size: 18),
                             const SizedBox(width: 6),
-                            Text('${movies[0]['rating']}  •  ${movies[0]['year']}  •  ${(movies[0]['mediaType']).toString().toUpperCase()}', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                            Text('${movies[_currentPage]['rating']}  •  ${movies[_currentPage]['year']}  •  ${(movies[_currentPage]['mediaType']).toString().toUpperCase()}', style: const TextStyle(color: Colors.white, fontSize: 14)),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -208,15 +241,59 @@ class DashboardPageState extends State<DashboardPage> {
                             backgroundColor: Colors.white, foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
                           ),
-                          onPressed: () => openMediaDetails(movies[0]),
-                          icon: const Icon(Icons.info_outline, size: 24),
-                          label: const Text('View Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          onPressed: () => openMediaDetails(movies[_currentPage]),
+                          icon: const Icon(Icons.play_arrow, size: 24),
+                          label: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       ],
                     ),
                   )
               ],
             ),
+            
+            if (continueWatchingList.isNotEmpty && !isSearching) ...[
+              const Padding(
+                padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
+                child: Text('Continue Watching', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              ),
+              SizedBox(
+                height: 160,
+                child: ListView.builder(
+                  scrollDirection: Axis.horizontal,
+                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                  itemCount: continueWatchingList.length,
+                  itemBuilder: (context, index) {
+                    final media = continueWatchingList[index];
+                    return GestureDetector(
+                      onTap: () => openMediaDetails(media),
+                      child: Container(
+                        width: 110,
+                        margin: const EdgeInsets.symmetric(horizontal: 4),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Container(
+                              height: 130,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(8),
+                                image: DecorationImage(
+                                  image: NetworkImage(media['posterUrl'] != '' ? media['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
+                                  fit: BoxFit.cover,
+                                ),
+                              ),
+                              child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 40)),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+            ],
+
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
               child: Text('Watch on OTT', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -236,9 +313,7 @@ class DashboardPageState extends State<DashboardPage> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         side: BorderSide(color: ottPlatforms[index]['color'], width: 1.5),
                       ),
-                      onPressed: () {
-                        fetchTmdbData(ottPlatforms[index]['name']);
-                      },
+                      onPressed: () => fetchTmdbData(ottPlatforms[index]['name']),
                       child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   );
@@ -324,7 +399,6 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// ── DETAILS SCREEN WITH DOWNLOAD & SEASONS/EPISODES ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -398,9 +472,25 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  void launchPlayer(String title) {
+  void launchPlayer(String title, {int? season, int? episode}) {
+    if (!continueWatchingList.any((m) => m['id'] == widget.mediaItem['id'])) {
+      continueWatchingList.insert(0, widget.mediaItem);
+    }
+    
+    final id = widget.mediaItem['id'];
+    final type = widget.mediaItem['mediaType'] ?? 'movie';
+    String finalUrl = '';
+
+    if (type == 'tv' || type == 'series') {
+      final s = season ?? 1;
+      final e = episode ?? 1;
+      finalUrl = 'https://nxsha.screenscape.me/embed?tmdb=$id&type=tv&s=$s&e=$e';
+    } else {
+      finalUrl = 'https://nxsha.screenscape.me/embed?tmdb=$id&type=movie';
+    }
+
     Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
-      videoUrl: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_10MB.mp4',
+      videoUrl: finalUrl,
       movieTitle: title,
     )));
   }
@@ -507,7 +597,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                       ),
                                       title: Text('${ep['episodeNumber']}. ${ep['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                       subtitle: Text(ep['overview'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                      trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32), onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}')),
+                                      trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32), onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}', season: selectedSeason, episode: ep['episodeNumber'])),
                                     );
                                   },
                                 ),
@@ -517,7 +607,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   ),
                 ],
               ),
-            ),
-    );
-  }
-}
+            );
+          }
+        }
