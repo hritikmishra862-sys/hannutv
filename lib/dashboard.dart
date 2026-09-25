@@ -12,6 +12,7 @@ const Map<String, String> kApiHeaders = {
   'accept': 'application/json',
 };
 
+// GLOBAL LIST FOR CONTINUE WATCHING
 List<Map> continueWatchingList = [];
 
 class DashboardPage extends StatefulWidget {
@@ -26,7 +27,7 @@ class DashboardPageState extends State<DashboardPage> {
   bool isSearching = false;
   final TextEditingController searchController = TextEditingController();
   
-  // LIVE SEARCH KE LIYE DEBOUNCE TIMER
+  // LIVE SEARCH DEBOUNCER
   Timer? _debounce;
   
   final PageController _pageController = PageController();
@@ -107,6 +108,14 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  void onSearchChanged(String value) {
+    if (_debounce?.isActive ?? false) _debounce!.cancel();
+    // 300ms SUPERFAST DEBOUNCE - Type karte hi list update hogi
+    _debounce = Timer(const Duration(milliseconds: 300), () {
+      fetchTmdbData(value);
+    });
+  }
+
   Future<void> _openTelegram() async {
     final Uri url = Uri.parse('https://t.me/HANNUTV');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
@@ -116,6 +125,7 @@ class DashboardPageState extends State<DashboardPage> {
 
   void openMediaDetails(Map media) {
     Navigator.push(context, MaterialPageRoute(builder: (context) => MediaDetailScreen(mediaItem: media))).then((_) {
+      // BACK AANE PAR DASHBOARD UPDATE HOGA TAAKI CONTINUE WATCHING DIKHE
       setState(() {}); 
     });
   }
@@ -199,13 +209,7 @@ class DashboardPageState extends State<DashboardPage> {
                                       },
                                     ),
                                   ),
-                                  // LIVE SEARCH LOGIC WITH DEBOUNCE
-                                  onChanged: (value) {
-                                    if (_debounce?.isActive ?? false) _debounce!.cancel();
-                                    _debounce = Timer(const Duration(milliseconds: 500), () {
-                                      fetchTmdbData(value);
-                                    });
-                                  },
+                                  onChanged: onSearchChanged, // LIVE SEARCH ENABLED
                                 ),
                               )
                             : Expanded(
@@ -258,14 +262,14 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            // CONTINUE WATCHING SHOW HOGA YAHAN
+            // CONTINUE WATCHING SECTION
             if (continueWatchingList.isNotEmpty && !isSearching) ...[
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
                 child: Text('Continue Watching', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               ),
               SizedBox(
-                height: 160,
+                height: 170, // Height thodi badhai taaki S2E4 text aa sake
                 child: ListView.builder(
                   scrollDirection: Axis.horizontal,
                   padding: const EdgeInsets.symmetric(horizontal: 12),
@@ -293,6 +297,10 @@ class DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                            
+                            // SHOW SAVED SEASON AND EPISODE ON DASHBOARD
+                            if (media['savedSeason'] != null)
+                              Text('S${media['savedSeason']} E${media['savedEpisode']}', style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -321,7 +329,10 @@ class DashboardPageState extends State<DashboardPage> {
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
                         side: BorderSide(color: ottPlatforms[index]['color'], width: 1.5),
                       ),
-                      onPressed: () => fetchTmdbData(ottPlatforms[index]['name']),
+                      onPressed: () {
+                        searchController.clear();
+                        fetchTmdbData(ottPlatforms[index]['name']);
+                      },
                       child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   );
@@ -345,7 +356,10 @@ class DashboardPageState extends State<DashboardPage> {
                       backgroundColor: Colors.grey[850],
                       labelStyle: const TextStyle(color: Colors.white),
                       label: Text(categories[index]),
-                      onPressed: () => fetchTmdbData(categories[index]),
+                      onPressed: () {
+                        searchController.clear();
+                        fetchTmdbData(categories[index]);
+                      },
                     ),
                   );
                 },
@@ -407,6 +421,7 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
+// ── DETAILS SCREEN ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -445,7 +460,8 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           };
           isLoadingDetails = false;
           if ((mediaType == 'tv') && details!['seasons'] != null && (details!['seasons'] as List).isNotEmpty) {
-            selectedSeason = details!['seasons'][0]['seasonNumber'];
+            // DEEP FIX: Resume from exactly where user left off
+            selectedSeason = widget.mediaItem['savedSeason'] ?? details!['seasons'][0]['seasonNumber'];
             if (selectedSeason != null) fetchEpisodes(selectedSeason!);
           }
         });
@@ -481,23 +497,26 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   }
 
   void launchPlayer(String title, {int? season, int? episode}) {
-    // Ye line search se click ki hui movie ko bhi Dashboard pe bhej degi
-    if (!continueWatchingList.any((m) => m['id'] == widget.mediaItem['id'])) {
-      continueWatchingList.insert(0, widget.mediaItem);
-    }
-    
     final id = widget.mediaItem['id'];
     final type = widget.mediaItem['mediaType'] ?? 'movie';
     
-    // YAHAN autoPlay=false KAR DIYA HAI (Audio Aayega aur Touch Reconnect Fix Hoga)
+    // REMOVE OLD ENTRY AND ADD NEW ONE TO TOP (WITH SEASON & EPISODE INFO)
+    continueWatchingList.removeWhere((m) => m['id'] == id);
+    Map currentMedia = Map.from(widget.mediaItem);
+    if (type == 'tv' || type == 'series') {
+      currentMedia['savedSeason'] = season ?? 1;
+      currentMedia['savedEpisode'] = episode ?? 1;
+    }
+    continueWatchingList.insert(0, currentMedia);
+
     String finalUrl = '';
 
     if (type == 'tv' || type == 'series') {
       final s = season ?? 1;
       final e = episode ?? 1;
-      finalUrl = 'https://stellar.rip/hi/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=false&nextButton=true&autoNext=true';
+      finalUrl = 'https://stellar.rip/hi/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true&nextButton=true&autoNext=true';
     } else {
-      finalUrl = 'https://stellar.rip/hi/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=false';
+      finalUrl = 'https://stellar.rip/hi/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
     }
 
     Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
@@ -608,6 +627,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                       ),
                                       title: Text('${ep['episodeNumber']}. ${ep['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                       subtitle: Text(ep['overview'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      
+                                      // HIGHLIGHT THE SAVED EPISODE
+                                      tileColor: (selectedSeason == widget.mediaItem['savedSeason'] && ep['episodeNumber'] == widget.mediaItem['savedEpisode']) ? Colors.grey[850] : null,
+                                      
                                       trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32), onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}', season: selectedSeason, episode: ep['episodeNumber'])),
                                     );
                                   },

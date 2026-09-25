@@ -24,7 +24,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void initState() {
     super.initState();
     
-    // Screen Rotation Allow
+    // SCREEN ROTATION ALLOW
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
       DeviceOrientation.landscapeLeft,
@@ -34,12 +34,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
+      // DEEP FIX FOR AUDIO: Autoplay ke sath audio mute nahi hoga!
+      ..setMediaPlaybackRequiresUserGesture(false) 
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
             if (mounted) setState(() => isLoading = false);
           },
-          // Yahan se Error Checker HATA DIYA HAI taaki 10-second baad video band na ho
+          // ERROR CHECKER COMPLETELY REMOVED - Ab VPN background blocks pe video band nahi hogi!
         ),
       )
       ..loadRequest(
@@ -52,6 +54,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   @override
   void dispose() {
+    // Back aane par wapas seedha (portrait) kar dega
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
@@ -62,23 +65,21 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      extendBodyBehindAppBar: true, // Video ko full screen karne ke liye
       appBar: AppBar(
-        backgroundColor: Colors.black,
-        title: Text(widget.movieTitle),
-        iconTheme: const IconThemeData(color: Colors.white),
-        titleTextStyle: const TextStyle(color: Colors.white, fontSize: 18),
+        backgroundColor: Colors.transparent, // Transparent AppBar
+        elevation: 0,
+        iconTheme: const IconThemeData(color: Colors.white, size: 30),
       ),
-      body: SafeArea(
-        child: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            
-            if (isLoading)
-              const Center(
-                child: CircularProgressIndicator(color: Colors.red),
-              ),
-          ],
-        ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _controller),
+          
+          if (isLoading)
+            const Center(
+              child: CircularProgressIndicator(color: Colors.red),
+            ),
+        ],
       ),
     );
   }
