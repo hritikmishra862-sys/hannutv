@@ -26,6 +26,9 @@ class DashboardPageState extends State<DashboardPage> {
   bool isSearching = false;
   final TextEditingController searchController = TextEditingController();
   
+  // LIVE SEARCH KE LIYE DEBOUNCE TIMER
+  Timer? _debounce;
+  
   final PageController _pageController = PageController();
   Timer? _carouselTimer;
   int _currentPage = 0;
@@ -68,6 +71,7 @@ class DashboardPageState extends State<DashboardPage> {
     _carouselTimer?.cancel();
     _pageController.dispose();
     searchController.dispose();
+    _debounce?.cancel();
     super.dispose();
   }
 
@@ -195,7 +199,13 @@ class DashboardPageState extends State<DashboardPage> {
                                       },
                                     ),
                                   ),
-                                  onSubmitted: (value) => fetchTmdbData(value),
+                                  // LIVE SEARCH LOGIC WITH DEBOUNCE
+                                  onChanged: (value) {
+                                    if (_debounce?.isActive ?? false) _debounce!.cancel();
+                                    _debounce = Timer(const Duration(milliseconds: 500), () {
+                                      fetchTmdbData(value);
+                                    });
+                                  },
                                 ),
                               )
                             : Expanded(
@@ -248,6 +258,7 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
+            // CONTINUE WATCHING SHOW HOGA YAHAN
             if (continueWatchingList.isNotEmpty && !isSearching) ...[
               const Padding(
                 padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
@@ -469,8 +480,8 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // --- STELLAR API LOGIC ---
   void launchPlayer(String title, {int? season, int? episode}) {
+    // Ye line search se click ki hui movie ko bhi Dashboard pe bhej degi
     if (!continueWatchingList.any((m) => m['id'] == widget.mediaItem['id'])) {
       continueWatchingList.insert(0, widget.mediaItem);
     }
@@ -478,15 +489,15 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     final id = widget.mediaItem['id'];
     final type = widget.mediaItem['mediaType'] ?? 'movie';
     
-    // Stellar Player Options: Theme = Red(E50914), autoPlay = true, language = hi
+    // YAHAN autoPlay=false KAR DIYA HAI (Audio Aayega aur Touch Reconnect Fix Hoga)
     String finalUrl = '';
 
     if (type == 'tv' || type == 'series') {
       final s = season ?? 1;
       final e = episode ?? 1;
-      finalUrl = 'https://stellar.rip/hi/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true&nextButton=true&autoNext=true';
+      finalUrl = 'https://stellar.rip/hi/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=false&nextButton=true&autoNext=true';
     } else {
-      finalUrl = 'https://stellar.rip/hi/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
+      finalUrl = 'https://stellar.rip/hi/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=false';
     }
 
     Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
