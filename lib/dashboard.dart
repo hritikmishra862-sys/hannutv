@@ -4,6 +4,14 @@ import 'dart:convert';
 import 'package:url_launcher/url_launcher.dart';
 import 'video_player_page.dart';
 
+// 👇 TERA API ACCESS TOKEN YAHAN SET HAI
+const String kTmdbToken = 'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
+
+const Map<String, String> kApiHeaders = {
+  'Authorization': 'Bearer $kTmdbToken',
+  'accept': 'application/json',
+};
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
   @override
@@ -14,7 +22,7 @@ class DashboardPageState extends State<DashboardPage> {
   List movies = [];
   bool isLoading = true;
   bool isSearching = false;
-  TextEditingController searchController = TextEditingController();
+  final TextEditingController searchController = TextEditingController();
 
   final List<Map<String, dynamic>> ottPlatforms = [
     {"name": "NETFLIX", "color": Colors.redAccent},
@@ -32,33 +40,43 @@ class DashboardPageState extends State<DashboardPage> {
     fetchTmdbData('');
   }
 
+  // DIRECT TMDB FETCH LOGIC
   Future<void> fetchTmdbData(String query) async {
-    setState(() { isLoading = true; });
+    setState(() => isLoading = true);
     try {
-      final String url = query.isEmpty 
-          ? 'http://localhost:3000/api/trending' 
-          : 'http://localhost:3000/api/search?q=${Uri.encodeComponent(query)}';
-          
-      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
+      final String url = query.isEmpty
+          ? 'https://api.themoviedb.org/3/trending/all/day?language=en-US'
+          : 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(query)}&language=en-US';
+
+      final response = await http.get(Uri.parse(url), headers: kApiHeaders);
       if (response.statusCode == 200) {
-        final responseData = json.decode(response.body);
+        final List rawData = json.decode(response.body)['results'] ?? [];
+        
         setState(() {
-          movies = responseData['data'] ?? [];
+          movies = rawData.where((m) => m['media_type'] != 'person').map((m) => {
+            'id': m['id'],
+            'title': m['title'] ?? m['name'] ?? 'Unknown',
+            'overview': m['overview'] ?? '',
+            'posterUrl': m['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}' : '',
+            'backdropUrl': m['backdrop_path'] != null ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}' : '',
+            'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
+            'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
+            'mediaType': m['media_type'] ?? 'movie',
+          }).toList();
           isLoading = false;
         });
       } else {
-        setState(() { isLoading = false; });
+        setState(() => isLoading = false);
       }
     } catch (e) {
-      debugPrint("API Error: $e");
-      setState(() { isLoading = false; });
+      setState(() => isLoading = false);
     }
   }
 
   Future<void> _openTelegram() async {
-    final Uri url = Uri.parse('https://t.me/YOUR_USERNAME'); 
+    final Uri url = Uri.parse('https://t.me/YOUR_TELEGRAM_USERNAME');
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      debugPrint('Could not open Telegram');
+      debugPrint('Telegram error');
     }
   }
 
@@ -104,9 +122,9 @@ class DashboardPageState extends State<DashboardPage> {
                   decoration: BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
-                        movies.isNotEmpty && movies[0]['backdropUrl'] != null && movies[0]['backdropUrl'] != '' 
-                            ? movies[0]['backdropUrl'] 
-                            : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600'
+                        movies.isNotEmpty && movies[0]['backdropUrl'] != ''
+                            ? movies[0]['backdropUrl']
+                            : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600',
                       ),
                       fit: BoxFit.cover,
                     ),
@@ -127,38 +145,38 @@ class DashboardPageState extends State<DashboardPage> {
                     padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: Row(
                       children: [
-                        isSearching 
-                        ? Expanded(
-                            child: TextField(
-                              controller: searchController,
-                              style: const TextStyle(color: Colors.white),
-                              autofocus: true,
-                              decoration: InputDecoration(
-                                hintText: 'Search Movies, Series...',
-                                border: InputBorder.none,
-                                suffixIcon: IconButton(
-                                  icon: const Icon(Icons.close, color: Colors.white),
-                                  onPressed: () {
-                                    setState(() {
-                                      isSearching = false;
-                                      searchController.clear();
-                                      fetchTmdbData('');
-                                    });
-                                  },
+                        isSearching
+                            ? Expanded(
+                                child: TextField(
+                                  controller: searchController,
+                                  style: const TextStyle(color: Colors.white),
+                                  autofocus: true,
+                                  decoration: InputDecoration(
+                                    hintText: 'Search Movies, Series...',
+                                    border: InputBorder.none,
+                                    suffixIcon: IconButton(
+                                      icon: const Icon(Icons.close, color: Colors.white),
+                                      onPressed: () {
+                                        setState(() {
+                                          isSearching = false;
+                                          searchController.clear();
+                                          fetchTmdbData('');
+                                        });
+                                      },
+                                    ),
+                                  ),
+                                  onSubmitted: (value) => fetchTmdbData(value),
+                                ),
+                              )
+                            : Expanded(
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Image.asset('assets/logo.png', height: 35),
                                 ),
                               ),
-                              onSubmitted: (value) => fetchTmdbData(value),
-                            ),
-                          )
-                        : Expanded(
-                            child: Align(
-                              alignment: Alignment.centerLeft,
-                              child: Image.asset('assets/logo.png', height: 35),
-                            ),
-                          ),
                         if (!isSearching)
                           IconButton(
-                            icon: const Icon(Icons.search, color: Colors.white, size: 28), 
+                            icon: const Icon(Icons.search, color: Colors.white, size: 28),
                             onPressed: () => setState(() => isSearching = true),
                           ),
                       ],
@@ -172,8 +190,8 @@ class DashboardPageState extends State<DashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          movies[0]['title'] ?? 'Title', 
-                          style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold),
+                          movies[0]['title'] ?? 'Title',
+                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
                           maxLines: 2, overflow: TextOverflow.ellipsis,
                         ),
                         const SizedBox(height: 8),
@@ -181,17 +199,17 @@ class DashboardPageState extends State<DashboardPage> {
                           children: [
                             const Icon(Icons.star, color: Colors.amber, size: 18),
                             const SizedBox(width: 6),
-                            Text('${movies[0]['rating'] ?? ''}  •  ${movies[0]['year'] ?? ''}  •  ${(movies[0]['type'] ?? '').toString().toUpperCase()}', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                            Text('${movies[0]['rating']}  •  ${movies[0]['year']}  •  ${(movies[0]['mediaType']).toString().toUpperCase()}', style: const TextStyle(color: Colors.white, fontSize: 14)),
                           ],
                         ),
                         const SizedBox(height: 16),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white, foregroundColor: Colors.black, 
+                            backgroundColor: Colors.white, foregroundColor: Colors.black,
                             padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
                           ),
                           onPressed: () => openMediaDetails(movies[0]),
-                          icon: const Icon(Icons.play_arrow, size: 28),
+                          icon: const Icon(Icons.info_outline, size: 24),
                           label: const Text('View Details', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       ],
@@ -219,7 +237,7 @@ class DashboardPageState extends State<DashboardPage> {
                         side: BorderSide(color: ottPlatforms[index]['color'], width: 1.5),
                       ),
                       onPressed: () {
-                        ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('Opening ${ottPlatforms[index]['name']} Catalog...')));
+                        fetchTmdbData(ottPlatforms[index]['name']);
                       },
                       child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
@@ -253,14 +271,12 @@ class DashboardPageState extends State<DashboardPage> {
             Padding(
               padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 10.0),
               child: Text(
-                searchController.text.isEmpty ? 'Trending Now' : 'Search Results', 
-                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)
+                searchController.text.isEmpty ? 'Trending Now' : 'Search Results',
+                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
               ),
             ),
-            isLoading 
-              ? const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
-              : movies.isEmpty 
-                ? const Center(child: Padding(padding: EdgeInsets.all(20.0), child: Text("No Data Found / Server Offline", style: TextStyle(color: Colors.grey))))
+            isLoading
+                ? const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
                 : GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
@@ -281,7 +297,9 @@ class DashboardPageState extends State<DashboardPage> {
                                 decoration: BoxDecoration(
                                   borderRadius: BorderRadius.circular(8),
                                   image: DecorationImage(
-                                    image: NetworkImage(movie['posterUrl'] != null && movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888?text=NO+POSTER'),
+                                    image: NetworkImage(
+                                      movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888?text=NO+POSTER',
+                                    ),
                                     fit: BoxFit.cover,
                                   ),
                                 ),
@@ -306,6 +324,7 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
+// ── DETAILS SCREEN WITH DOWNLOAD & SEASONS/EPISODES ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -328,85 +347,80 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   }
 
   Future<void> fetchDetails() async {
-    final mediaType = widget.mediaItem['mediaType'];
+    final mediaType = widget.mediaItem['mediaType'] ?? 'movie';
     final id = widget.mediaItem['id'];
-    
+
     try {
-      final response = await http.get(Uri.parse('http://localhost:3000/api/details/$mediaType/$id'));
+      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/$mediaType/$id?language=en-US'), headers: kApiHeaders);
       if (response.statusCode == 200) {
-        final data = json.decode(response.body)['data'];
+        final data = json.decode(response.body);
         setState(() {
-          details = data;
+          details = {
+            'title': data['title'] ?? data['name'] ?? '',
+            'overview': data['overview'] ?? '',
+            'backdropUrl': data['backdrop_path'] != null ? 'https://image.tmdb.org/t/p/original${data['backdrop_path']}' : '',
+            'seasons': data['seasons'] != null ? (data['seasons'] as List).map((s) => {'seasonNumber': s['season_number'], 'episodeCount': s['episode_count']}).toList() : [],
+          };
           isLoadingDetails = false;
-          if (mediaType == 'tv' && data['seasons'] != null && data['seasons'].isNotEmpty) {
-            selectedSeason = data['seasons'][0]['seasonNumber'];
-            fetchEpisodes(selectedSeason!);
+          if ((mediaType == 'tv') && details!['seasons'] != null && (details!['seasons'] as List).isNotEmpty) {
+            selectedSeason = details!['seasons'][0]['seasonNumber'];
+            if (selectedSeason != null) fetchEpisodes(selectedSeason!);
           }
         });
+      } else {
+        setState(() => isLoadingDetails = false);
       }
     } catch (e) {
-      setState(() { isLoadingDetails = false; });
+      setState(() => isLoadingDetails = false);
     }
   }
 
   Future<void> fetchEpisodes(int seasonNumber) async {
     setState(() { isLoadingEpisodes = true; selectedSeason = seasonNumber; });
     try {
-      final response = await http.get(Uri.parse('http://localhost:3000/api/season/${widget.mediaItem['id']}/$seasonNumber'));
+      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.mediaItem['id']}/season/$seasonNumber?language=en-US'), headers: kApiHeaders);
       if (response.statusCode == 200) {
+        final data = json.decode(response.body);
         setState(() {
-          episodes = json.decode(response.body)['data'] ?? [];
+          episodes = (data['episodes'] as List? ?? []).map((ep) => {
+            'episodeNumber': ep['episode_number'],
+            'name': ep['name'],
+            'overview': ep['overview'],
+            'stillUrl': ep['still_path'] != null ? 'https://image.tmdb.org/t/p/w500${ep['still_path']}' : '',
+          }).toList();
           isLoadingEpisodes = false;
         });
+      } else {
+        setState(() => isLoadingEpisodes = false);
       }
     } catch (e) {
-      setState(() { isLoadingEpisodes = false; });
+      setState(() => isLoadingEpisodes = false);
     }
   }
 
   void launchPlayer(String title) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => VideoPlayerPage(
-          videoUrl: 'http://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4',
-          movieTitle: title,
-        ),
-      ),
-    );
+    Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
+      videoUrl: 'https://test-videos.co.uk/vids/bigbuckbunny/mp4/h264/720/Big_Buck_Bunny_720_10s_10MB.mp4',
+      movieTitle: title,
+    )));
   }
 
-  void _showDownloadPopup(BuildContext context) {
+  void _showDownloadPopup(BuildContext context, String contentTitle) {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
         return Container(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 15),
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Select Download Quality", 
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              ListTile(
-                leading: const Icon(Icons.download, color: Colors.red),
-                title: const Text("1080p (Full HD)", style: TextStyle(color: Colors.white)),
-                onTap: () {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text("Downloading in 1080p...")));
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.download, color: Colors.white70),
-                title: const Text("720p (HD)", style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.download, color: Colors.white70),
-                title: const Text("480p (SD)", style: TextStyle(color: Colors.white)),
-                onTap: () => Navigator.pop(context),
-              ),
+              Text("Download: $contentTitle", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+              const SizedBox(height: 16),
+              ListTile(leading: const Icon(Icons.download, color: Colors.red), title: const Text("1080p (Full HD)"), onTap: () => Navigator.pop(context)),
+              ListTile(leading: const Icon(Icons.download, color: Colors.white70), title: const Text("720p (HD)"), onTap: () => Navigator.pop(context)),
+              ListTile(leading: const Icon(Icons.download, color: Colors.white70), title: const Text("480p (SD)"), onTap: () => Navigator.pop(context)),
             ],
           ),
         );
@@ -416,132 +430,94 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final mediaType = widget.mediaItem['mediaType'];
+    final mediaType = widget.mediaItem['mediaType'] ?? 'movie';
 
     return Scaffold(
       appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
       extendBodyBehindAppBar: true,
-      body: isLoadingDetails 
-        ? const Center(child: CircularProgressIndicator(color: Colors.red))
-        : SingleChildScrollView(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Container(
-                  height: 300,
-                  decoration: BoxDecoration(
-                    image: DecorationImage(
-                      image: NetworkImage(details != null && details!['backdropUrl'] != '' ? details!['backdropUrl'] : (widget.mediaItem['backdropUrl'] ?? 'https://via.placeholder.com/600x400/222/888')),
-                      fit: BoxFit.cover,
-                    ),
-                  ),
-                  child: Container(
+      body: isLoadingDetails
+          ? const Center(child: CircularProgressIndicator(color: Colors.red))
+          : SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    height: 300,
                     decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.bottomCenter, end: Alignment.topCenter,
-                        colors: [const Color(0xFF0F0F0F), Colors.transparent],
+                      image: DecorationImage(
+                        image: NetworkImage(details != null && details!['backdropUrl'] != '' ? details!['backdropUrl'] : (widget.mediaItem['backdropUrl'] ?? '')),
+                        fit: BoxFit.cover,
+                      ),
+                    ),
+                    child: Container(
+                      decoration: const BoxDecoration(
+                        gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF0F0F0F), Colors.transparent]),
                       ),
                     ),
                   ),
-                ),
-                Padding(
-                  padding: const EdgeInsets.all(16.0),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(details!['title'] ?? '', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 8),
-                      Text(details!['overview'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                      const SizedBox(height: 20),
-                      
-                      if (mediaType == 'movie') ...[
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(vertical: 14)),
-                                onPressed: () => launchPlayer(details!['title']),
-                                icon: const Icon(Icons.play_arrow, color: Colors.white),
-                                label: const Text('Play', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                            const SizedBox(width: 10),
-                            Expanded(
-                              child: ElevatedButton.icon(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], padding: const EdgeInsets.symmetric(vertical: 14)),
-                                onPressed: () => _showDownloadPopup(context),
-                                icon: const Icon(Icons.download, color: Colors.white),
-                                label: const Text('Download', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ] else if (mediaType == 'tv' && details!['seasons'] != null) ...[
-                        Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(8)),
-                          child: DropdownButton<int>(
-                            value: selectedSeason,
-                            isExpanded: true,
-                            underline: const SizedBox(),
-                            dropdownColor: Colors.grey[900],
-                            items: (details!['seasons'] as List).map<DropdownMenuItem<int>>((season) {
-                              return DropdownMenuItem<int>(
-                                value: season['seasonNumber'],
-                                child: Text('Season ${season['seasonNumber']}  (${season['episodeCount']} Episodes)', style: const TextStyle(color: Colors.white)),
-                              );
-                            }).toList(),
-                            onChanged: (int? newValue) {
-                              if (newValue != null) fetchEpisodes(newValue);
-                            },
-                          ),
-                        ),
+                  Padding(
+                    padding: const EdgeInsets.all(16.0),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(details?['title'] ?? widget.mediaItem['title'] ?? '', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 8),
+                        Text(details?['overview'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 14, height: 1.4)),
                         const SizedBox(height: 20),
-                        const Text('Episodes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
                         
-                        isLoadingEpisodes 
-                          ? const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)))
-                          : ListView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              itemCount: episodes.length,
-                              itemBuilder: (context, index) {
-                                final ep = episodes[index];
-                                return ListTile(
-                                  contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                                  leading: ClipRRect(
-                                    borderRadius: BorderRadius.circular(4),
-                                    child: Image.network(
-                                      ep['stillUrl'] != null && ep['stillUrl'] != '' ? ep['stillUrl'] : 'https://via.placeholder.com/150x84/222222/888888?text=EP',
-                                      width: 120, height: 80, fit: BoxFit.cover,
-                                    ),
-                                  ),
-                                  title: Text('${ep['episodeNumber']}. ${ep['name']}', style: const TextStyle(fontWeight: FontWeight.bold)),
-                                  subtitle: Text(ep['overview'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                  trailing: Row(
-                                    mainAxisSize: MainAxisSize.min,
-                                    children: [
-                                      IconButton(
-                                        icon: const Icon(Icons.download, color: Colors.grey, size: 28),
-                                        onPressed: () => _showDownloadPopup(context),
+                        if (mediaType == 'movie') ...[
+                          Row(
+                            children: [
+                              Expanded(child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(vertical: 14)), onPressed: () => launchPlayer(details?['title'] ?? 'Movie'), icon: const Icon(Icons.play_arrow, color: Colors.white), label: const Text('Play Movie', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)))),
+                              const SizedBox(width: 10),
+                              Expanded(child: ElevatedButton.icon(style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], padding: const EdgeInsets.symmetric(vertical: 14)), onPressed: () => _showDownloadPopup(context, details?['title'] ?? 'Movie'), icon: const Icon(Icons.download, color: Colors.white), label: const Text('Download', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)))),
+                            ],
+                          ),
+                        ] else if (mediaType == 'tv' && details?['seasons'] != null && (details!['seasons'] as List).isNotEmpty) ...[
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16),
+                            decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(8)),
+                            child: DropdownButton<int>(
+                              value: selectedSeason,
+                              isExpanded: true,
+                              underline: const SizedBox(),
+                              dropdownColor: Colors.grey[900],
+                              items: (details!['seasons'] as List).map<DropdownMenuItem<int>>((season) {
+                                return DropdownMenuItem<int>(value: season['seasonNumber'], child: Text('Season ${season['seasonNumber']}  (${season['episodeCount']} Episodes)', style: const TextStyle(color: Colors.white)));
+                              }).toList(),
+                              onChanged: (int? newValue) { if (newValue != null) fetchEpisodes(newValue); },
+                            ),
+                          ),
+                          const SizedBox(height: 20),
+                          const Text('Episodes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          isLoadingEpisodes
+                              ? const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)))
+                              : ListView.builder(
+                                  shrinkWrap: true,
+                                  physics: const NeverScrollableScrollPhysics(),
+                                  itemCount: episodes.length,
+                                  itemBuilder: (context, index) {
+                                    final ep = episodes[index];
+                                    return ListTile(
+                                      contentPadding: const EdgeInsets.symmetric(vertical: 8),
+                                      leading: ClipRRect(
+                                        borderRadius: BorderRadius.circular(4),
+                                        child: Image.network(ep['stillUrl'] != '' ? ep['stillUrl'] : 'https://via.placeholder.com/300x168/222222/888888?text=EP', width: 110, height: 70, fit: BoxFit.cover),
                                       ),
-                                      IconButton(
-                                        icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 36),
-                                        onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}'),
-                                      ),
-                                    ],
-                                  ),
-                                );
-                              },
-                            )
-                      ]
-                    ],
+                                      title: Text('${ep['episodeNumber']}. ${ep['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                      subtitle: Text(ep['overview'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
+                                      trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32), onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}')),
+                                    );
+                                  },
+                                ),
+                        ],
+                      ],
+                    ),
                   ),
-                )
-              ],
+                ],
+              ),
             ),
-          ),
     );
   }
 }

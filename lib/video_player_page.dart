@@ -6,16 +6,19 @@ class VideoPlayerPage extends StatefulWidget {
   final String videoUrl;
   final String movieTitle;
 
-  const VideoPlayerPage({Key? key, required this.videoUrl, required this.movieTitle}) : super(key: key);
+  const VideoPlayerPage({
+    Key? key,
+    required this.videoUrl,
+    required this.movieTitle,
+  }) : super(key: key);
 
   @override
-  _VideoPlayerPageState createState() => _VideoPlayerPageState();
+  State<VideoPlayerPage> createState() => _VideoPlayerPageState();
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late VideoPlayerController _videoPlayerController;
   ChewieController? _chewieController;
-  bool _hasError = false;
 
   @override
   void initState() {
@@ -24,27 +27,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   Future<void> initializePlayer() async {
-    try {
-      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
-      await _videoPlayerController.initialize();
-      
-      _chewieController = ChewieController(
-        videoPlayerController: _videoPlayerController,
-        autoPlay: true,
-        looping: false,
-        aspectRatio: 16 / 9,
-        allowFullScreen: true,
-        materialProgressColors: ChewieProgressColors(
-          playedColor: Colors.red,
-          handleColor: Colors.red,
-          backgroundColor: Colors.grey,
-          bufferedColor: Colors.white,
-        ),
-      );
-      setState(() {});
-    } catch (e) {
-      setState(() { _hasError = true; });
-    }
+    _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+    await _videoPlayerController.initialize();
+    _chewieController = ChewieController(
+      videoPlayerController: _videoPlayerController,
+      autoPlay: true,
+      looping: false,
+      aspectRatio: _videoPlayerController.value.aspectRatio,
+      allowFullScreen: true,
+      materialProgressColors: ChewieProgressColors(
+        playedColor: Colors.red,
+        handleColor: Colors.red,
+        bufferedColor: Colors.redAccent,
+        backgroundColor: Colors.grey,
+      ),
+    );
+    if (mounted) setState(() {});
   }
 
   @override
@@ -58,49 +56,53 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            Center(
-              child: _hasError 
-                ? const Text("Video failed to load.", style: TextStyle(color: Colors.white))
-                : _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
-                  ? Chewie(controller: _chewieController!)
-                  : const CircularProgressIndicator(color: Colors.red),
-            ),
-            
-            // HANNUTV Watermark (Top Right Corner)
-            Positioned(
-              top: 15,
-              right: 15,
-              child: IgnorePointer(
-                child: Opacity(
-                  opacity: 0.6,
-                  child: Image.asset('assets/logo.png', width: 65),
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        title: Text(widget.movieTitle),
+      ),
+      body: Stack(
+        children: [
+          Center(
+            child: _chewieController != null &&
+                    _chewieController!.videoPlayerController.value.isInitialized
+                ? Chewie(controller: _chewieController!)
+                : const CircularProgressIndicator(color: Colors.red),
+          ),
+          Positioned(
+            top: 16,
+            right: 16,
+            child: IgnorePointer(
+              child: Opacity(
+                opacity: 0.8,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: Colors.black54,
+                    borderRadius: BorderRadius.circular(6),
+                    border: Border.all(color: Colors.redAccent, width: 1),
+                  ),
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset(
+                        'assets/logo.png',
+                        height: 20,
+                        errorBuilder: (_, __, ___) => const Text(
+                          'HANNUTV',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 12,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
             ),
-
-            // Top-Left Back Button and Title
-            Positioned(
-              top: 15,
-              left: 10,
-              child: Row(
-                children: [
-                  IconButton(
-                    icon: const Icon(Icons.arrow_back, color: Colors.white, size: 30),
-                    onPressed: () => Navigator.pop(context),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(
-                    widget.movieTitle, 
-                    style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ],
-              ),
-            ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
