@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:better_player/better_player.dart';
+import 'package:video_player/video_player.dart';
+import 'package:chewie/chewie.dart';
 
 class VideoPlayerPage extends StatefulWidget {
   final String videoUrl;
@@ -12,30 +13,45 @@ class VideoPlayerPage extends StatefulWidget {
 }
 
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
-  late BetterPlayerController _betterPlayerController;
+  late VideoPlayerController _videoPlayerController;
+  ChewieController? _chewieController;
+  bool _hasError = false;
 
   @override
   void initState() {
     super.initState();
-    BetterPlayerConfiguration betterPlayerConfiguration = const BetterPlayerConfiguration(
-      aspectRatio: 16 / 9,
-      fit: BoxFit.contain,
-      autoPlay: true,
-      looping: false,
-      fullScreenByDefault: false,
-      controlsConfiguration: BetterPlayerControlsConfiguration(
-        enableQualities: true, // User ko 1080p, 720p change karne ka option dega
-        playerTheme: BetterPlayerTheme.cupertino,
-      ),
-    );
+    initializePlayer();
+  }
 
-    BetterPlayerDataSource dataSource = BetterPlayerDataSource(
-      BetterPlayerDataSourceType.network,
-      widget.videoUrl,
-    );
+  Future<void> initializePlayer() async {
+    try {
+      _videoPlayerController = VideoPlayerController.networkUrl(Uri.parse(widget.videoUrl));
+      await _videoPlayerController.initialize();
+      
+      _chewieController = ChewieController(
+        videoPlayerController: _videoPlayerController,
+        autoPlay: true,
+        looping: false,
+        aspectRatio: 16 / 9,
+        allowFullScreen: true,
+        materialProgressColors: ChewieProgressColors(
+          playedColor: Colors.red,
+          handleColor: Colors.red,
+          backgroundColor: Colors.grey,
+          bufferedColor: Colors.white,
+        ),
+      );
+      setState(() {});
+    } catch (e) {
+      setState(() { _hasError = true; });
+    }
+  }
 
-    _betterPlayerController = BetterPlayerController(betterPlayerConfiguration);
-    _betterPlayerController.setupDataSource(dataSource);
+  @override
+  void dispose() {
+    _videoPlayerController.dispose();
+    _chewieController?.dispose();
+    super.dispose();
   }
 
   @override
@@ -45,24 +61,27 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       body: SafeArea(
         child: Stack(
           children: [
-            // Asli Video Player
             Center(
-              child: BetterPlayer(controller: _betterPlayerController),
+              child: _hasError 
+                ? const Text("Video failed to load.", style: TextStyle(color: Colors.white))
+                : _chewieController != null && _chewieController!.videoPlayerController.value.isInitialized
+                  ? Chewie(controller: _chewieController!)
+                  : const CircularProgressIndicator(color: Colors.red),
             ),
             
-            // Top-Right HANNUTV Watermark Logo
+            // HANNUTV Watermark (Top Right Corner)
             Positioned(
-              top: 20,
-              right: 20,
+              top: 15,
+              right: 15,
               child: IgnorePointer(
                 child: Opacity(
-                  opacity: 0.6, // Logo halka sa transparent rahega
-                  child: Image.asset('assets/logo.png', width: 70),
+                  opacity: 0.6,
+                  child: Image.asset('assets/logo.png', width: 65),
                 ),
               ),
             ),
 
-            // Top-Left Back Button & Title
+            // Top-Left Back Button and Title
             Positioned(
               top: 15,
               left: 10,
@@ -84,11 +103,5 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         ),
       ),
     );
-  }
-
-  @override
-  void dispose() {
-    _betterPlayerController.dispose();
-    super.dispose();
   }
 }

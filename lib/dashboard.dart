@@ -39,7 +39,7 @@ class DashboardPageState extends State<DashboardPage> {
           ? 'http://localhost:3000/api/trending' 
           : 'http://localhost:3000/api/search?q=${Uri.encodeComponent(query)}';
           
-      final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(url)).timeout(const Duration(seconds: 10));
       if (response.statusCode == 200) {
         final responseData = json.decode(response.body);
         setState(() {
@@ -50,13 +50,13 @@ class DashboardPageState extends State<DashboardPage> {
         setState(() { isLoading = false; });
       }
     } catch (e) {
+      debugPrint("API Error: $e");
       setState(() { isLoading = false; });
     }
   }
 
-  // Telegram Support Function
   Future<void> _openTelegram() async {
-    final Uri url = Uri.parse('https://t.me/YOUR_USERNAME'); // Apna Telegram username daal
+    final Uri url = Uri.parse('https://t.me/YOUR_USERNAME'); 
     if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
       debugPrint('Could not open Telegram');
     }
@@ -76,7 +76,7 @@ class DashboardPageState extends State<DashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.support_agent, color: Colors.red, size: 30),
-            onPressed: _openTelegram, // Telegram Button
+            onPressed: _openTelegram,
           )
         ],
       ),
@@ -84,7 +84,6 @@ class DashboardPageState extends State<DashboardPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // Top App Updated Banner
             Container(
               width: double.infinity,
               color: Colors.green.withOpacity(0.2),
@@ -98,8 +97,6 @@ class DashboardPageState extends State<DashboardPage> {
                 ],
               ),
             ),
-            
-            // Hero Banner
             Stack(
               children: [
                 Container(
@@ -107,7 +104,7 @@ class DashboardPageState extends State<DashboardPage> {
                   decoration: BoxDecoration(
                     image: DecorationImage(
                       image: NetworkImage(
-                        movies.isNotEmpty && movies[0]['backdropUrl'] != '' 
+                        movies.isNotEmpty && movies[0]['backdropUrl'] != null && movies[0]['backdropUrl'] != '' 
                             ? movies[0]['backdropUrl'] 
                             : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600'
                       ),
@@ -154,7 +151,6 @@ class DashboardPageState extends State<DashboardPage> {
                             ),
                           )
                         : Expanded(
-                            // Yahan ONYXTUBE ki jagah HANNUTV ka logo laga diya
                             child: Align(
                               alignment: Alignment.centerLeft,
                               child: Image.asset('assets/logo.png', height: 35),
@@ -185,7 +181,7 @@ class DashboardPageState extends State<DashboardPage> {
                           children: [
                             const Icon(Icons.star, color: Colors.amber, size: 18),
                             const SizedBox(width: 6),
-                            Text('${movies[0]['rating']}  •  ${movies[0]['year']}  •  ${movies[0]['type'].toString().toUpperCase()}', style: const TextStyle(color: Colors.white, fontSize: 14)),
+                            Text('${movies[0]['rating'] ?? ''}  •  ${movies[0]['year'] ?? ''}  •  ${(movies[0]['type'] ?? '').toString().toUpperCase()}', style: const TextStyle(color: Colors.white, fontSize: 14)),
                           ],
                         ),
                         const SizedBox(height: 16),
@@ -203,8 +199,6 @@ class DashboardPageState extends State<DashboardPage> {
                   )
               ],
             ),
-            
-            // OTT Platforms Section
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
               child: Text('Watch on OTT', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -233,8 +227,6 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               ),
             ),
-
-            // Categories
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
               child: Text('Categories', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
@@ -258,8 +250,6 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               ),
             ),
-            
-            // Trending Grid
             Padding(
               padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 10.0),
               child: Text(
@@ -269,43 +259,45 @@ class DashboardPageState extends State<DashboardPage> {
             ),
             isLoading 
               ? const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
-              : GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 3, childAspectRatio: 0.65, crossAxisSpacing: 12, mainAxisSpacing: 12,
-                  ),
-                  itemCount: movies.length,
-                  itemBuilder: (context, index) {
-                    final movie = movies[index];
-                    return GestureDetector(
-                      onTap: () => openMediaDetails(movie),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          Expanded(
-                            child: Container(
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  image: NetworkImage(movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888?text=NO+POSTER'),
-                                  fit: BoxFit.cover,
+              : movies.isEmpty 
+                ? const Center(child: Padding(padding: EdgeInsets.all(20.0), child: Text("No Data Found / Server Offline", style: TextStyle(color: Colors.grey))))
+                : GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3, childAspectRatio: 0.65, crossAxisSpacing: 12, mainAxisSpacing: 12,
+                    ),
+                    itemCount: movies.length,
+                    itemBuilder: (context, index) {
+                      final movie = movies[index];
+                      return GestureDetector(
+                        onTap: () => openMediaDetails(movie),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Container(
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(8),
+                                  image: DecorationImage(
+                                    image: NetworkImage(movie['posterUrl'] != null && movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888?text=NO+POSTER'),
+                                    fit: BoxFit.cover,
+                                  ),
                                 ),
                               ),
                             ),
-                          ),
-                          const SizedBox(height: 6),
-                          Text(
-                            movie['title'] ?? '',
-                            style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                            maxLines: 1, overflow: TextOverflow.ellipsis,
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                ),
+                            const SizedBox(height: 6),
+                            Text(
+                              movie['title'] ?? '',
+                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                              maxLines: 1, overflow: TextOverflow.ellipsis,
+                            ),
+                          ],
+                        ),
+                      );
+                    },
+                  ),
             const SizedBox(height: 40),
           ],
         ),
@@ -314,7 +306,6 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// Ye Details Screen hai jahan Download aur Play ka option aayega
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -373,7 +364,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // Play Video Function
   void launchPlayer(String title) {
     Navigator.push(
       context,
@@ -386,7 +376,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     );
   }
 
-  // Download Options Dialog
   void _showDownloadPopup(BuildContext context) {
     showModalBottomSheet(
       context: context,
@@ -442,7 +431,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   height: 300,
                   decoration: BoxDecoration(
                     image: DecorationImage(
-                      image: NetworkImage(details!['backdropUrl'] != '' ? details!['backdropUrl'] : widget.mediaItem['backdropUrl']),
+                      image: NetworkImage(details != null && details!['backdropUrl'] != '' ? details!['backdropUrl'] : (widget.mediaItem['backdropUrl'] ?? 'https://via.placeholder.com/600x400/222/888')),
                       fit: BoxFit.cover,
                     ),
                   ),
@@ -460,9 +449,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(details!['title'], style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
+                      Text(details!['title'] ?? '', style: const TextStyle(fontSize: 28, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 8),
-                      Text(details!['overview'], style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                      Text(details!['overview'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 14)),
                       const SizedBox(height: 20),
                       
                       if (mediaType == 'movie') ...[
@@ -473,14 +462,14 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(vertical: 14)),
                                 onPressed: () => launchPlayer(details!['title']),
                                 icon: const Icon(Icons.play_arrow, color: Colors.white),
-                                label: const Text('Play Movie', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                label: const Text('Play', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                               ),
                             ),
                             const SizedBox(width: 10),
                             Expanded(
                               child: ElevatedButton.icon(
                                 style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[800], padding: const EdgeInsets.symmetric(vertical: 14)),
-                                onPressed: () => _showDownloadPopup(context), // Download Button
+                                onPressed: () => _showDownloadPopup(context),
                                 icon: const Icon(Icons.download, color: Colors.white),
                                 label: const Text('Download', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                               ),
@@ -524,7 +513,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                   leading: ClipRRect(
                                     borderRadius: BorderRadius.circular(4),
                                     child: Image.network(
-                                      ep['stillUrl'] != '' ? ep['stillUrl'] : 'https://via.placeholder.com/150x84/222222/888888?text=EP',
+                                      ep['stillUrl'] != null && ep['stillUrl'] != '' ? ep['stillUrl'] : 'https://via.placeholder.com/150x84/222222/888888?text=EP',
                                       width: 120, height: 80, fit: BoxFit.cover,
                                     ),
                                   ),
@@ -535,7 +524,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                     children: [
                                       IconButton(
                                         icon: const Icon(Icons.download, color: Colors.grey, size: 28),
-                                        onPressed: () => _showDownloadPopup(context), // Episode Download Button
+                                        onPressed: () => _showDownloadPopup(context),
                                       ),
                                       IconButton(
                                         icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 36),
