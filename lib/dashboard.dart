@@ -38,9 +38,9 @@ class DashboardPage extends StatefulWidget {
 class DashboardPageState extends State<DashboardPage> {
   List trendingList = [];
   List actionList = [];
+  List comedyList = [];
   List horrorList = [];
-  List romanceList = [];
-  List thrillerList = [];
+  List dramaList = [];
   List searchResults = [];
 
   bool isLoading = true;
@@ -52,7 +52,7 @@ class DashboardPageState extends State<DashboardPage> {
   Timer? _carouselTimer;
   int _currentPage = 0;
 
-  // DEEP FIX: Asli OTT Watch Provider IDs (India Region)
+  // OTT Watch Provider IDs
   final List<Map<String, dynamic>> ottPlatforms = [
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
     {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
@@ -102,7 +102,7 @@ class DashboardPageState extends State<DashboardPage> {
     }).toList();
   }
 
-  // DEEP FIX: OTT Category Wise Sync
+  // DEEP FIX: Full Netflix/Prime Dashboard Sync
   Future<void> loadAllDashboards({String? providerId}) async {
     setState(() => isLoading = true);
     try {
@@ -115,18 +115,18 @@ class DashboardPageState extends State<DashboardPage> {
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Action Movies
-        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=9648$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Horror/Mystery TV
-        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=10749$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Romance Movies
-        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=80$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Crime/Thriller TV
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Action
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=35$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Comedy
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=27$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Horror
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=18$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Drama
       ]);
 
       setState(() {
         trendingList = parseData(responses[0], forceMediaType: providerId != null ? 'tv' : null);
         actionList = parseData(responses[1], forceMediaType: 'movie');
-        horrorList = parseData(responses[2], forceMediaType: 'tv');
-        romanceList = parseData(responses[3], forceMediaType: 'movie');
-        thrillerList = parseData(responses[4], forceMediaType: 'tv');
+        comedyList = parseData(responses[2], forceMediaType: 'tv');
+        horrorList = parseData(responses[3], forceMediaType: 'movie');
+        dramaList = parseData(responses[4], forceMediaType: 'tv');
         isLoading = false;
       });
     } catch (e) {
@@ -134,7 +134,7 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // SEARCH AUTOCORRECT & LIVE SYNC
+  // DEEP FIX: SEARCH AUTOCORRECT
   void onSearchChanged(String value) {
     if (value.isEmpty) {
       setState(() { isSearching = false; searchResults = []; });
@@ -142,9 +142,9 @@ class DashboardPageState extends State<DashboardPage> {
     }
     setState(() => isSearching = true);
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () async {
+    _debounce = Timer(const Duration(milliseconds: 300), () async {
       setState(() => isLoading = true);
-      // Auto-correct partial strings correctly using TMDB Multi-Search
+      // API automatically handles partial strings like "all of us are"
       final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
       final res = await http.get(Uri.parse(url), headers: kApiHeaders);
       setState(() {
@@ -165,8 +165,9 @@ class DashboardPageState extends State<DashboardPage> {
       )));
       return;
     }
+    
+    // DEEP FIX: Update Continue Watching Immediately
     Navigator.push(context, MaterialPageRoute(builder: (context) => MediaDetailScreen(mediaItem: media))).then((_) {
-      // BACK AATE HI CONTINUE WATCHING DASHBOARD UPDATE KAREGA
       setState(() {}); 
     });
   }
@@ -263,7 +264,7 @@ class DashboardPageState extends State<DashboardPage> {
                                 child: TextField(
                                   controller: searchController, style: const TextStyle(color: Colors.white), autofocus: true,
                                   decoration: InputDecoration(
-                                    hintText: 'Search Movies, Series...', border: InputBorder.none,
+                                    hintText: 'Search...', border: InputBorder.none,
                                     suffixIcon: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () {
                                       setState(() { isSearching = false; searchController.clear(); searchResults.clear(); });
                                     }),
@@ -358,11 +359,11 @@ class DashboardPageState extends State<DashboardPage> {
               // CATEGORY WISE DASHBOARD
               _buildHorizontalList('Trending Now', trendingList),
               if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
-              if (customUploadedMovies.isNotEmpty) _buildHorizontalList('User Requests (Cloud)', customUploadedMovies),
-              _buildHorizontalList('Action Packed', actionList),
-              _buildHorizontalList('Horror Shows', horrorList),
-              _buildHorizontalList('Romance & Drama', romanceList),
-              _buildHorizontalList('Thrillers', thrillerList),
+              if (customUploadedMovies.isNotEmpty) _buildHorizontalList('User Requests', customUploadedMovies),
+              _buildHorizontalList('Action Movies', actionList),
+              _buildHorizontalList('Comedy Shows', comedyList),
+              _buildHorizontalList('Horror Movies', horrorList),
+              _buildHorizontalList('Drama & Romance Shows', dramaList),
             ],
             const SizedBox(height: 40),
           ],
@@ -447,7 +448,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   }
 
   void launchPlayer(String title, {int? season, int? episode}) {
-    // REMOVE OLD ENTRY AND UPDATE TO CONTINUE WATCHING
     continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
     final type = widget.mediaItem['mediaType'] ?? 'movie';
