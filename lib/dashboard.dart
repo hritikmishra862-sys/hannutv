@@ -14,6 +14,21 @@ const Map<String, String> kApiHeaders = {
 
 List<Map> continueWatchingList = [];
 
+// YAHAN ADMIN APNI CLOUD MOVIES DAAL SAKTA HAI (Future me Firebase se link kar lena)
+List<Map> customUploadedMovies = [
+  {
+    'id': 9999991, 
+    'title': "User Requested Movie",
+    'overview': "Yeh movie admin ne cloud server se upload ki hai.",
+    'posterUrl': "https://via.placeholder.com/300x450/red/white?text=Custom+Upload",
+    'backdropUrl': "https://via.placeholder.com/600x400/red/white?text=Custom+Upload",
+    'rating': "10.0",
+    'year': "2024",
+    'mediaType': "movie",
+    'customUrl': "https://nxsha.screenscape.me/embed?tmdb=10195&type=movie" // Tera cloud link yahan aayega
+  }
+];
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
   @override
@@ -21,7 +36,14 @@ class DashboardPage extends StatefulWidget {
 }
 
 class DashboardPageState extends State<DashboardPage> {
-  List movies = [];
+  // CATEGORY LISTS (Netflix Style)
+  List trendingList = [];
+  List actionList = [];
+  List horrorList = [];
+  List romanceList = [];
+  List thrillerList = [];
+  List searchResults = [];
+
   bool isLoading = true;
   bool isSearching = false;
   final TextEditingController searchController = TextEditingController();
@@ -31,7 +53,7 @@ class DashboardPageState extends State<DashboardPage> {
   Timer? _carouselTimer;
   int _currentPage = 0;
 
-  // OTT FILTER LOGIC (Asli TMDB Network IDs lagaye hain taaki original series aayein)
+  // OTT PROVIDER IDs
   final List<Map<String, dynamic>> ottPlatforms = [
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "213"},
     {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
@@ -40,27 +62,19 @@ class DashboardPageState extends State<DashboardPage> {
     {"name": "ZEE5", "color": Colors.purple, "providerId": "232"},
   ];
 
-  final List<String> categories = ["Action", "Anime", "Comedy", "Horror", "Romance", "Sci-Fi"];
-
   @override
   void initState() {
     super.initState();
-    fetchTmdbData('');
+    loadAllDashboards();
     _startCarousel();
   }
 
   void _startCarousel() {
     _carouselTimer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
-      if (_pageController.hasClients && movies.isNotEmpty) {
+      if (_pageController.hasClients && trendingList.isNotEmpty) {
         _currentPage++;
-        if (_currentPage >= (movies.length > 5 ? 5 : movies.length)) {
-          _currentPage = 0;
-        }
-        _pageController.animateToPage(
-          _currentPage,
-          duration: const Duration(milliseconds: 800),
-          curve: Curves.easeInOut,
-        );
+        if (_currentPage >= (trendingList.length > 5 ? 5 : trendingList.length)) _currentPage = 0;
+        _pageController.animateToPage(_currentPage, duration: const Duration(milliseconds: 800), curve: Curves.easeInOut);
       }
     });
   }
@@ -74,67 +88,81 @@ class DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  // OTT Filter aur Fast Loading ke sath API Fetching
-  Future<void> fetchTmdbData(String query, {String? providerId}) async {
+  // Data Parser
+  List parseData(http.Response response, {String? forceMediaType}) {
+    if (response.statusCode != 200) return [];
+    final List rawData = json.decode(response.body)['results'] ?? [];
+    return rawData.where((m) => m['media_type'] != 'person').map((m) => {
+      'id': m['id'],
+      'title': m['title'] ?? m['name'] ?? 'Unknown',
+      'overview': m['overview'] ?? '',
+      'posterUrl': m['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}' : '',
+      'backdropUrl': m['backdrop_path'] != null ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}' : '',
+      'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
+      'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
+      'mediaType': forceMediaType ?? (m['media_type'] ?? 'movie'),
+    }).toList();
+  }
+
+  // DEEP CODING: LOAD ALL CATEGORIES SIMULTANEOUSLY (Super Fast)
+  Future<void> loadAllDashboards({String? providerId}) async {
     setState(() => isLoading = true);
     try {
-      String url = '';
-      if (providerId != null) {
-        // Deep Coding: OTT Provider ID se filter karega
-        url = 'https://api.themoviedb.org/3/discover/tv?with_networks=$providerId&watch_region=IN&language=hi-IN&sort_by=popularity.desc';
-      } else {
-        url = query.isEmpty
-            ? 'https://api.themoviedb.org/3/trending/all/day?language=hi-IN'
-            : 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(query)}&language=hi-IN';
-      }
+      String base = 'https://api.themoviedb.org/3';
+      String net = providerId != null ? '&with_networks=$providerId' : '';
+      String type = providerId != null ? 'discover/tv' : 'discover/movie'; 
+      
+      String trendUrl = providerId != null 
+          ? '$base/discover/tv?language=en-US&sort_by=popularity.desc&with_networks=$providerId'
+          : '$base/trending/all/day?language=en-US';
 
-      final response = await http.get(Uri.parse(url), headers: kApiHeaders);
-      if (response.statusCode == 200) {
-        final List rawData = json.decode(response.body)['results'] ?? [];
-        
-        setState(() {
-          movies = rawData.where((m) => m['media_type'] != 'person').map((m) => {
-            'id': m['id'],
-            'title': m['title'] ?? m['name'] ?? 'Unknown',
-            'overview': m['overview'] ?? '',
-            'posterUrl': m['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}' : '',
-            'backdropUrl': m['backdrop_path'] != null ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}' : '',
-            'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
-            'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
-            'mediaType': providerId != null ? 'tv' : (m['media_type'] ?? 'movie'),
-            // Future Admin Panel Cloud Server Link Placeholder (agar admin custom link dega toh)
-            'customUrl': m['customUrl'], 
-          }).toList();
-          isLoading = false;
-        });
-      } else {
-        setState(() => isLoading = false);
-      }
+      var responses = await Future.wait([
+        http.get(Uri.parse(trendUrl), headers: kApiHeaders),
+        http.get(Uri.parse('$base/$type?language=en-US&with_genres=28$net&sort_by=popularity.desc'), headers: kApiHeaders), // Action
+        http.get(Uri.parse('$base/$type?language=en-US&with_genres=27$net&sort_by=popularity.desc'), headers: kApiHeaders), // Horror
+        http.get(Uri.parse('$base/$type?language=en-US&with_genres=10749$net&sort_by=popularity.desc'), headers: kApiHeaders), // Romance
+        http.get(Uri.parse('$base/$type?language=en-US&with_genres=53$net&sort_by=popularity.desc'), headers: kApiHeaders), // Thriller
+      ]);
+
+      setState(() {
+        trendingList = parseData(responses[0], forceMediaType: providerId != null ? 'tv' : null);
+        actionList = parseData(responses[1], forceMediaType: providerId != null ? 'tv' : 'movie');
+        horrorList = parseData(responses[2], forceMediaType: providerId != null ? 'tv' : 'movie');
+        romanceList = parseData(responses[3], forceMediaType: providerId != null ? 'tv' : 'movie');
+        thrillerList = parseData(responses[4], forceMediaType: providerId != null ? 'tv' : 'movie');
+        isLoading = false;
+      });
     } catch (e) {
       setState(() => isLoading = false);
     }
   }
 
-  void onSearchChanged(String value) {
+  void onSearchChanged(String value) async {
+    if (value.isEmpty) {
+      setState(() { isSearching = false; searchResults = []; });
+      return;
+    }
+    setState(() => isSearching = true);
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () {
-      fetchTmdbData(value);
+    _debounce = Timer(const Duration(milliseconds: 400), () async {
+      setState(() => isLoading = true);
+      final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US';
+      final res = await http.get(Uri.parse(url), headers: kApiHeaders);
+      setState(() {
+        searchResults = parseData(res);
+        isLoading = false;
+      });
     });
   }
 
   Future<void> _openTelegram() async {
-    final Uri url = Uri.parse('https://t.me/HANNUTV');
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      debugPrint('Telegram error');
-    }
+    if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication)) debugPrint('Telegram error');
   }
 
   void openMediaDetails(Map media) {
-    // Agar future me custom admin panel se apni cloud link aayegi toh direct chalayega
-    if (media['customUrl'] != null && media['customUrl'] != '') {
+    if (media.containsKey('customUrl')) {
       Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
-        videoUrl: media['customUrl'],
-        movieTitle: media['title'],
+        tmdbId: 0, mediaType: 'movie', season: 1, episode: 1, movieTitle: media['title'], customUrl: media['customUrl'],
       )));
       return;
     }
@@ -143,19 +171,57 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  Widget _buildHorizontalList(String title, List moviesData) {
+    if (moviesData.isEmpty) return const SizedBox();
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Padding(
+          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
+          child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+        ),
+        SizedBox(
+          height: 160,
+          child: ListView.builder(
+            scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
+            itemCount: moviesData.length,
+            itemBuilder: (context, index) {
+              final media = moviesData[index];
+              return GestureDetector(
+                onTap: () => openMediaDetails(media),
+                child: Container(
+                  width: 110, margin: const EdgeInsets.symmetric(horizontal: 4),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        height: 130,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(8),
+                          image: DecorationImage(image: NetworkImage(media['posterUrl'] != '' ? media['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover),
+                        ),
+                        child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 40)),
+                      ),
+                      const SizedBox(height: 4),
+                      Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                    ],
+                  ),
+                ),
+              );
+            },
+          ),
+        ),
+      ],
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
       appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.support_agent, color: Colors.red, size: 30),
-            onPressed: _openTelegram,
-          )
-        ],
+        backgroundColor: Colors.transparent, elevation: 0,
+        actions: [IconButton(icon: const Icon(Icons.support_agent, color: Colors.red, size: 30), onPressed: _openTelegram)],
       ),
       body: SingleChildScrollView(
         child: Column(
@@ -165,21 +231,17 @@ class DashboardPageState extends State<DashboardPage> {
               children: [
                 SizedBox(
                   height: 400,
-                  child: movies.isEmpty
+                  child: trendingList.isEmpty
                       ? Container(color: Colors.black)
                       : PageView.builder(
                           controller: _pageController,
-                          itemCount: movies.length > 5 ? 5 : movies.length,
+                          itemCount: trendingList.length > 5 ? 5 : trendingList.length,
                           onPageChanged: (index) => _currentPage = index,
                           itemBuilder: (context, index) {
                             return Container(
                               decoration: BoxDecoration(
                                 image: DecorationImage(
-                                  image: NetworkImage(
-                                    movies[index]['backdropUrl'] != ''
-                                        ? movies[index]['backdropUrl']
-                                        : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600',
-                                  ),
+                                  image: NetworkImage(trendingList[index]['backdropUrl'] != '' ? trendingList[index]['backdropUrl'] : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600'),
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -189,13 +251,7 @@ class DashboardPageState extends State<DashboardPage> {
                 ),
                 Container(
                   height: 400,
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.bottomCenter,
-                      end: Alignment.topCenter,
-                      colors: [const Color(0xFF0F0F0F), Colors.transparent, Colors.black.withOpacity(0.9)],
-                    ),
-                  ),
+                  decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [const Color(0xFF0F0F0F), Colors.transparent, Colors.black.withOpacity(0.9)])),
                 ),
                 SafeArea(
                   child: Padding(
@@ -205,69 +261,35 @@ class DashboardPageState extends State<DashboardPage> {
                         isSearching
                             ? Expanded(
                                 child: TextField(
-                                  controller: searchController,
-                                  style: const TextStyle(color: Colors.white),
-                                  autofocus: true,
+                                  controller: searchController, style: const TextStyle(color: Colors.white), autofocus: true,
                                   decoration: InputDecoration(
-                                    hintText: 'Search Movies, Series...',
-                                    border: InputBorder.none,
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(Icons.close, color: Colors.white),
-                                      onPressed: () {
-                                        setState(() {
-                                          isSearching = false;
-                                          searchController.clear();
-                                          fetchTmdbData('');
-                                        });
-                                      },
-                                    ),
+                                    hintText: 'Search Movies, Series...', border: InputBorder.none,
+                                    suffixIcon: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () {
+                                      setState(() { isSearching = false; searchController.clear(); searchResults.clear(); });
+                                    }),
                                   ),
                                   onChanged: onSearchChanged, 
                                 ),
                               )
-                            : Expanded(
-                                child: Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: Image.asset('assets/logo.png', height: 35),
-                                ),
-                              ),
+                            : Expanded(child: Align(alignment: Alignment.centerLeft, child: Image.asset('assets/logo.png', height: 35))),
                         if (!isSearching)
-                          IconButton(
-                            icon: const Icon(Icons.search, color: Colors.white, size: 28),
-                            onPressed: () => setState(() => isSearching = true),
-                          ),
+                          IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 28), onPressed: () => setState(() => isSearching = true)),
                       ],
                     ),
                   ),
                 ),
-                if (movies.isNotEmpty && !isSearching)
+                if (trendingList.isNotEmpty && !isSearching)
                   Positioned(
                     bottom: 20, left: 16, right: 16,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          movies[_currentPage]['title'] ?? 'Title',
-                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-                          maxLines: 2, overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(trendingList[_currentPage]['title'] ?? 'Title', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.star, color: Colors.amber, size: 18),
-                            const SizedBox(width: 6),
-                            Text('${movies[_currentPage]['rating']}  •  ${movies[_currentPage]['year']}  •  ${(movies[_currentPage]['mediaType']).toString().toUpperCase()}', style: const TextStyle(color: Colors.white, fontSize: 14)),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
                         ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white, foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                          ),
-                          onPressed: () => openMediaDetails(movies[_currentPage]),
-                          icon: const Icon(Icons.play_arrow, size: 24),
-                          label: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24)),
+                          onPressed: () => openMediaDetails(trendingList[_currentPage]),
+                          icon: const Icon(Icons.play_arrow, size: 24), label: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
                       ],
                     ),
@@ -275,60 +297,12 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            if (continueWatchingList.isNotEmpty && !isSearching) ...[
-              const Padding(
-                padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
-                child: Text('Continue Watching', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              ),
-              SizedBox(
-                height: 170,
-                child: ListView.builder(
-                  scrollDirection: Axis.horizontal,
-                  padding: const EdgeInsets.symmetric(horizontal: 12),
-                  itemCount: continueWatchingList.length,
-                  itemBuilder: (context, index) {
-                    final media = continueWatchingList[index];
-                    return GestureDetector(
-                      onTap: () => openMediaDetails(media),
-                      child: Container(
-                        width: 110,
-                        margin: const EdgeInsets.symmetric(horizontal: 4),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Container(
-                              height: 130,
-                              decoration: BoxDecoration(
-                                borderRadius: BorderRadius.circular(8),
-                                image: DecorationImage(
-                                  image: NetworkImage(media['posterUrl'] != '' ? media['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
-                                  fit: BoxFit.cover,
-                                ),
-                              ),
-                              child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 40)),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            if (media['savedSeason'] != null)
-                              Text('S${media['savedSeason']} E${media['savedEpisode']}', style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ],
-
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
-              child: Text('Watch on OTT', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
+            // OTT FILTERS (Netflix, Prime, Hotstar)
+            const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
             SizedBox(
               height: 50,
               child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
+                scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
                 itemCount: ottPlatforms.length,
                 itemBuilder: (context, index) {
                   return Container(
@@ -341,7 +315,8 @@ class DashboardPageState extends State<DashboardPage> {
                       ),
                       onPressed: () {
                         searchController.clear();
-                        fetchTmdbData('', providerId: ottPlatforms[index]['providerId']);
+                        setState(() => isSearching = false);
+                        loadAllDashboards(providerId: ottPlatforms[index]['providerId']); 
                       },
                       child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
@@ -349,80 +324,46 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               ),
             ),
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
-              child: Text('Categories', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-            ),
-            SizedBox(
-              height: 40,
-              child: ListView.builder(
-                scrollDirection: Axis.horizontal,
-                padding: const EdgeInsets.symmetric(horizontal: 12),
-                itemCount: categories.length,
+
+            if (isLoading)
+              const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
+            else if (isSearching)
+              GridView.builder(
+                shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 0.65, crossAxisSpacing: 12, mainAxisSpacing: 12),
+                itemCount: searchResults.length,
                 itemBuilder: (context, index) {
-                  return Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 4),
-                    child: ActionChip(
-                      backgroundColor: Colors.grey[850],
-                      labelStyle: const TextStyle(color: Colors.white),
-                      label: Text(categories[index]),
-                      onPressed: () {
-                        searchController.clear();
-                        fetchTmdbData(categories[index]);
-                      },
+                  final movie = searchResults[index];
+                  return GestureDetector(
+                    onTap: () => openMediaDetails(movie),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Expanded(
+                          child: Container(
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(8),
+                              image: DecorationImage(image: NetworkImage(movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Text(movie['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      ],
                     ),
                   );
                 },
-              ),
-            ),
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16.0, 20.0, 16.0, 10.0),
-              child: Text(
-                searchController.text.isEmpty ? 'Trending Now' : 'Search Results',
-                style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
-              ),
-            ),
-            isLoading
-                ? const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
-                : GridView.builder(
-                    shrinkWrap: true,
-                    physics: const NeverScrollableScrollPhysics(),
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3, childAspectRatio: 0.65, crossAxisSpacing: 12, mainAxisSpacing: 12,
-                    ),
-                    itemCount: movies.length,
-                    itemBuilder: (context, index) {
-                      final movie = movies[index];
-                      return GestureDetector(
-                        onTap: () => openMediaDetails(movie),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Expanded(
-                              child: Container(
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(8),
-                                  image: DecorationImage(
-                                    image: NetworkImage(
-                                      movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888?text=NO+POSTER',
-                                    ),
-                                    fit: BoxFit.cover,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            Text(
-                              movie['title'] ?? '',
-                              style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                              maxLines: 1, overflow: TextOverflow.ellipsis,
-                            ),
-                          ],
-                        ),
-                      );
-                    },
-                  ),
+              )
+            else ...[
+              // MULTIPLE NETFLIX STYLE CATEGORY ROWS
+              _buildHorizontalList('Trending Now', trendingList),
+              if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
+              if (customUploadedMovies.isNotEmpty) _buildHorizontalList('User Requests (Cloud)', customUploadedMovies),
+              _buildHorizontalList('Action Packed', actionList),
+              _buildHorizontalList('Horror Shows', horrorList),
+              _buildHorizontalList('Romance & Drama', romanceList),
+              _buildHorizontalList('Thrillers', thrillerList),
+            ],
             const SizedBox(height: 40),
           ],
         ),
@@ -431,6 +372,7 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
+// ── DETAILS SCREEN ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -457,7 +399,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     final id = widget.mediaItem['id'];
 
     try {
-      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/$mediaType/$id?language=hi-IN'), headers: kApiHeaders);
+      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/$mediaType/$id?language=en-US'), headers: kApiHeaders);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
@@ -484,7 +426,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   Future<void> fetchEpisodes(int seasonNumber) async {
     setState(() { isLoadingEpisodes = true; selectedSeason = seasonNumber; });
     try {
-      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.mediaItem['id']}/season/$seasonNumber?language=hi-IN'), headers: kApiHeaders);
+      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.mediaItem['id']}/season/$seasonNumber?language=en-US'), headers: kApiHeaders);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
@@ -514,28 +456,19 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
     continueWatchingList.insert(0, currentMedia);
 
-    final id = widget.mediaItem['id'];
-    String finalUrl = '';
-
-    // DEEP CODING: Changed /hi/ to /en/ (For English Player UI - 'Skip Now', 'Quality')
-    if (type == 'tv' || type == 'series') {
-      final s = season ?? 1;
-      final e = episode ?? 1;
-      finalUrl = 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true&nextButton=true&autoNext=true';
-    } else {
-      finalUrl = 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
-    }
-
+    // Deep Fix: Send IDs to Player to handle Multi-Servers dynamically
     Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
-      videoUrl: finalUrl,
+      tmdbId: widget.mediaItem['id'],
+      mediaType: type,
+      season: season ?? 1,
+      episode: episode ?? 1,
       movieTitle: title,
     )));
   }
 
   void _showDownloadPopup(BuildContext context, String contentTitle) {
     showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.grey[900],
+      context: context, backgroundColor: Colors.grey[900],
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
         return Container(
@@ -571,16 +504,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   Container(
                     height: 300,
                     decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: NetworkImage(details != null && details!['backdropUrl'] != '' ? details!['backdropUrl'] : (widget.mediaItem['backdropUrl'] ?? '')),
-                        fit: BoxFit.cover,
-                      ),
+                      image: DecorationImage(image: NetworkImage(details != null && details!['backdropUrl'] != '' ? details!['backdropUrl'] : (widget.mediaItem['backdropUrl'] ?? '')), fit: BoxFit.cover),
                     ),
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF0F0F0F), Colors.transparent]),
-                      ),
-                    ),
+                    child: Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF0F0F0F), Colors.transparent]))),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(16.0),
@@ -602,13 +528,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                           ),
                         ] else if (mediaType == 'tv' && details?['seasons'] != null && (details!['seasons'] as List).isNotEmpty) ...[
                           Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(8)),
+                            padding: const EdgeInsets.symmetric(horizontal: 16), decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(8)),
                             child: DropdownButton<int>(
-                              value: selectedSeason,
-                              isExpanded: true,
-                              underline: const SizedBox(),
-                              dropdownColor: Colors.grey[900],
+                              value: selectedSeason, isExpanded: true, underline: const SizedBox(), dropdownColor: Colors.grey[900],
                               items: (details!['seasons'] as List).map<DropdownMenuItem<int>>((season) {
                                 return DropdownMenuItem<int>(value: season['seasonNumber'], child: Text('Season ${season['seasonNumber']}  (${season['episodeCount']} Episodes)', style: const TextStyle(color: Colors.white)));
                               }).toList(),
@@ -621,22 +543,15 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                           isLoadingEpisodes
                               ? const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)))
                               : ListView.builder(
-                                  shrinkWrap: true,
-                                  physics: const NeverScrollableScrollPhysics(),
-                                  itemCount: episodes.length,
+                                  shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), itemCount: episodes.length,
                                   itemBuilder: (context, index) {
                                     final ep = episodes[index];
                                     return ListTile(
                                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                                      leading: ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: Image.network(ep['stillUrl'] != '' ? ep['stillUrl'] : 'https://via.placeholder.com/300x168/222222/888888?text=EP', width: 110, height: 70, fit: BoxFit.cover),
-                                      ),
+                                      leading: ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.network(ep['stillUrl'] != '' ? ep['stillUrl'] : 'https://via.placeholder.com/300x168/222222/888888?text=EP', width: 110, height: 70, fit: BoxFit.cover)),
                                       title: Text('${ep['episodeNumber']}. ${ep['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
                                       subtitle: Text(ep['overview'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
-                                      
                                       tileColor: (selectedSeason == widget.mediaItem['savedSeason'] && ep['episodeNumber'] == widget.mediaItem['savedEpisode']) ? Colors.grey[850] : null,
-                                      
                                       trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32), onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}', season: selectedSeason, episode: ep['episodeNumber'])),
                                     );
                                   },
