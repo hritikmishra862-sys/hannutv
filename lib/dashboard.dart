@@ -607,6 +607,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                   ),
                 ],
               ),
-            );
-          }
-        }
+            ),
+    );
+  }
+}
