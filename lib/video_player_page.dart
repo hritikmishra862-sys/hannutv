@@ -21,7 +21,6 @@ class VideoPlayerPage extends StatefulWidget {
 class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late final WebViewController _controller;
   
-  // Custom Loading State
   bool isVideoPlaying = false;
   bool isCropped = false;
 
@@ -29,7 +28,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void initState() {
     super.initState();
     
-    // SCREEN KO TEDHA (LANDSCAPE) AUR FULLSCREEN KARNA
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
@@ -39,37 +37,36 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
-      
-      // JAVASCRIPT CHANNEL (Video actual play hone ka wait karega)
       ..addJavaScriptChannel(
         'VideoState',
         onMessageReceived: (JavaScriptMessage message) {
           if (message.message == 'playing' && mounted) {
             setState(() {
-              isVideoPlaying = true; // HANNUTV Logo hata dega
+              isVideoPlaying = true;
             });
           }
         },
       )
-      
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // DEEP CODING JAVASCRIPT INJECTION
             _controller.runJavaScript('''
-              // 1. TOUCH RELOAD FIX: Ads aur popups ko silently kill karna
+              // TOUCH RELOAD FIX
               window.open = function() { return null; };
               
-              // 2. CHECK IF VIDEO STARTED: Jab video 0.1s chal jaye tabhi flutter ko batao
+              // DEEP CODING FOR FAST BUFFERING (Force Preload & Auto playback tracking)
               var checkVideo = setInterval(function() {
                 var vids = document.getElementsByTagName('video');
-                if (vids.length > 0 && vids[0].currentTime > 0.1) {
-                  VideoState.postMessage('playing');
-                  clearInterval(checkVideo);
+                if (vids.length > 0) {
+                  vids[0].preload = 'auto'; // Force background download
+                  if (vids[0].currentTime > 0.1) {
+                    VideoState.postMessage('playing');
+                    clearInterval(checkVideo);
+                  }
                 }
               }, 500);
               
-              // 3. HIDE SERVER TOASTS: Spica/Sirius wale background texts ko hide karna
+              // HIDE SERVER TEXTS (Spica/Sirius hide karega)
               var style = document.createElement('style');
               style.innerHTML = 'div[style*="z-index"] { display: none !important; }';
               document.head.appendChild(style);
@@ -84,13 +81,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         },
       );
 
-    // AUDIO MUTE BYPASS
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController)
           .setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // FALLBACK: Agar 15 second tak stream na chale, toh bhi logo hata do taaki user player dekh sake
     Future.delayed(const Duration(seconds: 15), () {
       if (mounted && !isVideoPlaying) {
         setState(() => isVideoPlaying = true);
@@ -98,7 +93,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
   }
 
-  // CROP / FILL SCREEN LOGIC
   void toggleCrop() {
     setState(() {
       isCropped = !isCropped;
@@ -115,7 +109,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   @override
   void dispose() {
-    // Back aane par phone ko normal (Portrait) mode mein laana
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.portraitUp,
     ]);
@@ -129,10 +122,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // 1. MAIN VIDEO PLAYER
           WebViewWidget(controller: _controller),
           
-          // 2. CUSTOM HANNUTV LOADING SCREEN (Jab tak video connect/start na ho)
           if (!isVideoPlaying)
             Container(
               color: Colors.black,
@@ -141,7 +132,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  // Logo
                   Image.asset(
                     'assets/logo.png',
                     height: 60,
@@ -151,18 +141,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     ),
                   ),
                   const SizedBox(height: 30),
-                  // Loading Indicator
                   const CircularProgressIndicator(color: Colors.red),
                   const SizedBox(height: 15),
                   const Text(
-                    "Starting Stream...",
+                    "Connecting to Premium Server...",
                     style: TextStyle(color: Colors.white70, fontSize: 14, letterSpacing: 1),
                   ),
                 ],
               ),
             ),
             
-          // 3. BACK BUTTON
           if (isVideoPlaying)
             Positioned(
               top: 20,
@@ -181,7 +169,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               ),
             ),
 
-          // 4. CROP / ZOOM BUTTON (Video ko full fit karne ke liye)
           if (isVideoPlaying)
             Positioned(
               top: 20,

@@ -31,12 +31,13 @@ class DashboardPageState extends State<DashboardPage> {
   Timer? _carouselTimer;
   int _currentPage = 0;
 
+  // OTT FILTER LOGIC (Asli TMDB Network IDs lagaye hain taaki original series aayein)
   final List<Map<String, dynamic>> ottPlatforms = [
-    {"name": "NETFLIX", "color": Colors.redAccent},
-    {"name": "PRIME", "color": Colors.blueAccent},
-    {"name": "HOTSTAR", "color": Colors.green},
-    {"name": "SONYLIV", "color": Colors.orange},
-    {"name": "ZEE5", "color": Colors.purple},
+    {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "213"},
+    {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
+    {"name": "HOTSTAR", "color": Colors.green, "providerId": "122"},
+    {"name": "SONYLIV", "color": Colors.orange, "providerId": "237"},
+    {"name": "ZEE5", "color": Colors.purple, "providerId": "232"},
   ];
 
   final List<String> categories = ["Action", "Anime", "Comedy", "Horror", "Romance", "Sci-Fi"];
@@ -73,13 +74,19 @@ class DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  // API LANGUAGE CHANGED TO HINDI (hi-IN)
-  Future<void> fetchTmdbData(String query) async {
+  // OTT Filter aur Fast Loading ke sath API Fetching
+  Future<void> fetchTmdbData(String query, {String? providerId}) async {
     setState(() => isLoading = true);
     try {
-      final String url = query.isEmpty
-          ? 'https://api.themoviedb.org/3/trending/all/day?language=hi-IN'
-          : 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(query)}&language=hi-IN';
+      String url = '';
+      if (providerId != null) {
+        // Deep Coding: OTT Provider ID se filter karega
+        url = 'https://api.themoviedb.org/3/discover/tv?with_networks=$providerId&watch_region=IN&language=hi-IN&sort_by=popularity.desc';
+      } else {
+        url = query.isEmpty
+            ? 'https://api.themoviedb.org/3/trending/all/day?language=hi-IN'
+            : 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(query)}&language=hi-IN';
+      }
 
       final response = await http.get(Uri.parse(url), headers: kApiHeaders);
       if (response.statusCode == 200) {
@@ -94,7 +101,9 @@ class DashboardPageState extends State<DashboardPage> {
             'backdropUrl': m['backdrop_path'] != null ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}' : '',
             'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
             'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
-            'mediaType': m['media_type'] ?? 'movie',
+            'mediaType': providerId != null ? 'tv' : (m['media_type'] ?? 'movie'),
+            // Future Admin Panel Cloud Server Link Placeholder (agar admin custom link dega toh)
+            'customUrl': m['customUrl'], 
           }).toList();
           isLoading = false;
         });
@@ -121,6 +130,14 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   void openMediaDetails(Map media) {
+    // Agar future me custom admin panel se apni cloud link aayegi toh direct chalayega
+    if (media['customUrl'] != null && media['customUrl'] != '') {
+      Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
+        videoUrl: media['customUrl'],
+        movieTitle: media['title'],
+      )));
+      return;
+    }
     Navigator.push(context, MaterialPageRoute(builder: (context) => MediaDetailScreen(mediaItem: media))).then((_) {
       setState(() {}); 
     });
@@ -292,7 +309,6 @@ class DashboardPageState extends State<DashboardPage> {
                             ),
                             const SizedBox(height: 4),
                             Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                            
                             if (media['savedSeason'] != null)
                               Text('S${media['savedSeason']} E${media['savedEpisode']}', style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                           ],
@@ -325,7 +341,7 @@ class DashboardPageState extends State<DashboardPage> {
                       ),
                       onPressed: () {
                         searchController.clear();
-                        fetchTmdbData(ottPlatforms[index]['name']);
+                        fetchTmdbData('', providerId: ottPlatforms[index]['providerId']);
                       },
                       child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
@@ -436,7 +452,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     fetchDetails();
   }
 
-  // API LANGUAGE CHANGED TO HINDI (hi-IN)
   Future<void> fetchDetails() async {
     final mediaType = widget.mediaItem['mediaType'] ?? 'movie';
     final id = widget.mediaItem['id'];
@@ -466,7 +481,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // API LANGUAGE CHANGED TO HINDI (hi-IN)
   Future<void> fetchEpisodes(int seasonNumber) async {
     setState(() { isLoadingEpisodes = true; selectedSeason = seasonNumber; });
     try {
@@ -503,12 +517,13 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     final id = widget.mediaItem['id'];
     String finalUrl = '';
 
+    // DEEP CODING: Changed /hi/ to /en/ (For English Player UI - 'Skip Now', 'Quality')
     if (type == 'tv' || type == 'series') {
       final s = season ?? 1;
       final e = episode ?? 1;
-      finalUrl = 'https://stellar.rip/hi/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true&nextButton=true&autoNext=true';
+      finalUrl = 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true&nextButton=true&autoNext=true';
     } else {
-      finalUrl = 'https://stellar.rip/hi/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
+      finalUrl = 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
     }
 
     Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
