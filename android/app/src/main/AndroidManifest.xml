@@ -1,8 +1,14 @@
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
+
+    <!-- Internet Permission (Movies load karne aur video play karne ke liye bahut zaroori hai) -->
+    <uses-permission android:name="android.permission.INTERNET"/>
+
     <application
-        android:label="onyxtube"
+        android:label="HANNUTV"
         android:name="${applicationName}"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:usesCleartextTraffic="true"> <!-- Yeh line API se data lane ke liye zaroori hai -->
+        
         <activity
             android:name=".MainActivity"
             android:exported="true"

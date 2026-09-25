@@ -37,6 +37,8 @@ dependencies:
   http: ^1.6.0
   video_player: ^2.14.0
   chewie: ^1.17.2
+  url_launcher: ^6.3.2
+  better_player: ^1.14.0
 
 dev_dependencies:
   flutter_test:
