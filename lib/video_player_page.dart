@@ -34,19 +34,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool showControls = true;
   Timer? _hideTimer;
 
-  // DEEP FIX: 4 NEW SERVERS OPTIMIZED FOR HINDI DUB & DUAL AUDIO
+  // VIP Server (Vidlink) supports DUAL AUDIO internally (Hindi/Korean etc)
   int activeServerIndex = 0;
   final List<Map<String, dynamic>> servers = [
-    {'name': 'Server 1 (Auto Hindi/English)', 'color': Colors.green, 'type': 'vidsrc_net'},
-    {'name': 'Server 2 (Multi-Audio VIP)', 'color': Colors.greenAccent, 'type': 'vidlink'},
-    {'name': 'Server 3 (Dual Audio Mix)', 'color': Colors.orange, 'type': 'autoembed'},
-    {'name': 'Server 4 (Backup Fast)', 'color': Colors.blue, 'type': 'vidsrc_to'},
+    {'name': 'VIP Server (Dual Audio/Fast)', 'color': Colors.green, 'type': 'vidlink'},
+    {'name': 'Auto Server (Medium)', 'color': Colors.orange, 'type': 'vidsrc'},
+    {'name': 'Premium Server (English)', 'color': Colors.blue, 'type': 'stellar'},
   ];
 
   @override
   void initState() {
     super.initState();
     
+    // SCREEN FULLSCREEN LANDSCAPE MODE
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
@@ -66,17 +66,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // SERVER 1: VidSrc NET (Often defaults to Hindi/Local IP)
-    if (srv == 'vidsrc_net') return isTv ? 'https://vidsrc.net/embed/tv?tmdb=$id&season=$s&episode=$e' : 'https://vidsrc.net/embed/movie?tmdb=$id';
-    
-    // SERVER 2: VidLink (Has internal gear icon for audio tracks)
+    // DIRECT LINKS 
     if (srv == 'vidlink') return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
-    
-    // SERVER 3: AutoEmbed (Scrapes multiple dual-audio sources)
-    if (srv == 'autoembed') return isTv ? 'https://autoembed.co/tv/tmdb/$id-$s-$e' : 'https://autoembed.co/movie/tmdb/$id';
-    
-    // SERVER 4: VidSrc TO (Reliable backup)
-    return isTv ? 'https://vidsrc.to/embed/tv/$id/$s/$e' : 'https://vidsrc.to/embed/movie/$id';
+    if (srv == 'vidsrc') return isTv ? 'https://vidsrc.to/embed/tv/$id/$s/$e' : 'https://vidsrc.to/embed/movie/$id';
+    return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
   }
 
   void _initWebView() {
@@ -98,19 +91,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // SILENT AD KILLER & FAST BUFFERING (No White Screen)
+            // DEEP FIX: Removed aggressive JS that caused Black Screen.
+            // Sirf status check aur text hide karega. Player perfectly load hoga.
             _controller.runJavaScript('''
-              document.addEventListener('click', function(e) {
-                var a = e.target.closest('a');
-                if (a && a.target === '_blank') { e.preventDefault(); }
-              }, true);
-              
-              window.open = function() { return null; };
-              
               var checkVideo = setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
-                  vids[0].preload = 'auto'; 
                   if (vids[0].currentTime > 0.1) {
                     VideoState.postMessage('playing');
                     clearInterval(checkVideo);
@@ -123,6 +109,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               document.head.appendChild(style);
             ''');
           },
+          // SMART AD BLOCKER: Ye video CDN ko allow karega (No White/Black Screen), par Ads rokega.
+          onNavigationRequest: (NavigationRequest request) {
+            final url = request.url.toLowerCase();
+            // Agar link me bet, casino, pop, ads hai ya wo doosri app khol raha hai, toh block kardo.
+            if (url.contains('casino') || url.contains('bet') || url.contains('ads') || url.contains('pop') || !url.startsWith('http')) {
+              return NavigationDecision.prevent;
+            }
+            // Baaki asli video links ko pass hone do
+            return NavigationDecision.navigate;
+          },
         ),
       )
       ..loadRequest(
@@ -130,11 +126,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         headers: {'Referer': 'https://hannutv.app/'},
       );
 
+    // Audio Autoplay Bypass
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    Future.delayed(const Duration(seconds: 12), () {
+    // 10 Second Fallback Timeout (Screen pe atakne se bachane ke liye)
+    Future.delayed(const Duration(seconds: 10), () {
       if (mounted && !isVideoPlaying) {
         setState(() => isVideoPlaying = true);
       }
@@ -167,7 +165,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             children: [
               const Text("Select Streaming Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text("Language Tip: Agar ek server par English/Korean hai, toh doosra server try karein. Kuch servers player ke andar ⚙️ icon se Hindi change karne dete hain.", style: TextStyle(color: Colors.redAccent, fontSize: 12), textAlign: TextAlign.center),
+              const Text("Dual Audio tip: Use VIP Server. Click the ⚙️ or 🎧 icon inside the player to change language.", style: TextStyle(color: Colors.redAccent, fontSize: 12), textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ...List.generate(servers.length, (index) {
                 final srv = servers[index];
@@ -224,8 +222,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         behavior: HitTestBehavior.translucent,
         child: Stack(
           children: [
+            // 1. FAST RAW WEBVIEW PLAYER
             WebViewWidget(controller: _controller),
             
+            // 2. HANNUTV LOADING SCREEN
             if (!isVideoPlaying)
               Container(
                 color: Colors.black,
@@ -253,6 +253,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
               ),
               
+            // 3. TOP LEFT: BACK BUTTON (Auto Hides in 3s)
             if (isVideoPlaying && showControls)
               Positioned(
                 top: 20,
@@ -271,6 +272,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
               ),
 
+            // 4. TOP RIGHT: SERVER & CROP BUTTONS (Auto Hides in 3s)
             if (isVideoPlaying && showControls)
               Positioned(
                 top: 20,
