@@ -10,7 +10,7 @@ class VideoPlayerPage extends StatefulWidget {
   final int season;
   final int episode;
   final String movieTitle;
-  final String? customUrl; // Cloud uploads ke liye
+  final String? customUrl; 
 
   const VideoPlayerPage({
     Key? key,
@@ -32,11 +32,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool isVideoPlaying = false;
   bool isCropped = false;
   
-  // AUTO-HIDE LOGIC
+  // AUTO-HIDE UI
   bool showControls = true; 
   Timer? _hideTimer;
   
-  // MULTI-SERVER ARCHITECTURE (Dual Audio & Fast Buffering)
+  // MULTI-SERVER ARCHITECTURE 
   int activeServerIndex = 0;
   final List<Map<String, dynamic>> servers = [
     {'name': 'VIP Server (Dual Audio / SuperFast)', 'color': Colors.green, 'type': 'vidlink'},
@@ -59,7 +59,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   String _generateVideoUrl() {
-    // Agar custom cloud upload hai
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) return widget.customUrl!;
     
     final srv = servers[activeServerIndex]['type'];
@@ -68,15 +67,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // SERVER 1: VIP SERVER (VidLink) - Native Dual Audio Selector
+    // SERVER 1: VIP (VidLink - Dual Audio Support)
     if (srv == 'vidlink') return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
-    
-    // SERVER 2: PREMIUM (Stellar)
+    // SERVER 2: PREMIUM (Stellar - English UI)
     if (srv == 'stellar') return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
-    
     // SERVER 3: AUTO (Vidsrc)
     if (srv == 'vidsrc') return isTv ? 'https://vidsrc.to/embed/tv/$id/$s/$e' : 'https://vidsrc.to/embed/movie/$id';
-    
     // SERVER 4: BACKUP (Cinesrc)
     return isTv ? 'https://cinesrc.st/embed/tv/$id?s=$s&e=$e&autoplay=true' : 'https://cinesrc.st/embed/movie/$id?autoplay=true';
   }
@@ -92,27 +88,37 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // DEEP CODING: Kill Ads, FAST BUFFER (5s limit), and UI Cleanup
+            // DEEP FIX: JS INJECTION - Kill Popups silently, Force Buffer
             _controller.runJavaScript('''
+              // 1. Silent Popup Killer (Fixes White Screen Reloading)
               window.open = function() { return null; };
+              document.addEventListener('click', function(e) {
+                var a = e.target.closest('a');
+                if(a && a.target === '_blank') { e.preventDefault(); }
+              }, true);
+              
+              // 2. Buffer Enforcement
               var checkVideo = setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
-                  vids[0].preload = 'auto'; // FORCE FAST BACKGROUND BUFFER
+                  vids[0].preload = 'auto'; 
                   if (vids[0].currentTime > 0.1) {
                     VideoState.postMessage('playing');
                     clearInterval(checkVideo);
                   }
                 }
               }, 500);
+              
+              // 3. Hide Server Toasts
               var style = document.createElement('style');
               style.innerHTML = 'div[style*="z-index"] { display: none !important; }';
               document.head.appendChild(style);
             ''');
           },
           onNavigationRequest: (request) {
-            // Sirf player links allow karo, baaki saare ads block
-            if (!request.url.contains(servers[activeServerIndex]['type']) && !request.url.contains('stellar') && !request.url.contains('vidlink') && !request.url.contains('vidsrc')) {
+            // DEEP FIX: ONLY BLOCK KNOWN AD DOMAINS, ALLOW CDN STREAMS (No White Screen)
+            final url = request.url.toLowerCase();
+            if (url.contains('bet') || url.contains('casino') || url.contains('ads') || url.contains('pop')) {
               return NavigationDecision.prevent;
             }
             return NavigationDecision.navigate;
@@ -125,13 +131,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // FAST 5 SECOND TIMEOUT - Agar video API slow hai toh bhi controls dikha do
-    Future.delayed(const Duration(seconds: 6), () {
+    // Fallback if Stream takes too long
+    Future.delayed(const Duration(seconds: 12), () {
       if (mounted && !isVideoPlaying) setState(() => isVideoPlaying = true);
     });
   }
 
-  // AUTO-HIDE UI CONTROLS AFTER 3 SECONDS
   void _startHideTimer() {
     _hideTimer?.cancel();
     if (mounted) setState(() => showControls = true);
@@ -140,12 +145,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
   }
 
-  // BOTTOM SHEET TO CHANGE SERVERS
   void _showServerSelector() {
-    _hideTimer?.cancel(); // Menu khulne par hide mat karo
+    _hideTimer?.cancel(); 
     showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.grey[900],
+      context: context, backgroundColor: Colors.grey[900],
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
         return Container(
@@ -155,7 +158,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             children: [
               const Text("Select Streaming Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text("Dual Audio tip: Click the ⚙️ or 🎧 icon in the player to change language.", style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
+              const Text("Dual Audio tip: Use VIP Server. Click the ⚙️ or 🎧 icon in the player to change language.", style: TextStyle(color: Colors.white54, fontSize: 12), textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ...List.generate(servers.length, (index) {
                 final srv = servers[index];
@@ -166,7 +169,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     Navigator.pop(context);
                     if (activeServerIndex != index) {
                       setState(() => activeServerIndex = index);
-                      _initWebView(); // Naya server load karo
+                      _initWebView(); 
                     } else {
                       _startHideTimer();
                     }
@@ -205,7 +208,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     return Scaffold(
       backgroundColor: Colors.black,
       body: GestureDetector(
-        // Screen pe tap karte hi buttons dikhenge aur 3 sec me gayab honge
         onTap: _startHideTimer, 
         behavior: HitTestBehavior.opaque,
         child: Stack(
@@ -228,7 +230,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
               ),
               
-            // TOP LEFT: BACK BUTTON (Auto hides after 3s)
             if (isVideoPlaying)
               AnimatedOpacity(
                 opacity: showControls ? 1.0 : 0.0,
@@ -244,7 +245,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
               ),
 
-            // TOP RIGHT: SERVER & CROP BUTTONS (Auto hides after 3s)
             if (isVideoPlaying)
               AnimatedOpacity(
                 opacity: showControls ? 1.0 : 0.0,
@@ -254,7 +254,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   child: SafeArea(
                     child: Row(
                       children: [
-                        // SERVER CHANGE BUTTON (Shows Green/Orange/Red dot)
                         GestureDetector(
                           onTap: _showServerSelector,
                           child: Container(
@@ -270,7 +269,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                           ),
                         ),
                         const SizedBox(width: 12),
-                        // CROP BUTTON
                         Container(
                           decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
                           child: IconButton(icon: Icon(isCropped ? Icons.fullscreen_exit : Icons.crop_free, color: Colors.white, size: 24), onPressed: toggleCrop),

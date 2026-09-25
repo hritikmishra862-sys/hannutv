@@ -14,7 +14,7 @@ const Map<String, String> kApiHeaders = {
 
 List<Map> continueWatchingList = [];
 
-// YAHAN ADMIN APNI CLOUD MOVIES DAAL SAKTA HAI (Future me Firebase se link kar lena)
+// ADMIN CLOUD UPLOADS
 List<Map> customUploadedMovies = [
   {
     'id': 9999991, 
@@ -25,7 +25,7 @@ List<Map> customUploadedMovies = [
     'rating': "10.0",
     'year': "2024",
     'mediaType': "movie",
-    'customUrl': "https://nxsha.screenscape.me/embed?tmdb=10195&type=movie" // Tera cloud link yahan aayega
+    'customUrl': "https://nxsha.screenscape.me/embed?tmdb=10195&type=movie"
   }
 ];
 
@@ -36,7 +36,6 @@ class DashboardPage extends StatefulWidget {
 }
 
 class DashboardPageState extends State<DashboardPage> {
-  // CATEGORY LISTS (Netflix Style)
   List trendingList = [];
   List actionList = [];
   List horrorList = [];
@@ -53,9 +52,9 @@ class DashboardPageState extends State<DashboardPage> {
   Timer? _carouselTimer;
   int _currentPage = 0;
 
-  // OTT PROVIDER IDs
+  // DEEP FIX: Asli OTT Watch Provider IDs (India Region)
   final List<Map<String, dynamic>> ottPlatforms = [
-    {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "213"},
+    {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
     {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
     {"name": "HOTSTAR", "color": Colors.green, "providerId": "122"},
     {"name": "SONYLIV", "color": Colors.orange, "providerId": "237"},
@@ -88,7 +87,6 @@ class DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  // Data Parser
   List parseData(http.Response response, {String? forceMediaType}) {
     if (response.statusCode != 200) return [];
     final List rawData = json.decode(response.body)['results'] ?? [];
@@ -104,32 +102,31 @@ class DashboardPageState extends State<DashboardPage> {
     }).toList();
   }
 
-  // DEEP CODING: LOAD ALL CATEGORIES SIMULTANEOUSLY (Super Fast)
+  // DEEP FIX: OTT Category Wise Sync
   Future<void> loadAllDashboards({String? providerId}) async {
     setState(() => isLoading = true);
     try {
       String base = 'https://api.themoviedb.org/3';
-      String net = providerId != null ? '&with_networks=$providerId' : '';
-      String type = providerId != null ? 'discover/tv' : 'discover/movie'; 
+      String prov = providerId != null ? '&with_watch_providers=$providerId&watch_region=IN' : '';
       
       String trendUrl = providerId != null 
-          ? '$base/discover/tv?language=en-US&sort_by=popularity.desc&with_networks=$providerId'
+          ? '$base/discover/tv?language=en-US&sort_by=popularity.desc$prov'
           : '$base/trending/all/day?language=en-US';
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
-        http.get(Uri.parse('$base/$type?language=en-US&with_genres=28$net&sort_by=popularity.desc'), headers: kApiHeaders), // Action
-        http.get(Uri.parse('$base/$type?language=en-US&with_genres=27$net&sort_by=popularity.desc'), headers: kApiHeaders), // Horror
-        http.get(Uri.parse('$base/$type?language=en-US&with_genres=10749$net&sort_by=popularity.desc'), headers: kApiHeaders), // Romance
-        http.get(Uri.parse('$base/$type?language=en-US&with_genres=53$net&sort_by=popularity.desc'), headers: kApiHeaders), // Thriller
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Action Movies
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=9648$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Horror/Mystery TV
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=10749$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Romance Movies
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=80$prov&sort_by=popularity.desc'), headers: kApiHeaders), // Crime/Thriller TV
       ]);
 
       setState(() {
         trendingList = parseData(responses[0], forceMediaType: providerId != null ? 'tv' : null);
-        actionList = parseData(responses[1], forceMediaType: providerId != null ? 'tv' : 'movie');
-        horrorList = parseData(responses[2], forceMediaType: providerId != null ? 'tv' : 'movie');
-        romanceList = parseData(responses[3], forceMediaType: providerId != null ? 'tv' : 'movie');
-        thrillerList = parseData(responses[4], forceMediaType: providerId != null ? 'tv' : 'movie');
+        actionList = parseData(responses[1], forceMediaType: 'movie');
+        horrorList = parseData(responses[2], forceMediaType: 'tv');
+        romanceList = parseData(responses[3], forceMediaType: 'movie');
+        thrillerList = parseData(responses[4], forceMediaType: 'tv');
         isLoading = false;
       });
     } catch (e) {
@@ -137,7 +134,8 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  void onSearchChanged(String value) async {
+  // SEARCH AUTOCORRECT & LIVE SYNC
+  void onSearchChanged(String value) {
     if (value.isEmpty) {
       setState(() { isSearching = false; searchResults = []; });
       return;
@@ -146,7 +144,8 @@ class DashboardPageState extends State<DashboardPage> {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 400), () async {
       setState(() => isLoading = true);
-      final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US';
+      // Auto-correct partial strings correctly using TMDB Multi-Search
+      final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
       final res = await http.get(Uri.parse(url), headers: kApiHeaders);
       setState(() {
         searchResults = parseData(res);
@@ -167,6 +166,7 @@ class DashboardPageState extends State<DashboardPage> {
       return;
     }
     Navigator.push(context, MaterialPageRoute(builder: (context) => MediaDetailScreen(mediaItem: media))).then((_) {
+      // BACK AATE HI CONTINUE WATCHING DASHBOARD UPDATE KAREGA
       setState(() {}); 
     });
   }
@@ -297,7 +297,7 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            // OTT FILTERS (Netflix, Prime, Hotstar)
+            // OTT FILTERS
             const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
             SizedBox(
               height: 50,
@@ -355,7 +355,7 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              // MULTIPLE NETFLIX STYLE CATEGORY ROWS
+              // CATEGORY WISE DASHBOARD
               _buildHorizontalList('Trending Now', trendingList),
               if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
               if (customUploadedMovies.isNotEmpty) _buildHorizontalList('User Requests (Cloud)', customUploadedMovies),
@@ -447,6 +447,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
   }
 
   void launchPlayer(String title, {int? season, int? episode}) {
+    // REMOVE OLD ENTRY AND UPDATE TO CONTINUE WATCHING
     continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
     final type = widget.mediaItem['mediaType'] ?? 'movie';
@@ -456,7 +457,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
     continueWatchingList.insert(0, currentMedia);
 
-    // Deep Fix: Send IDs to Player to handle Multi-Servers dynamically
     Navigator.push(context, MaterialPageRoute(builder: (context) => VideoPlayerPage(
       tmdbId: widget.mediaItem['id'],
       mediaType: type,
