@@ -4,38 +4,37 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-// ==========================================
-// 1. NATIVE KOTLIN BRIDGE SERVICE
-// ==========================================
+/// 🌉 NATIVE METHODCHANNEL SERVICE FOR NETMIRROR CNCVERSE
 class CNCVerseService {
-  static const MethodChannel _channel = MethodChannel('com.horis.cncverse/stream');
+  static const MethodChannel _channel =
+      MethodChannel('com.horis.cncverse/stream');
 
-  static Future getStreamUrl({
+  static Future<String?> getStreamUrl({
     required String title,
     required String mediaType,
-    required String provider,
+    String provider = 'netflix',
     int season = 1,
     int episode = 1,
   }) async {
     try {
-      final String? streamUrl = await _channel.invokeMethod('getStreamUrl', {
+      final String? url = await _channel.invokeMethod<String>('getStreamUrl', {
         'title': title,
         'mediaType': mediaType,
         'provider': provider,
         'season': season,
         'episode': episode,
       });
-      return streamUrl;
+      return url;
     } on PlatformException catch (e) {
-      debugPrint("Native Extraction Failed: ${e.message}");
+      debugPrint("CNCVerse Native MethodChannel Error: ${e.message}");
+      return null;
+    } catch (e) {
+      debugPrint("CNCVerse General Error: $e");
       return null;
     }
   }
 }
 
-// ==========================================
-// 2. VIDEO PLAYER PAGE (EXACT YOUR UI)
-// ==========================================
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
   final String mediaType;
@@ -43,7 +42,7 @@ class VideoPlayerPage extends StatefulWidget {
   final int episode;
   final String movieTitle;
   final String? customUrl;
-  final String preferredServer; // 'netmirror_portal', 'vidbolt', 'olly', 'vega'
+  final String preferredServer;
 
   const VideoPlayerPage({
     Key? key,
@@ -53,14 +52,14 @@ class VideoPlayerPage extends StatefulWidget {
     required this.episode,
     required this.movieTitle,
     this.customUrl,
-    this.preferredServer = 'netmirror_portal',
+    this.preferredServer = 'netmirror_native',
   }) : super(key: key);
 
   @override
-  State createState() => _VideoPlayerPageState();
+  State<VideoPlayerPage> createState() => _VideoPlayerPageState();
 }
 
-class _VideoPlayerPageState extends State {
+class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late WebViewController _controller;
 
   bool isVideoPlaying = false;
@@ -69,13 +68,14 @@ class _VideoPlayerPageState extends State {
   Timer? _hideTimer;
   bool isPageLoading = true;
   late String currentServerKey;
+  String? resolvedDirectStreamUrl;
 
-  // 🤖 VIP SERVERS (YOUR EXACT LIST)
-  final List> allServers = [
+  // 🤖 VIP SERVERS WITH NATIVE NETMIRROR FIRST
+  final List<Map<String, dynamic>> allServers = [
     {
-      'key': 'netmirror_portal',
-      'name': 'HANNUTV VIP (NetMirror)',
-      'sub': 'Official NetMirror Hub (Zero Ads)',
+      'key': 'netmirror_native',
+      'name': 'HANNUTV VIP (NetMirror Direct)',
+      'sub': 'Native Kotlin Scraper Engine (Zero Ads)',
       'color': Colors.redAccent,
       'lang': 'hindi',
     },
@@ -118,7 +118,7 @@ class _VideoPlayerPageState extends State {
 
   String selectedLanguage = 'hindi';
 
-  List> get currentServers =>
+  List<Map<String, dynamic>> get currentServers =>
       allServers.where((s) => s['lang'] == selectedLanguage).toList();
 
   @override
@@ -132,98 +132,115 @@ class _VideoPlayerPageState extends State {
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    _prepareAndPlayServer();
+    _loadStreamEngine();
     _startHideTimer();
+  }
+
+  Future<void> _loadStreamEngine() async {
+    setState(() {
+      isPageLoading = true;
+      isVideoPlaying = false;
+    });
+
+    if (currentServerKey == 'netmirror_native') {
+      final directLink = await CNCVerseService.getStreamUrl(
+        title: widget.movieTitle,
+        mediaType: widget.mediaType,
+        provider: 'netflix',
+        season: widget.season,
+        episode: widget.episode,
+      );
+
+      if (directLink != null && directLink.isNotEmpty) {
+        resolvedDirectStreamUrl = directLink;
+        _initNativeHtmlPlayer(directLink);
+        return;
+      } else {
+        currentServerKey = 'vidbolt';
+      }
+    }
+
+    _initFallbackWebView();
   }
 
   void _switchServer(String newServerKey) {
     setState(() {
       currentServerKey = newServerKey;
-      isPageLoading = true;
-      isVideoPlaying = false;
     });
-    _prepareAndPlayServer();
+    _loadStreamEngine();
     _startHideTimer();
   }
 
-  Future _prepareAndPlayServer() async {
-    setState(() => isPageLoading = true);
-    String playUrl = await _resolvePlayUrl();
-    _initWebView(playUrl);
-  }
-
-  Future _resolvePlayUrl() async {
-    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
-      return widget.customUrl!;
-    }
-
-    final id = widget.tmdbId;
-    final s = widget.season;
-    final e = widget.episode;
-    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
-
-    // 🚀 Native Kotlin Extraction for NetMirror
-    if (currentServerKey == 'netmirror_portal') {
-      String? nativeExtractedUrl = await CNCVerseService.getStreamUrl(
-        title: widget.movieTitle,
-        mediaType: widget.mediaType,
-        provider: 'netmirror',
-        season: widget.season,
-        episode: widget.episode,
-      );
-
-      if (nativeExtractedUrl != null && nativeExtractedUrl.isNotEmpty) {
-        return nativeExtractedUrl;
-      }
-
-      // Fallback if extraction is in-progress or fails
-      return isTv
-          ? 'https://netmirror.center/explore/tv'
-          : 'https://netmirror.center/explore/movie';
-    }
-
-    // 🚀 2. VIDBOLT 1080P ULTRA HD
-    if (currentServerKey == 'vidbolt') {
-      return isTv
-          ? 'https://vidbolt.pro/tv/\(id/\)s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
-          : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
-    }
-
-    // 🚀 3. OLLY STREAM VIP
-    if (currentServerKey == 'olly') {
-      return isTv
-          ? 'https://ollyembed.pages.dev/tv/\(id/\)s/$e?server=1'
-          : 'https://ollyembed.pages.dev/movie/$id?server=1';
-    }
-
-    // 🚀 4. VEGA 4K MULTI-AUDIO
-    if (currentServerKey == 'vega') {
-      return isTv
-          ? 'https://vidsrc.to/embed/tv/\(id/\)s/$e'
-          : 'https://vidsrc.to/embed/movie/$id';
-    }
-
-    // 🚀 5. FLIXORENT ENGLISH
-    if (currentServerKey == 'flixorent') {
-      return isTv
-          ? 'https://vidsrc.pro/embed/tv/\(id/\)s/$e'
-          : 'https://vidsrc.pro/embed/movie/$id';
-    }
-
-    // 🚀 6. VIDLINK ENGLISH
-    return isTv
-        ? 'https://vidlink.pro/tv/\(id/\)s/$e'
-        : 'https://vidlink.pro/movie/$id';
-  }
-
-  void _initWebView(String targetUrl) {
-    final cleanTitle = widget.movieTitle.replaceAll("'", "\\'");
-
+  // 🎬 NATIVE DIRECT STREAM HTML5 PLAYER (ZERO ADS, 100% CLEAN)
+  void _initNativeHtmlPlayer(String streamUrl) {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setUserAgent(
         "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+      )
+      ..addJavaScriptChannel(
+        'VideoState',
+        onMessageReceived: (JavaScriptMessage message) {
+          if (message.message == 'playing' && mounted) {
+            setState(() {
+              isVideoPlaying = true;
+              isPageLoading = false;
+            });
+          }
+        },
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (String url) {
+            if (mounted) setState(() => isPageLoading = false);
+            _controller.runJavaScript('''
+              var v = document.getElementById('native-video');
+              if (v) {
+                v.play().catch(function(){});
+                v.addEventListener('playing', function() {
+                  VideoState.postMessage('playing');
+                });
+              }
+            ''');
+          },
+        ),
+      );
+
+    final html = '''
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
+            video { width: 100%; height: 100%; object-fit: contain; background: #000; }
+          </style>
+        </head>
+        <body>
+          <video id="native-video" src="$streamUrl" autoplay playsinline controls></video>
+        </body>
+      </html>
+    ''';
+
+    _controller.loadHtmlString(html, baseUrl: 'https://hannutv.app');
+
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
+  }
+
+  // 🌐 FALLBACK WEBVIEW ENGINE (VIDBOLT, OLLY, VEGA, FLIXORENT)
+  void _initFallbackWebView() {
+    final targetUrl = _generateFallbackUrl();
+
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setUserAgent(
+        "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
       )
       ..addJavaScriptChannel(
         'VideoState',
@@ -247,7 +264,6 @@ class _VideoPlayerPageState extends State {
             String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
-
               window.open = function() { return null; };
               window.alert = function() { return null; };
               window.confirm = function() { return null; };
@@ -259,12 +275,8 @@ class _VideoPlayerPageState extends State {
                       text.includes('ad-blocker') || 
                       text.includes('disable adblock') || 
                       text.includes('please disable') ||
-                      text.includes('inside an iframe') ||
-                      text.includes('netmirror') ||
-                      text.includes('net mirror')) {
-                    if (el.tagName === 'HEADER' || el.tagName === 'NAV') {
-                      el.style.display = 'none';
-                    } else if (!el.querySelector('video') && !el.querySelector('iframe')) {
+                      text.includes('inside an iframe')) {
+                    if (!el.querySelector('video') && !el.querySelector('iframe')) {
                       el.remove();
                     }
                   }
@@ -279,18 +291,6 @@ class _VideoPlayerPageState extends State {
                     el.remove();
                   }
                 });
-
-                if (window.location.hostname.includes('netmirror.center') && !window._netMirrorExecuted) {
-                  var searchInput = document.querySelector('input[type="search"], input[placeholder*="Search"], input[name="q"], .search-input');
-                  if (searchInput && searchInput.value !== '$cleanTitle') {
-                    window._netMirrorExecuted = true;
-                    searchInput.value = '$cleanTitle';
-                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    var form = searchInput.closest('form');
-                    if (form) form.dispatchEvent(new Event('submit', { bubbles: true }));
-                  }
-                }
 
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
@@ -323,7 +323,6 @@ class _VideoPlayerPageState extends State {
             }
 
             if (url.contains('hannutv.app') ||
-                url.contains('netmirror') ||
                 url.contains('vidbolt') ||
                 url.contains('ollyembed') ||
                 url.contains('pages.dev') ||
@@ -340,13 +339,29 @@ class _VideoPlayerPageState extends State {
         ),
       );
 
-    _controller.loadRequest(
-      Uri.parse(targetUrl),
-      headers: {
-        'Referer': 'https://netmirror.center/',
-        'Origin': 'https://netmirror.center',
-      },
-    );
+    final embedHtml = '''
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
+            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
+          </style>
+        </head>
+        <body>
+          <iframe 
+            id="player-frame"
+            src="$targetUrl" 
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
+            allowfullscreen>
+          </iframe>
+        </body>
+      </html>
+    ''';
+
+    _controller.loadHtmlString(embedHtml, baseUrl: 'https://hannutv.app');
 
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController)
@@ -354,13 +369,53 @@ class _VideoPlayerPageState extends State {
     }
   }
 
+  String _generateFallbackUrl() {
+    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
+      return widget.customUrl!;
+    }
+
+    final id = widget.tmdbId;
+    final s = widget.season;
+    final e = widget.episode;
+    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+
+    if (currentServerKey == 'vidbolt') {
+      return isTv
+          ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
+          : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
+    }
+    if (currentServerKey == 'olly') {
+      return isTv
+          ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
+          : 'https://ollyembed.pages.dev/movie/$id?server=1';
+    }
+    if (currentServerKey == 'vega') {
+      return isTv
+          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
+          : 'https://vidsrc.to/embed/movie/$id';
+    }
+    if (currentServerKey == 'flixorent') {
+      return isTv
+          ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
+          : 'https://vidsrc.pro/embed/movie/$id';
+    }
+    return isTv
+        ? 'https://vidlink.pro/tv/$id/$s/$e'
+        : 'https://vidlink.pro/movie/$id';
+  }
+
   void _seekRelative(int seconds) {
     _startHideTimer();
     final js = '''
       (function() {
-        var vids = document.getElementsByTagName('video');
-        if (vids.length > 0) {
-          vids[0].currentTime += $seconds;
+        var v = document.getElementById('native-video');
+        if (!v) {
+          var frame = document.getElementById('player-frame');
+          var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
+          v = doc ? doc.querySelector('video') : document.querySelector('video');
+        }
+        if (v) {
+          v.currentTime += $seconds;
         }
       })();
     ''';
@@ -394,7 +449,7 @@ class _VideoPlayerPageState extends State {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "Switch Video Engine",
+                    "Switch Video Server",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -411,9 +466,9 @@ class _VideoPlayerPageState extends State {
                           Navigator.pop(context);
                           setState(() {
                             selectedLanguage = 'hindi';
-                            currentServerKey = 'netmirror_portal';
+                            currentServerKey = 'netmirror_native';
                           });
-                          _switchServer('netmirror_portal');
+                          _switchServer('netmirror_native');
                         },
                       ),
                       const SizedBox(width: 8),
@@ -440,7 +495,9 @@ class _VideoPlayerPageState extends State {
                 final isSelected = currentServerKey == srv['key'];
                 return ListTile(
                   leading: Icon(
-                    isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                    isSelected
+                        ? Icons.check_circle
+                        : Icons.radio_button_unchecked,
                     color: isSelected ? Colors.greenAccent : Colors.grey,
                   ),
                   title: Text(
@@ -474,9 +531,9 @@ class _VideoPlayerPageState extends State {
   void toggleCrop() {
     setState(() => isCropped = !isCropped);
     _controller.runJavaScript('''
-      var vids = document.getElementsByTagName('video');
-      if (vids.length > 0) {
-        vids[0].style.objectFit = '${isCropped ? "cover" : "contain"}';
+      var v = document.getElementById('native-video') || document.querySelector('video');
+      if (v) {
+        v.style.objectFit = '${isCropped ? "cover" : "contain"}';
       }
     ''');
     _startHideTimer();
@@ -486,7 +543,8 @@ class _VideoPlayerPageState extends State {
   void dispose() {
     _hideTimer?.cancel();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
@@ -507,7 +565,7 @@ class _VideoPlayerPageState extends State {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // 1. PURE BLACK WEBVIEW CONTAINER
+            // 1. PURE BLACK WEBVIEW CONTAINER (NATIVE OR EMBEDDED)
             Positioned.fill(
               child: Container(
                 color: Colors.black,
@@ -547,7 +605,8 @@ class _VideoPlayerPageState extends State {
                 left: 20,
                 child: SafeArea(
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.black87,
                       borderRadius: BorderRadius.circular(20),
@@ -559,12 +618,14 @@ class _VideoPlayerPageState extends State {
                         const SizedBox(
                           width: 14,
                           height: 14,
-                          child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2),
+                          child: CircularProgressIndicator(
+                              color: Colors.red, strokeWidth: 2),
                         ),
                         const SizedBox(width: 10),
                         Text(
                           "Connecting: ${currentSrv['name']}...",
-                          style: const TextStyle(color: Colors.white, fontSize: 12),
+                          style: const TextStyle(
+                              color: Colors.white, fontSize: 12),
                         ),
                       ],
                     ),
@@ -587,7 +648,8 @@ class _VideoPlayerPageState extends State {
                           shape: BoxShape.circle,
                         ),
                         child: IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                          icon: const Icon(Icons.arrow_back,
+                              color: Colors.white, size: 22),
                           onPressed: () => Navigator.pop(context),
                         ),
                       ),
@@ -599,7 +661,9 @@ class _VideoPlayerPageState extends State {
                             color: Colors.white,
                             fontSize: 16,
                             fontWeight: FontWeight.bold,
-                            shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+                            shadows: [
+                              Shadow(color: Colors.black, blurRadius: 6)
+                            ],
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -625,7 +689,8 @@ class _VideoPlayerPageState extends State {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white24),
                         ),
-                        child: const Icon(Icons.replay_10, color: Colors.white, size: 36),
+                        child: const Icon(Icons.replay_10,
+                            color: Colors.white, size: 36),
                       ),
                     ),
                     const SizedBox(width: 80),
@@ -638,7 +703,8 @@ class _VideoPlayerPageState extends State {
                           shape: BoxShape.circle,
                           border: Border.all(color: Colors.white24),
                         ),
-                        child: const Icon(Icons.forward_10, color: Colors.white, size: 36),
+                        child: const Icon(Icons.forward_10,
+                            color: Colors.white, size: 36),
                       ),
                     ),
                   ],
@@ -657,15 +723,18 @@ class _VideoPlayerPageState extends State {
                       GestureDetector(
                         onTap: _showServerSelector,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
                           decoration: BoxDecoration(
                             color: Colors.black.withOpacity(0.8),
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: Colors.redAccent, width: 1.2),
+                            border:
+                                Border.all(color: Colors.redAccent, width: 1.2),
                           ),
                           child: Row(
                             children: [
-                              const Icon(Icons.swap_horiz, color: Colors.redAccent, size: 16),
+                              const Icon(Icons.swap_horiz,
+                                  color: Colors.redAccent, size: 16),
                               const SizedBox(width: 6),
                               Text(
                                 "Server: ${currentSrv['name']}",
