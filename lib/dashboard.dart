@@ -162,23 +162,6 @@ class DashboardPageState extends State<DashboardPage> {
     ).then((_) => setState(() {}));
   }
 
-  // 🚀 DIRECT HANNUTV (NETMIRROR) LIVE SEARCH
-  void launchNetMirrorDirectSearch(String query) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => VideoPlayerPage(
-          tmdbId: 0,
-          mediaType: 'movie',
-          season: 1,
-          episode: 1,
-          movieTitle: query,
-          preferredServer: 'netmirror_live',
-        ),
-      ),
-    );
-  }
-
   Widget _buildHorizontalList(String title, List moviesData) {
     if (moviesData.isEmpty) return const SizedBox();
     return Column(
@@ -288,7 +271,7 @@ class DashboardPageState extends State<DashboardPage> {
                                     style: const TextStyle(color: Colors.white),
                                     autofocus: true,
                                     decoration: InputDecoration(
-                                      hintText: 'Search Movies & Shows...',
+                                      hintText: 'Search NetMirror & HANNUTV...',
                                       border: InputBorder.none,
                                       prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
                                       suffixIcon: IconButton(
@@ -302,10 +285,6 @@ class DashboardPageState extends State<DashboardPage> {
                                         },
                                       ),
                                     ),
-                                    onSubmitted: (query) {
-                                       // DIRECT HANNUTV LIVE SEARCH SUBMIT
-                                       if(query.isNotEmpty) launchNetMirrorDirectSearch(query);
-                                    },
                                     onChanged: onSearchChanged,
                                   ),
                                 ),
@@ -317,11 +296,6 @@ class DashboardPageState extends State<DashboardPage> {
                                 ),
                               ),
                         if (!isSearching) ...[
-                          IconButton(
-                            icon: const Icon(Icons.flash_on, color: Colors.redAccent, size: 28),
-                            tooltip: "HANNUTV Live Search",
-                            onPressed: () => _showLiveSearchDialog(context),
-                          ),
                           IconButton(
                             icon: const Icon(Icons.search, color: Colors.white, size: 28),
                             onPressed: () => setState(() => isSearching = true),
@@ -405,7 +379,7 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 HANNUTV Live (NetMirror Feed)', netmirrorLiveFeed),
+              _buildHorizontalList('🔥 HANNUTV (NetMirror Official)', netmirrorLiveFeed),
               _buildHorizontalList('Trending Now', trendingList),
               if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
               _buildHorizontalList('Action Movies', actionList),
@@ -419,43 +393,8 @@ class DashboardPageState extends State<DashboardPage> {
       ),
     );
   }
-
-  void _showLiveSearchDialog(BuildContext context) {
-    TextEditingController liveSearchController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) {
-        return AlertDialog(
-          backgroundColor: Colors.grey[900],
-          title: const Text("⚡ HANNUTV Live Search", style: TextStyle(color: Colors.white)),
-          content: TextField(
-            controller: liveSearchController,
-            style: const TextStyle(color: Colors.white),
-            autofocus: true,
-            decoration: const InputDecoration(hintText: "Directly search inside NetMirror...", hintStyle: TextStyle(color: Colors.grey)),
-            onSubmitted: (val) {
-              Navigator.pop(context);
-              if (val.isNotEmpty) launchNetMirrorDirectSearch(val);
-            },
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel", style: TextStyle(color: Colors.grey))),
-            ElevatedButton(
-              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
-              onPressed: () {
-                Navigator.pop(context);
-                if (liveSearchController.text.isNotEmpty) launchNetMirrorDirectSearch(liveSearchController.text);
-              },
-              child: const Text("Search", style: TextStyle(color: Colors.white)),
-            ),
-          ],
-        );
-      },
-    );
-  }
 }
 
-// ── DETAILS SCREEN WITH AUTO NETMIRROR DIRECT PLAY ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -527,7 +466,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // 🚀 DIRECT PLAY VIA NETMIRROR ULTRA LIVE
+  // 🚀 DIRECT PLAY VIA NETMIRROR VIP API
   void launchPlayer(String title, {int? season, int? episode}) {
     continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
@@ -546,8 +485,8 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           mediaType: type,
           season: season ?? 1,
           episode: episode ?? 1,
-          movieTitle: title, // This title goes DIRECTLY to NetMirror search!
-          preferredServer: 'netmirror_live',
+          movieTitle: title,
+          preferredServer: 'netmirror_vip', // DIRECT VIP SERVER
         ),
       ),
     );
