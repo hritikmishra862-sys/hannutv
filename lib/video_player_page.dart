@@ -164,6 +164,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               setInterval(function() {
                 var text = document.body.innerText.toLowerCase();
                 if (text.includes("video not found") || 
+                    text.includes("we couldn't find this content") || 
+                    text.includes("not available") || 
                     text.includes("404") || 
                     text.includes("server error") || 
                     text.includes("playback disabled") || 
@@ -209,7 +211,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 window.open = function() { return null; };
                 setInterval(function() {
                   var text = document.body.innerText.toLowerCase();
-                  if (text.includes("video not found") || text.includes("404") || text.includes("playback disabled")) {
+                  if (text.includes("video not found") || text.includes("we couldn't find this content") || text.includes("not available") || text.includes("404") || text.includes("playback disabled")) {
                       VideoState.postMessage('not_found');
                   }
                 }, 100);
