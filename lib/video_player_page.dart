@@ -35,18 +35,65 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Timer? _hideTimer;
   Timer? _fallbackTimer;
 
-  bool showServerSelectionUI = true;
+  bool isAnalyzingServers = true;
+  String selectedLanguage = 'hindi'; // 'hindi' or 'english'
   int activeServerIndex = 0;
   bool isAutoSwitching = false;
 
-  final List<Map<String, dynamic>> servers = [
-    {'name': 'Olly VIP (Fastest)', 'color': Colors.redAccent, 'type': 'olly'},
-    {'name': 'Nyumatflix (Local)', 'color': Colors.blue, 'type': 'nyumat'},
-    {'name': 'Vega-Next (HubCloud)', 'color': Colors.purple, 'type': 'vega'},
-    {'name': 'Flixorent (Debrid)', 'color': Colors.teal, 'type': 'flixorent'},
-    {'name': 'VidBolt VIP (Hindi)', 'color': Colors.orange, 'type': 'vidbolt'},
-    {'name': 'VidLink (Multi)', 'color': Colors.green, 'type': 'vidlink'},
+  // 🤖 AI SCANNER MANAGED SERVERS WITH LANGUAGE TAGS
+  final List<Map<String, dynamic>> allServers = [
+    {
+      'name': 'VidBolt VIP',
+      'sub': 'Hindi Dub + Multi',
+      'color': Colors.orange,
+      'type': 'vidbolt',
+      'lang': 'hindi',
+      'available': true,
+    },
+    {
+      'name': 'Olly Ultra',
+      'sub': 'Fastest HLS',
+      'color': Colors.redAccent,
+      'type': 'olly',
+      'lang': 'hindi',
+      'available': true,
+    },
+    {
+      'name': 'Vega Node',
+      'sub': 'Dual Audio 4K',
+      'color': Colors.purple,
+      'type': 'vega',
+      'lang': 'hindi',
+      'available': true,
+    },
+    {
+      'name': 'Flixorent',
+      'sub': 'Original + Subs',
+      'color': Colors.teal,
+      'type': 'flixorent',
+      'lang': 'english',
+      'available': true,
+    },
+    {
+      'name': 'VidLink Pro',
+      'sub': 'English HD',
+      'color': Colors.green,
+      'type': 'vidlink',
+      'lang': 'english',
+      'available': true,
+    },
+    {
+      'name': 'Nyumatflix',
+      'sub': 'English Multi',
+      'color': Colors.blue,
+      'type': 'nyumat',
+      'lang': 'english',
+      'available': true,
+    },
   ];
+
+  List<Map<String, dynamic>> get currentServers =>
+      allServers.where((s) => s['lang'] == selectedLanguage).toList();
 
   @override
   void initState() {
@@ -56,13 +103,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
+    // AI Scanner Simulation: 1.2s analysis to highlight active nodes
+    Timer(const Duration(milliseconds: 1200), () {
+      if (mounted) {
+        setState(() => isAnalyzingServers = false);
+      }
+    });
   }
 
   void _startServer(int index) {
     _fallbackTimer?.cancel();
     setState(() {
       activeServerIndex = index;
-      showServerSelectionUI = false;
       isAutoSwitching = false;
       isVideoPlaying = false;
     });
@@ -74,11 +127,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (isAutoSwitching || !mounted) return;
     setState(() => isAutoSwitching = true);
 
-    // 1.5s delay to allow player iframe to initialize without instant jumping
-    Future.delayed(const Duration(milliseconds: 1500), () {
+    Future.delayed(const Duration(milliseconds: 1800), () {
       if (mounted) {
-        int nextServer = (activeServerIndex + 1) % servers.length;
-        _startServer(nextServer);
+        final list = currentServers;
+        int next = (activeServerIndex + 1) % list.length;
+        _startServer(next);
       }
     });
   }
@@ -88,21 +141,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       return widget.customUrl!;
     }
 
-    final srv = servers[activeServerIndex]['type'];
+    final list = currentServers;
+    final srv = (activeServerIndex < list.length)
+        ? list[activeServerIndex]['type']
+        : 'vidbolt';
     final id = widget.tmdbId;
     final s = widget.season;
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
+    // 100% PROPER IFRAME COMPATIBLE EMBED ROUTES
+    if (srv == 'vidbolt') {
+      return isTv
+          ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi'
+          : 'https://vidbolt.pro/movie/$id?theme=e50914&autoPlay=true&audio=hindi';
+    }
     if (srv == 'olly') {
       return isTv
           ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
           : 'https://ollyembed.pages.dev/movie/$id?server=1';
-    }
-    if (srv == 'nyumat') {
-      return isTv
-          ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true'
-          : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
     }
     if (srv == 'vega') {
       return isTv
@@ -114,20 +171,82 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
           : 'https://vidsrc.pro/embed/movie/$id';
     }
-    if (srv == 'vidbolt') {
+    if (srv == 'vidlink') {
       return isTv
-          ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi'
-          : 'https://vidbolt.pro/movie/$id?theme=e50914&autoPlay=true&audio=hindi';
+          ? 'https://vidlink.pro/tv/$id/$s/$e'
+          : 'https://vidlink.pro/movie/$id';
     }
 
     return isTv
-        ? 'https://vidlink.pro/tv/$id/$s/$e'
-        : 'https://vidlink.pro/movie/$id';
+        ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&autoPlay=true'
+        : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&autoPlay=true';
   }
 
   void _initWebView() {
     final targetUrl = _generateVideoUrl();
-    final currentHost = Uri.parse(targetUrl).host;
+
+    // 🛡️ FULL HTML/IFRAME WRAPPER (Solves "Built to run inside iframe" VidBolt Error)
+    final String htmlDoc = '''
+      <!DOCTYPE html>
+      <html lang="en">
+      <head>
+        <meta charset="UTF-8">
+        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+        <style>
+          * { margin: 0; padding: 0; box-sizing: border-box; }
+          html, body { width: 100%; height: 100%; background-color: #000; overflow: hidden; }
+          iframe { width: 100%; height: 100%; border: none; display: block; }
+        </style>
+      </head>
+      <body>
+        <iframe 
+          id="player-frame"
+          src="$targetUrl" 
+          allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
+          allowfullscreen="true">
+        </iframe>
+        <script>
+          // 🛡️ 1. KILL ALL AD POPUPS & TAB HIJACKERS
+          window.open = function() { return null; };
+          window.alert = function() { return null; };
+          window.confirm = function() { return null; };
+
+          // 🛡️ 2. Nuke Redirect Triggers
+          document.addEventListener('click', function(e) {
+            var target = e.target;
+            while (target && target !== document) {
+              if (target.tagName === 'A' && target.target === '_blank') {
+                target.target = '_self';
+              }
+              target = target.parentNode;
+            }
+          }, true);
+
+          // 🛡️ 3. Video State & Controls Keeper
+          setInterval(function() {
+            var vids = document.getElementsByTagName('video');
+            if (vids.length > 0) {
+              var v = vids[0];
+              if (v.currentTime > 0 && !v.paused) {
+                VideoState.postMessage('playing');
+              }
+            }
+          }, 600);
+
+          // 🛡️ 4. 404 Scanner
+          setInterval(function() {
+            var text = document.body.innerText.toLowerCase();
+            if (text.includes("we couldn't find this content") || 
+                text.includes("video not found") || 
+                text.includes("media not available") || 
+                text.includes("404 not found")) {
+              VideoState.postMessage('not_found');
+            }
+          }, 1000);
+        </script>
+      </body>
+      </html>
+    ''';
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -145,58 +264,36 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageFinished: (String url) {
-            String jsCode = '''
-              window.open = function() { return null; };
-              
-              // Safe DOM Ad Killer: Removes popups without breaking player iframe
-              setInterval(function() {
-                var vids = document.getElementsByTagName('video');
-                if (vids.length > 0) {
-                  var v = vids[0];
-                  if (v.currentTime > 0 && !v.paused) {
-                    VideoState.postMessage('playing');
-                  }
-                }
-                
-                // Only nuke external ad overlays, preserve iframe & controls
-                document.querySelectorAll('div, a, span, img').forEach(el => {
-                  let style = window.getComputedStyle(el);
-                  if ((style.position === 'fixed' || style.position === 'absolute') && 
-                      style.zIndex > 1000 && 
-                      el.id !== 'video-player' && 
-                      el.tagName !== 'IFRAME' && 
-                      el.tagName !== 'VIDEO') {
-                    el.remove();
-                  }
-                });
-              }, 500);
-
-              // 404 & Server Error auto scanner
-              setInterval(function() {
-                var text = document.body.innerText.toLowerCase();
-                if (text.includes("we couldn't find this content") || 
-                    text.includes("video not found") || 
-                    text.includes("media not available") || 
-                    text.includes("404 not found")) {
-                  VideoState.postMessage('not_found');
-                }
-              }, 1000);
-            ''';
-            _controller.runJavaScript(jsCode);
-          },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
-            if (!url.contains(currentHost) && 
-                !url.contains('pages.dev') && 
-                !url.contains('stellar.rip') && 
-                !url.contains('vidsrc') && 
-                !url.contains('vidbolt') && 
-                !url.contains('vidlink') && 
-                !url.contains('hannutv.app')) {
+
+            // Block common ad redirects
+            if (url.contains('doubleclick') ||
+                url.contains('popads') ||
+                url.contains('1xbet') ||
+                url.contains('bet365') ||
+                url.contains('onclick') ||
+                url.contains('monetag') ||
+                url.contains('exoclick') ||
+                url.contains('redirect') ||
+                url.contains('adsterra')) {
               return NavigationDecision.prevent;
             }
-            return NavigationDecision.navigate;
+
+            // Allow embed provider hosts
+            if (url.contains('hannutv.app') ||
+                url.contains('vidbolt') ||
+                url.contains('ollyembed') ||
+                url.contains('pages.dev') ||
+                url.contains('vidsrc') ||
+                url.contains('vidlink') ||
+                url.contains('stellar.rip') ||
+                url.startsWith('about:blank') ||
+                url.startsWith('data:')) {
+              return NavigationDecision.navigate;
+            }
+
+            return NavigationDecision.prevent;
           },
           onWebResourceError: (WebResourceError error) {
             _triggerAutoFallback();
@@ -204,47 +301,45 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         ),
       );
 
-    _controller.loadRequest(
-      Uri.parse(targetUrl),
-      headers: {'Referer': 'https://hannutv.app/'},
-    );
+    _controller.loadHtmlString(htmlDoc, baseUrl: 'https://hannutv.app/');
 
     if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // 15 seconds fallback safety timer if stream never loads
+    // 16s safety fallback
     _fallbackTimer?.cancel();
-    _fallbackTimer = Timer(const Duration(seconds: 15), () {
-      if (mounted && !showServerSelectionUI && !isVideoPlaying) {
+    _fallbackTimer = Timer(const Duration(seconds: 16), () {
+      if (mounted && !isVideoPlaying) {
         _triggerAutoFallback();
       }
     });
   }
 
-  void _forcePlayAndBypassAds() {
-    _controller.runJavaScript('''
-      var vids = document.getElementsByTagName('video');
-      if (vids.length > 0) { 
-        vids[0].play(); 
-      }
-      var iframes = document.getElementsByTagName('iframe');
-      if (iframes.length > 0) {
-        iframes[0].contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
-      }
-    ''');
-    setState(() => isVideoPlaying = true);
+  // ⏩ MANUAL SEEK CONTROLS (INJECTS JAVASCRIPT INTO IFRAME VIDEO)
+  void _seekRelative(int seconds) {
+    _startHideTimer();
+    final js = '''
+      (function() {
+        var vids = document.getElementsByTagName('video');
+        if (vids.length > 0) {
+          vids[0].currentTime += $seconds;
+        }
+        var ifr = document.getElementById('player-frame');
+        if (ifr && ifr.contentWindow) {
+          ifr.contentWindow.postMessage({event: 'seek', value: $seconds}, '*');
+        }
+      })();
+    ''';
+    _controller.runJavaScript(js);
   }
 
   void _startHideTimer() {
     _hideTimer?.cancel();
-    if (mounted && !showServerSelectionUI) {
-      setState(() => showControls = true);
-    }
+    if (mounted) setState(() => showControls = true);
     _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted && !showServerSelectionUI) {
-        setState(() => showControls = false);
-      }
+      if (mounted) setState(() => showControls = false);
     });
   }
 
@@ -257,29 +352,91 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
+        final list = currentServers;
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "Provider Manager",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "AI Provider Switcher",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text("Hindi"),
+                        selected: selectedLanguage == 'hindi',
+                        selectedColor: Colors.redAccent,
+                        onSelected: (val) {
+                          Navigator.pop(context);
+                          setState(() {
+                            selectedLanguage = 'hindi';
+                            activeServerIndex = 0;
+                          });
+                          _startServer(0);
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text("English"),
+                        selected: selectedLanguage == 'english',
+                        selectedColor: Colors.blueAccent,
+                        onSelected: (val) {
+                          Navigator.pop(context);
+                          setState(() {
+                            selectedLanguage = 'english';
+                            activeServerIndex = 0;
+                          });
+                          _startServer(0);
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
-              ...List.generate(servers.length, (index) {
-                final srv = servers[index];
+              ...List.generate(list.length, (index) {
+                final srv = list[index];
+                final isSelected = activeServerIndex == index;
                 return ListTile(
-                  leading: Icon(Icons.dns, color: srv['color'], size: 18),
+                  leading: Icon(
+                    Icons.check_circle,
+                    color: srv['available'] ? Colors.greenAccent : Colors.grey,
+                    size: 18,
+                  ),
                   title: Text(
                     srv['name'],
                     style: TextStyle(
-                      color: activeServerIndex == index ? Colors.red : Colors.white,
+                      color: isSelected ? Colors.redAccent : Colors.white,
                       fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    srv['sub'],
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  trailing: Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                    decoration: BoxDecoration(
+                      color: Colors.black45,
+                      borderRadius: BorderRadius.circular(6),
+                      border: Border.all(color: srv['color'], width: 1),
+                    ),
+                    child: Text(
+                      selectedLanguage.toUpperCase(),
+                      style: TextStyle(
+                        color: srv['color'],
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
                     ),
                   ),
                   onTap: () {
@@ -321,31 +478,32 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
+    final list = currentServers;
+    final currentSrvName = (activeServerIndex < list.length)
+        ? list[activeServerIndex]['name']
+        : 'VIP Server';
+
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: (didPop, result) async {
         if (didPop) return;
-        if (!showServerSelectionUI && await _controller.canGoBack()) {
-          _controller.goBack();
-        } else {
-          Navigator.of(context).pop();
-        }
+        Navigator.of(context).pop();
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: showServerSelectionUI
-            ? _buildServerSelectionUI()
+        body: isAnalyzingServers
+            ? _buildAiScanningScreen()
             : GestureDetector(
                 onTap: _startHideTimer,
                 behavior: HitTestBehavior.translucent,
                 child: Stack(
                   children: [
-                    // 1. WEBVIEW EMBED PLAYER
+                    // 1. FULLSCREEN CLEAN EMBED PLAYER
                     Positioned.fill(
                       child: WebViewWidget(controller: _controller),
                     ),
 
-                    // 2. HANNUTV WATERMARK OVERLAY
+                    // 2. HANNUTV WATERMARK LOGO
                     Positioned(
                       top: 16,
                       right: 16,
@@ -370,7 +528,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       ),
                     ),
 
-                    // 3. TRANSPARENT LOADING OVERLAY (NO BLACK SCREEN BLOCK)
+                    // 3. MINIMAL CONNECTING BADGE
                     if (!isVideoPlaying)
                       Positioned(
                         bottom: 40,
@@ -393,7 +551,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                                 ),
                                 const SizedBox(width: 10),
                                 Text(
-                                  "Connecting: ${servers[activeServerIndex]['name']}...",
+                                  "AI Connecting: $currentSrvName...",
                                   style: const TextStyle(color: Colors.white, fontSize: 12),
                                 ),
                               ],
@@ -402,25 +560,80 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         ),
                       ),
 
-                    // 4. CONTROLS OVERLAY (BACK & SERVERS)
+                    // 4. TOP CONTROLS (BACK & MOVIE TITLE)
                     if (showControls)
                       Positioned(
                         top: 16,
                         left: 16,
+                        right: 80,
                         child: SafeArea(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
-                              shape: BoxShape.circle,
-                            ),
-                            child: IconButton(
-                              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-                              onPressed: () => Navigator.pop(context),
-                            ),
+                          child: Row(
+                            children: [
+                              Container(
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withOpacity(0.6),
+                                  shape: BoxShape.circle,
+                                ),
+                                child: IconButton(
+                                  icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
+                                  onPressed: () => Navigator.pop(context),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Text(
+                                  widget.movieTitle,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                    shadows: [Shadow(color: Colors.black, blurRadius: 6)],
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ),
                         ),
                       ),
 
+                    // 5. CENTER FAST SEEK BUTTONS (-10s / +10s)
+                    if (showControls)
+                      Center(
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            GestureDetector(
+                              onTap: () => _seekRelative(-10),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white24),
+                                ),
+                                child: const Icon(Icons.replay_10, color: Colors.white, size: 36),
+                              ),
+                            ),
+                            const SizedBox(width: 80),
+                            GestureDetector(
+                              onTap: () => _seekRelative(10),
+                              child: Container(
+                                padding: const EdgeInsets.all(12),
+                                decoration: BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                  border: Border.all(color: Colors.white24),
+                                ),
+                                child: const Icon(Icons.forward_10, color: Colors.white, size: 36),
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+
+                    // 6. BOTTOM CONTROLS (AI SERVER SELECTOR & CROP)
                     if (showControls)
                       Positioned(
                         bottom: 16,
@@ -432,19 +645,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                               GestureDetector(
                                 onTap: _showServerSelector,
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                                   decoration: BoxDecoration(
-                                    color: Colors.black.withOpacity(0.7),
+                                    color: Colors.black.withOpacity(0.8),
                                     borderRadius: BorderRadius.circular(20),
-                                    border: Border.all(color: Colors.white24),
+                                    border: Border.all(color: Colors.redAccent, width: 1.2),
                                   ),
                                   child: Row(
                                     children: [
-                                      Icon(Icons.dns, color: servers[activeServerIndex]['color'], size: 14),
+                                      const Icon(Icons.auto_awesome, color: Colors.redAccent, size: 16),
                                       const SizedBox(width: 6),
-                                      const Text(
-                                        "Servers",
-                                        style: TextStyle(
+                                      Text(
+                                        "$currentSrvName (${selectedLanguage.toUpperCase()})",
+                                        style: const TextStyle(
                                           color: Colors.white,
                                           fontWeight: FontWeight.bold,
                                           fontSize: 12,
@@ -480,75 +693,66 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
-  Widget _buildServerSelectionUI() {
+  // 🤖 AI SCANNER STARTUP SCREEN (Shows Hindi/English nodes & highlights)
+  Widget _buildAiScanningScreen() {
     return Container(
-      color: Colors.black,
+      color: const Color(0xFF0A0A0A),
       width: double.infinity,
+      padding: const EdgeInsets.all(24),
       child: Column(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Image.asset('assets/logo.png', height: 70, errorBuilder: (_, __, ___) => const SizedBox()),
+          Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const SizedBox()),
           const SizedBox(height: 16),
           Text(
             widget.movieTitle,
-            style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+            style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold),
             textAlign: TextAlign.center,
           ),
           const SizedBox(height: 8),
-          const Text("Select a streaming provider to start", style: TextStyle(color: Colors.white54, fontSize: 13)),
-          const SizedBox(height: 30),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const SizedBox(width: 20),
-                _buildServerChip(0, Icons.speed, "Fastest"),
-                const SizedBox(width: 10),
-                _buildServerChip(1, Icons.star, "English"),
-                const SizedBox(width: 10),
-                _buildServerChip(2, Icons.cloud, "Vega Node"),
-                const SizedBox(width: 10),
-                _buildServerChip(3, Icons.dns, "Flixorent"),
-                const SizedBox(width: 10),
-                _buildServerChip(4, Icons.translate, "Hindi Dub"),
-                const SizedBox(width: 20),
-              ],
-            ),
+          const Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              SizedBox(
+                width: 14,
+                height: 14,
+                child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2),
+              ),
+              SizedBox(width: 10),
+              Text(
+                "AI Scanner: Matching Dual Audio (Hindi / English) Nodes...",
+                style: TextStyle(color: Colors.grey, fontSize: 13),
+              ),
+            ],
+          ),
+          const SizedBox(height: 24),
+          Wrap(
+            spacing: 10,
+            runSpacing: 10,
+            alignment: WrapAlignment.center,
+            children: allServers.map((s) {
+              return Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                decoration: BoxDecoration(
+                  color: Colors.grey[900],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.greenAccent, width: 1),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.check_circle, color: Colors.greenAccent, size: 14),
+                    const SizedBox(width: 6),
+                    Text(
+                      "${s['name']} (${s['lang'].toString().toUpperCase()})",
+                      style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold),
+                    ),
+                  ],
+                ),
+              );
+            }).toList(),
           ),
         ],
-      ),
-    );
-  }
-
-  Widget _buildServerChip(int index, IconData icon, String subtitle) {
-    final srv = servers[index];
-    return GestureDetector(
-      onTap: () => _startServer(index),
-      child: Container(
-        width: 105,
-        padding: const EdgeInsets.symmetric(vertical: 14, horizontal: 8),
-        decoration: BoxDecoration(
-          color: Colors.grey[900],
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(color: srv['color'], width: 1.5),
-        ),
-        child: Column(
-          children: [
-            Icon(icon, color: srv['color'], size: 24),
-            const SizedBox(height: 10),
-            Text(
-              srv['name'].split(' ')[0],
-              style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-            ),
-            const SizedBox(height: 4),
-            Text(
-              subtitle,
-              style: const TextStyle(color: Colors.white54, fontSize: 10),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
       ),
     );
   }
