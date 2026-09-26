@@ -22,6 +22,7 @@ class DashboardPage extends StatefulWidget {
 }
 
 class DashboardPageState extends State<DashboardPage> {
+  List netmirrorLiveFeed = [];
   List trendingList = [];
   List actionList = [];
   List comedyList = [];
@@ -38,14 +39,11 @@ class DashboardPageState extends State<DashboardPage> {
   Timer? _carouselTimer;
   int _currentPage = 0;
 
-  // OTT Watch Provider Channels (Pantyflix Hub, Netflix, Prime, etc.)
   final List<Map<String, dynamic>> ottPlatforms = [
-    {"name": "🔥 PANTYFLIX VIP", "color": Colors.red, "providerId": "pantyflix"},
+    {"name": "🔥 PANTYFLIX VIP", "color": Colors.red, "providerId": "hannutv"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
     {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
     {"name": "HOTSTAR", "color": Colors.green, "providerId": "122"},
-    {"name": "SONYLIV", "color": Colors.orange, "providerId": "237"},
-    {"name": "ZEE5", "color": Colors.purple, "providerId": "232"},
   ];
 
   @override
@@ -96,10 +94,6 @@ class DashboardPageState extends State<DashboardPage> {
                   ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}'
                   : '',
               'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
-              'year': (m['release_date'] ?? m['first_air_date'] ?? '')
-                  .toString()
-                  .split('-')
-                  .first,
               'mediaType': forceMediaType ?? (m['media_type'] ?? 'movie'),
             })
         .toList();
@@ -109,16 +103,17 @@ class DashboardPageState extends State<DashboardPage> {
     setState(() => isLoading = true);
     try {
       String base = 'https://api.themoviedb.org/3';
-      String prov = (providerId != null && providerId != 'pantyflix')
+      String prov = (providerId != null && providerId != 'hannutv')
           ? '&with_watch_providers=$providerId&watch_region=IN'
           : '';
 
-      String trendUrl = (providerId != null && providerId != 'pantyflix')
+      String trendUrl = (providerId != null && providerId != 'hannutv')
           ? '$base/discover/tv?language=en-US&sort_by=popularity.desc$prov'
           : '$base/trending/all/day?language=en-US';
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
+        http.get(Uri.parse('$base/trending/all/week?language=en-US'), headers: kApiHeaders),
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders),
         http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=35$prov&sort_by=popularity.desc'), headers: kApiHeaders),
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=27$prov&sort_by=popularity.desc'), headers: kApiHeaders),
@@ -126,11 +121,12 @@ class DashboardPageState extends State<DashboardPage> {
       ]);
 
       setState(() {
-        trendingList = parseData(responses[0], forceMediaType: (providerId != null && providerId != 'pantyflix') ? 'tv' : null);
-        actionList = parseData(responses[1], forceMediaType: 'movie');
-        comedyList = parseData(responses[2], forceMediaType: 'tv');
-        horrorList = parseData(responses[3], forceMediaType: 'movie');
-        dramaList = parseData(responses[4], forceMediaType: 'tv');
+        trendingList = parseData(responses[0], forceMediaType: (providerId != null && providerId != 'hannutv') ? 'tv' : null);
+        netmirrorLiveFeed = parseData(responses[1]);
+        actionList = parseData(responses[2], forceMediaType: 'movie');
+        comedyList = parseData(responses[3], forceMediaType: 'tv');
+        horrorList = parseData(responses[4], forceMediaType: 'movie');
+        dramaList = parseData(responses[5], forceMediaType: 'tv');
         isLoading = false;
       });
     } catch (e) {
@@ -160,19 +156,19 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> _openTelegram() async {
-    if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'),
+    if (!await launchUrl(Uri.parse('https://t.me/Pantyflix'),
         mode: LaunchMode.externalApplication)) {
       debugPrint('Telegram error');
     }
   }
 
-  // 🚀 DIRECT LAUNCH PLAYER (YOUTUBE-STYLE SCREENSHOT UI)
-  void launchPlayerDirect(Map media) {
+  // 🚀 DIRECT PLAY (Bypassing detail screen)
+  void openMediaDetails(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
 
-    final type = media['mediaType'] ?? 'movie';
-    final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
+    int tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
+    String type = media['mediaType'] ?? 'movie';
 
     Navigator.push(
       context,
@@ -180,12 +176,9 @@ class DashboardPageState extends State<DashboardPage> {
         builder: (context) => VideoPlayerPage(
           tmdbId: tId,
           mediaType: type,
+          movieTitle: media['title'] ?? 'Title',
           season: 1,
           episode: 1,
-          movieTitle: media['title'] ?? 'Title',
-          overview: media['overview'] ?? '',
-          rating: media['rating'] ?? '9.0',
-          year: media['year'] ?? '2024',
         ),
       ),
     ).then((_) => setState(() {}));
@@ -209,7 +202,7 @@ class DashboardPageState extends State<DashboardPage> {
             itemBuilder: (context, index) {
               final media = moviesData[index];
               return GestureDetector(
-                onTap: () => launchPlayerDirect(media),
+                onTap: () => openMediaDetails(media),
                 child: Container(
                   width: 110,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -309,7 +302,7 @@ class DashboardPageState extends State<DashboardPage> {
                                     style: const TextStyle(color: Colors.white),
                                     autofocus: true,
                                     decoration: InputDecoration(
-                                      hintText: 'Search Movies & TV Series...',
+                                      hintText: 'Search TMDB Database...',
                                       border: InputBorder.none,
                                       prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
                                       suffixIcon: IconButton(
@@ -330,7 +323,7 @@ class DashboardPageState extends State<DashboardPage> {
                             : Expanded(
                                 child: Align(
                                   alignment: Alignment.centerLeft,
-                                  child: Image.asset('assets/logo.png', height: 35, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontSize: 24, fontWeight: FontWeight.bold))),
+                                  child: Image.asset('assets/logo.png', height: 35, errorBuilder: (_, __, ___) => const Text('PANTYFLIX', style: TextStyle(color: Colors.red, fontSize: 24, fontWeight: FontWeight.bold))),
                                 ),
                               ),
                         if (!isSearching) ...[
@@ -353,7 +346,7 @@ class DashboardPageState extends State<DashboardPage> {
                         const SizedBox(height: 8),
                         ElevatedButton.icon(
                           style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24)),
-                          onPressed: () => launchPlayerDirect(trendingList[_currentPage]),
+                          onPressed: () => openMediaDetails(trendingList[_currentPage]),
                           icon: const Icon(Icons.play_arrow, size: 24),
                           label: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                         ),
@@ -362,13 +355,15 @@ class DashboardPageState extends State<DashboardPage> {
                   )
               ],
             ),
-            
-            // OTT FILTERS
-            const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
+              child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            ),
             SizedBox(
               height: 50,
               child: ListView.builder(
-                scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
+                scrollDirection: Axis.horizontal,
+                padding: const EdgeInsets.symmetric(horizontal: 12),
                 itemCount: ottPlatforms.length,
                 itemBuilder: (context, index) {
                   return Container(
@@ -382,7 +377,7 @@ class DashboardPageState extends State<DashboardPage> {
                       onPressed: () {
                         searchController.clear();
                         setState(() => isSearching = false);
-                        loadAllDashboards(providerId: ottPlatforms[index]['providerId']); 
+                        loadAllDashboards(providerId: ottPlatforms[index]['providerId']);
                       },
                       child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
@@ -390,7 +385,6 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               ),
             ),
-
             if (isLoading)
               const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
             else if (isSearching)
@@ -403,7 +397,7 @@ class DashboardPageState extends State<DashboardPage> {
                 itemBuilder: (context, index) {
                   final movie = searchResults[index];
                   return GestureDetector(
-                    onTap: () => launchPlayerDirect(movie),
+                    onTap: () => openMediaDetails(movie),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
@@ -416,7 +410,8 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 Trending Now', trendingList),
+              _buildHorizontalList('🔥 PANTYFLIX Official Feed', netmirrorLiveFeed),
+              _buildHorizontalList('Trending Now', trendingList),
               if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
               _buildHorizontalList('Action Movies', actionList),
               _buildHorizontalList('Comedy Shows', comedyList),
