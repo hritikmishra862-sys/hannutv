@@ -86,10 +86,6 @@ class DashboardPageState extends State<DashboardPage> {
                   ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}'
                   : '',
               'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
-              'year': (m['release_date'] ?? m['first_air_date'] ?? '')
-                  .toString()
-                  .split('-')
-                  .first,
               'mediaType': forceMediaType ?? (m['media_type'] ?? 'movie'),
             })
         .toList();
@@ -133,8 +129,7 @@ class DashboardPageState extends State<DashboardPage> {
     if (_debounce?.isActive ?? false) _debounce!.cancel();
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       setState(() => isLoading = true);
-      final url =
-          'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
+      final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
       final res = await http.get(Uri.parse(url), headers: kApiHeaders);
       setState(() {
         searchResults = parseData(res);
@@ -150,7 +145,7 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // 🚀 DIRECT LAUNCH PLAYER (YOUTUBE-STYLE SCREENSHOT UI)
+  // 🚀 DIRECT LAUNCH PLAYER
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
@@ -164,8 +159,6 @@ class DashboardPageState extends State<DashboardPage> {
         builder: (context) => VideoPlayerPage(
           tmdbId: tId,
           mediaType: type,
-          season: 1,
-          episode: 1,
           movieTitle: media['title'] ?? 'Title',
         ),
       ),
@@ -290,7 +283,7 @@ class DashboardPageState extends State<DashboardPage> {
                                     style: const TextStyle(color: Colors.white),
                                     autofocus: true,
                                     decoration: InputDecoration(
-                                      hintText: 'Search Movies & TV Series...',
+                                      hintText: 'Search Movies & Shows...',
                                       border: InputBorder.none,
                                       prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
                                       suffixIcon: IconButton(
@@ -369,7 +362,7 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 Trending Now', trendingList),
+              _buildHorizontalList('🔥 HANNUTV Trending', trendingList),
               if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
               _buildHorizontalList('Action Movies', actionList),
               _buildHorizontalList('Comedy Shows', comedyList),
