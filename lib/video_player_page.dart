@@ -4,6 +4,38 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
+// ==========================================
+// 1. NATIVE KOTLIN BRIDGE SERVICE
+// ==========================================
+class CNCVerseService {
+  static const MethodChannel _channel = MethodChannel('com.horis.cncverse/stream');
+
+  static Future getStreamUrl({
+    required String title,
+    required String mediaType,
+    required String provider,
+    int season = 1,
+    int episode = 1,
+  }) async {
+    try {
+      final String? streamUrl = await _channel.invokeMethod('getStreamUrl', {
+        'title': title,
+        'mediaType': mediaType,
+        'provider': provider,
+        'season': season,
+        'episode': episode,
+      });
+      return streamUrl;
+    } on PlatformException catch (e) {
+      debugPrint("Native Extraction Failed: ${e.message}");
+      return null;
+    }
+  }
+}
+
+// ==========================================
+// 2. VIDEO PLAYER PAGE (EXACT YOUR UI)
+// ==========================================
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
   final String mediaType;
@@ -25,10 +57,10 @@ class VideoPlayerPage extends StatefulWidget {
   }) : super(key: key);
 
   @override
-  State<VideoPlayerPage> createState() => _VideoPlayerPageState();
+  State createState() => _VideoPlayerPageState();
 }
 
-class _VideoPlayerPageState extends State<VideoPlayerPage> {
+class _VideoPlayerPageState extends State {
   late WebViewController _controller;
 
   bool isVideoPlaying = false;
@@ -38,8 +70,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool isPageLoading = true;
   late String currentServerKey;
 
-  // 🤖 VIP SERVERS (NETMIRROR LIVE INJECTED)
-  final List<Map<String, dynamic>> allServers = [
+  // 🤖 VIP SERVERS (YOUR EXACT LIST)
+  final List> allServers = [
     {
       'key': 'netmirror_portal',
       'name': 'HANNUTV VIP (NetMirror)',
@@ -86,7 +118,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   String selectedLanguage = 'hindi';
 
-  List<Map<String, dynamic>> get currentServers =>
+  List> get currentServers =>
       allServers.where((s) => s['lang'] == selectedLanguage).toList();
 
   @override
@@ -100,7 +132,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    _initWebView();
+    _prepareAndPlayServer();
     _startHideTimer();
   }
 
@@ -110,11 +142,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       isPageLoading = true;
       isVideoPlaying = false;
     });
-    _initWebView();
+    _prepareAndPlayServer();
     _startHideTimer();
   }
 
-  String _generateVideoUrl() {
+  Future _prepareAndPlayServer() async {
+    setState(() => isPageLoading = true);
+    String playUrl = await _resolvePlayUrl();
+    _initWebView(playUrl);
+  }
+
+  Future _resolvePlayUrl() async {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
     }
@@ -123,10 +161,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final s = widget.season;
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
-    final query = Uri.encodeComponent(widget.movieTitle);
 
-    // 🚀 1. NETMIRROR OFFICIAL SEARCH & DIRECT PLAY PORTAL
+    // 🚀 Native Kotlin Extraction for NetMirror
     if (currentServerKey == 'netmirror_portal') {
+      String? nativeExtractedUrl = await CNCVerseService.getStreamUrl(
+        title: widget.movieTitle,
+        mediaType: widget.mediaType,
+        provider: 'netmirror',
+        season: widget.season,
+        episode: widget.episode,
+      );
+
+      if (nativeExtractedUrl != null && nativeExtractedUrl.isNotEmpty) {
+        return nativeExtractedUrl;
+      }
+
+      // Fallback if extraction is in-progress or fails
       return isTv
           ? 'https://netmirror.center/explore/tv'
           : 'https://netmirror.center/explore/movie';
@@ -135,39 +185,38 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     // 🚀 2. VIDBOLT 1080P ULTRA HD
     if (currentServerKey == 'vidbolt') {
       return isTv
-          ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
+          ? 'https://vidbolt.pro/tv/\(id/\)s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
           : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
     }
 
     // 🚀 3. OLLY STREAM VIP
     if (currentServerKey == 'olly') {
       return isTv
-          ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
+          ? 'https://ollyembed.pages.dev/tv/\(id/\)s/$e?server=1'
           : 'https://ollyembed.pages.dev/movie/$id?server=1';
     }
 
     // 🚀 4. VEGA 4K MULTI-AUDIO
     if (currentServerKey == 'vega') {
       return isTv
-          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
+          ? 'https://vidsrc.to/embed/tv/\(id/\)s/$e'
           : 'https://vidsrc.to/embed/movie/$id';
     }
 
     // 🚀 5. FLIXORENT ENGLISH
     if (currentServerKey == 'flixorent') {
       return isTv
-          ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
+          ? 'https://vidsrc.pro/embed/tv/\(id/\)s/$e'
           : 'https://vidsrc.pro/embed/movie/$id';
     }
 
     // 🚀 6. VIDLINK ENGLISH
     return isTv
-        ? 'https://vidlink.pro/tv/$id/$s/$e'
+        ? 'https://vidlink.pro/tv/\(id/\)s/$e'
         : 'https://vidlink.pro/movie/$id';
   }
 
-  void _initWebView() {
-    final targetUrl = _generateVideoUrl();
+  void _initWebView(String targetUrl) {
     final cleanTitle = widget.movieTitle.replaceAll("'", "\\'");
 
     _controller = WebViewController()
@@ -195,20 +244,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🛡️ WORLD'S BEST AD-KILLER + NETMIRROR DEEP AUTO-SEARCH & PLAY ENGINE
             String jsCode = '''
-              // 1. Force Pure Cinema Black
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
-              // 2. Kill Popups & Redirects completely
               window.open = function() { return null; };
               window.alert = function() { return null; };
               window.confirm = function() { return null; };
 
-              // 3. Ultra Ad-Blocker & NetMirror Branding Nuke
               setInterval(function() {
-                // Remove AdBlock warnings & modals
                 document.querySelectorAll('div, section, modal, aside, p, h2, span, header, nav').forEach(el => {
                   let text = el.innerText.toLowerCase();
                   if (text.includes('adblock') || 
@@ -226,7 +270,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   }
                 });
 
-                // Remove banner ads & click overlays
                 document.querySelectorAll('div, a, span, img').forEach(el => {
                   let style = window.getComputedStyle(el);
                   if ((style.position === 'fixed' || style.position === 'absolute') && 
@@ -237,7 +280,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   }
                 });
 
-                // 4. NETMIRROR AUTO SEARCH & CLICK INJECTION
                 if (window.location.hostname.includes('netmirror.center') && !window._netMirrorExecuted) {
                   var searchInput = document.querySelector('input[type="search"], input[placeholder*="Search"], input[name="q"], .search-input');
                   if (searchInput && searchInput.value !== '$cleanTitle') {
@@ -250,7 +292,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   }
                 }
 
-                // 5. Auto Video Play Detection
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -269,7 +310,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // Block ads & betting sites
             if (url.contains('doubleclick') ||
                 url.contains('popads') ||
                 url.contains('1xbet') ||
@@ -282,7 +322,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               return NavigationDecision.prevent;
             }
 
-            // Allow safe media embed URLs
             if (url.contains('hannutv.app') ||
                 url.contains('netmirror') ||
                 url.contains('vidbolt') ||
@@ -468,7 +507,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // 1. PURE BLACK WEBVIEW CONTAINER (NETMIRROR EMBEDDED)
+            // 1. PURE BLACK WEBVIEW CONTAINER
             Positioned.fill(
               child: Container(
                 color: Colors.black,
