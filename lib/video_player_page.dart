@@ -16,6 +16,12 @@ class VideoPlayerPage extends StatefulWidget {
   final int season;
   final int episode;
   final String movieTitle;
+  
+  // 🔥 FIX: Added these parameters so Dashboard doesn't crash when passing them
+  final String? overview; 
+  final String? posterUrl;
+  final String? customUrl;
+  final String? preferredServer;
 
   const VideoPlayerPage({
     Key? key,
@@ -24,6 +30,10 @@ class VideoPlayerPage extends StatefulWidget {
     this.season = 1,
     this.episode = 1,
     required this.movieTitle,
+    this.overview,
+    this.posterUrl,
+    this.customUrl,
+    this.preferredServer,
   }) : super(key: key);
 
   @override
@@ -58,6 +68,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
     // Keep portrait mode for YouTube style layout
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     
     _fetchMediaDetails();
     _initPlayerEngine();
@@ -65,6 +76,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   // 🚀 PANTYFLIX DIRECT URL GENERATOR
   String _generatePantyflixUrl() {
+    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
+      return widget.customUrl!;
+    }
     if (widget.mediaType == 'tv' || widget.mediaType == 'series') {
       return 'https://pantyflix.com/watch/play/tv/${widget.tmdbId}?season=$currentSeason&episode=$currentEpisode&server=$currentServer';
     } else {
@@ -234,6 +248,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   void dispose() {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -241,213 +256,201 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Widget build(BuildContext context) {
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            
-            // 🎬 TOP SECTION: YOUTUBE STYLE PLAYER (16:9 Aspect Ratio)
-            Stack(
-              children: [
-                AspectRatio(
-                  aspectRatio: 16 / 9,
-                  child: Container(
-                    color: Colors.black,
-                    child: WebViewWidget(controller: _controller),
-                  ),
-                ),
-                
-                // Loader while video page is fetching
-                if (isPageLoading)
-                  Positioned.fill(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          bottom: false,
+          child: Column(
+            children: [
+              // 🎬 THE VIDEO PLAYER AREA (Like YouTube)
+              Stack(
+                children: [
+                  AspectRatio(
+                    aspectRatio: 16 / 9,
                     child: Container(
-                      color: Colors.black87,
-                      child: const Center(
+                      color: Colors.black,
+                      child: WebViewWidget(controller: _controller),
+                    ),
+                  ),
+                  if (isPageLoading)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black87,
+                        child: const Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              CircularProgressIndicator(color: Colors.redAccent),
+                              SizedBox(height: 10),
+                              Text("Loading Server...", style: TextStyle(color: Colors.white, fontSize: 12)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  // Fullscreen Button
+                  Positioned(
+                    bottom: 10,
+                    right: 10,
+                    child: IconButton(
+                      icon: const Icon(Icons.fullscreen, color: Colors.white70, size: 30),
+                      onPressed: () => _toggleFullscreen(context),
+                    ),
+                  ),
+                  // Back button
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black54,
+                      child: IconButton(
+                        icon: const Icon(Icons.arrow_back, color: Colors.white),
+                        onPressed: () => Navigator.pop(context),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+
+              // 📱 THE DETAILS & UI AREA
+              Expanded(
+                child: isDetailsLoading 
+                  ? const Center(child: CircularProgressIndicator(color: Colors.red))
+                  : SingleChildScrollView(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
                         child: Column(
-                          mainAxisSize: MainAxisSize.min,
+                          crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            CircularProgressIndicator(color: Colors.redAccent),
-                            SizedBox(height: 10),
-                            Text("Bypassing Ads & Loading Stream...", style: TextStyle(color: Colors.white70, fontSize: 12)),
+                            // Title
+                            Text(
+                              widget.movieTitle,
+                              style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 8),
+                            // Rating & Year Dummy
+                            Row(
+                              children: [
+                                const Icon(Icons.star, color: Colors.yellow, size: 16),
+                                const SizedBox(width: 4),
+                                Text(mediaDetails?['vote_average']?.toStringAsFixed(1) ?? "N/A", style: const TextStyle(color: Colors.white70)),
+                                const SizedBox(width: 16),
+                                Text(isTv ? "Series" : "Movie", style: const TextStyle(color: Colors.white70)),
+                              ],
+                            ),
+                            const SizedBox(height: 20),
+
+                            // Dummy Action Buttons
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceAround,
+                              children: [
+                                _buildActionButton(Icons.add, "Add to List"),
+                                _buildActionButton(Icons.tv, "Play on TV"),
+                                _buildActionButton(Icons.share, "Share"),
+                                _buildActionButton(Icons.flag, "Report"),
+                              ],
+                            ),
+                            const SizedBox(height: 24),
+
+                            // Server Selection
+                            const Text(
+                              "If current server is not working, try a different one:",
+                              style: TextStyle(color: Colors.grey, fontSize: 12, fontStyle: FontStyle.italic),
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 10),
+                                ChoiceChip(
+                                  label: const Text("Rift"),
+                                  selected: currentServer == 'vidrift',
+                                  selectedColor: Colors.white,
+                                  labelStyle: TextStyle(color: currentServer == 'vidrift' ? Colors.black : Colors.white),
+                                  backgroundColor: Colors.grey[900],
+                                  onSelected: (_) => _changeStream(newServer: 'vidrift'),
+                                ),
+                                const SizedBox(width: 10),
+                                ChoiceChip(
+                                  label: const Text("Bolt"),
+                                  selected: currentServer == 'vidbolt',
+                                  selectedColor: Colors.white,
+                                  labelStyle: TextStyle(color: currentServer == 'vidbolt' ? Colors.black : Colors.white),
+                                  backgroundColor: Colors.grey[900],
+                                  onSelected: (_) => _changeStream(newServer: 'vidbolt'),
+                                ),
+                              ],
+                            ),
+                            
+                            const SizedBox(height: 30),
+
+                            // TV Show Episodes Generator (If it's a series)
+                            if (isTv) ...[
+                              Text(
+                                "Season $currentSeason",
+                                style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 16),
+                              GridView.builder(
+                                shrinkWrap: true,
+                                physics: const NeverScrollableScrollPhysics(),
+                                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                  crossAxisCount: 2,
+                                  childAspectRatio: 2.5,
+                                  crossAxisSpacing: 10,
+                                  mainAxisSpacing: 10,
+                                ),
+                                itemCount: episodesList.isNotEmpty ? episodesList.length : 20, 
+                                itemBuilder: (context, index) {
+                                  int epNum = episodesList.isNotEmpty ? episodesList[index]['episode_number'] : index + 1;
+                                  bool isSelected = currentEpisode == epNum;
+                                  return GestureDetector(
+                                    onTap: () => _changeEpisode(epNum),
+                                    child: Container(
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[900],
+                                        border: Border.all(color: isSelected ? Colors.white : Colors.transparent, width: 2),
+                                        borderRadius: BorderRadius.circular(8),
+                                      ),
+                                      child: Center(
+                                        child: Text(
+                                          "Episode : $epNum",
+                                          style: TextStyle(
+                                            color: isSelected ? Colors.white : Colors.grey,
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                },
+                              )
+                            ],
+                            const SizedBox(height: 40),
                           ],
                         ),
                       ),
                     ),
-                  ),
-
-                // Back Button
-                Positioned(
-                  top: 10, left: 10,
-                  child: CircleAvatar(
-                    backgroundColor: Colors.black54,
-                    child: IconButton(
-                      icon: const Icon(Icons.arrow_back, color: Colors.white),
-                      onPressed: () => Navigator.pop(context),
-                    ),
-                  ),
-                ),
-
-                // Fullscreen Button
-                Positioned(
-                  bottom: 10, right: 10,
-                  child: IconButton(
-                    icon: const Icon(Icons.fullscreen, color: Colors.white, size: 30),
-                    onPressed: () => _toggleFullscreen(context),
-                  ),
-                ),
-              ],
-            ),
-
-            // 📜 BOTTOM SECTION: DETAILS, SERVERS & EPISODES
-            Expanded(
-              child: isDetailsLoading 
-                ? const Center(child: CircularProgressIndicator(color: Colors.red))
-                : SingleChildScrollView(
-                    padding: const EdgeInsets.all(16.0),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        
-                        // Title & Rating
-                        Text(
-                          widget.movieTitle,
-                          style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold),
-                        ),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            const Icon(Icons.star, color: Colors.amber, size: 18),
-                            const SizedBox(width: 4),
-                            Text(
-                              mediaDetails?['vote_average']?.toStringAsFixed(1) ?? "N/A", 
-                              style: const TextStyle(color: Colors.white70, fontSize: 14)
-                            ),
-                            const SizedBox(width: 16),
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(color: Colors.grey[800], borderRadius: BorderRadius.circular(4)),
-                              child: Text(isTv ? "Series" : "Movie", style: const TextStyle(color: Colors.white70, fontSize: 12)),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Overview
-                        Text(
-                          mediaDetails?['overview'] ?? "No description available.",
-                          style: const TextStyle(color: Colors.grey, fontSize: 13, height: 1.4),
-                          maxLines: 4,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        const SizedBox(height: 24),
-
-                        // 🎛️ SERVER SELECTION
-                        const Text("Select Server (Rift Recommended)", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        Wrap(
-                          spacing: 10,
-                          runSpacing: 10,
-                          children: availableServers.map((srv) {
-                            bool isSelected = currentServer == srv['key'];
-                            return ChoiceChip(
-                              label: Text(srv['name']!),
-                              selected: isSelected,
-                              selectedColor: Colors.redAccent,
-                              backgroundColor: Colors.grey[900],
-                              labelStyle: TextStyle(color: isSelected ? Colors.white : Colors.grey, fontWeight: FontWeight.bold),
-                              onSelected: (_) => _changeStream(newServer: srv['key']),
-                            );
-                          }).toList(),
-                        ),
-                        
-                        const SizedBox(height: 30),
-
-                        // 📺 EPISODES LIST (Only for TV Shows)
-                        if (isTv && mediaDetails?['seasons'] != null) ...[
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                              
-                              // Season Dropdown
-                              DropdownButton<int>(
-                                value: currentSeason,
-                                dropdownColor: Colors.grey[900],
-                                underline: const SizedBox(),
-                                icon: const Icon(Icons.arrow_drop_down, color: Colors.redAccent),
-                                style: const TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold),
-                                items: (mediaDetails!['seasons'] as List).map<DropdownMenuItem<int>>((s) {
-                                  return DropdownMenuItem<int>(
-                                    value: s['season_number'],
-                                    child: Text("Season ${s['season_number']}"),
-                                  );
-                                }).toList(),
-                                onChanged: (val) {
-                                  if (val != null) _fetchEpisodes(val);
-                                },
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          
-                          episodesList.isEmpty 
-                            ? const Center(child: CircularProgressIndicator(color: Colors.red))
-                            : ListView.builder(
-                                shrinkWrap: true,
-                                physics: const NeverScrollableScrollPhysics(),
-                                itemCount: episodesList.length,
-                                itemBuilder: (context, index) {
-                                  final ep = episodesList[index];
-                                  bool isPlaying = currentEpisode == ep['episode_number'];
-                                  
-                                  return ListTile(
-                                    contentPadding: EdgeInsets.zero,
-                                    leading: Stack(
-                                      alignment: Alignment.center,
-                                      children: [
-                                        ClipRRect(
-                                          borderRadius: BorderRadius.circular(8),
-                                          child: Image.network(
-                                            ep['still_path'] != null 
-                                              ? 'https://image.tmdb.org/t/p/w200${ep['still_path']}' 
-                                              : 'https://via.placeholder.com/200x112/222222/888888?text=EP',
-                                            width: 100, height: 60, fit: BoxFit.cover,
-                                          ),
-                                        ),
-                                        if (isPlaying)
-                                          Container(
-                                            color: Colors.black54,
-                                            width: 100, height: 60,
-                                            child: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 30),
-                                          ),
-                                      ],
-                                    ),
-                                    title: Text(
-                                      "${ep['episode_number']}.${ep['name']}",
-                                      style: TextStyle(color: isPlaying ? Colors.redAccent : Colors.white, fontWeight: FontWeight.bold, fontSize: 14),
-                                      maxLines: 1, overflow: TextOverflow.ellipsis,
-                                    ),
-                                    subtitle: Text(
-                                      "${ep['runtime'] ?? '--'} min",
-                                      style: const TextStyle(color: Colors.grey, fontSize: 12),
-                                    ),
-                                    onTap: () {
-                                      // Click episode to play
-                                      _changeStream(newEpisode: ep['episode_number']);
-                                    },
-                                  );
-                                },
-                              )
-                        ]
-                      ],
-                    ),
-                  ),
             ),
           ],
         ),
       ),
+    );
+  }
+
+  Widget _buildActionButton(IconData icon, String label) {
+    return Column(
+      children: [
+        Icon(icon, color: Colors.white70),
+        const SizedBox(height: 4),
+        Text(label, style: const TextStyle(color: Colors.grey, fontSize: 12)),
+      ],
     );
   }
 }
@@ -465,7 +468,6 @@ class _FullscreenPlayerState extends State<FullscreenPlayer> {
   @override
   void initState() {
     super.initState();
-    // Force Landscape for Fullscreen
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
@@ -475,11 +477,13 @@ class _FullscreenPlayerState extends State<FullscreenPlayer> {
 
   @override
   Widget build(BuildContext context) {
-    return WillPopScope(
-      onWillPop: () async {
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, result) async {
+        if (didPop) return;
         SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-        return true;
+        Navigator.pop(context);
       },
       child: Scaffold(
         backgroundColor: Colors.black,
