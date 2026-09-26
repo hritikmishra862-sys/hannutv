@@ -52,7 +52,7 @@ class VideoPlayerPage extends StatefulWidget {
     required this.episode,
     required this.movieTitle,
     this.customUrl,
-    this.preferredServer = 'netmirror_native',
+    this.preferredServer = 'netmirror_net27',
   }) : super(key: key);
 
   @override
@@ -73,23 +73,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   // 🤖 6 ALL-IN-ONE WORKING HIGH-SPEED SERVERS
   final List<Map<String, dynamic>> allServers = [
     {
-      'key': 'netmirror_native',
-      'name': 'HANNUTV (NetMirror Direct)',
-      'sub': 'Official Kotlin Engine (Pure 1080p Stream)',
+      'key': 'netmirror_net27',
+      'name': 'HANNUTV (NetMirror net27)',
+      'sub': 'Official NetMirror Cloud Engine (Hindi / Multi)',
       'color': Colors.redAccent,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'netmirror_live',
-      'name': 'NetMirror VIP Live Hub',
-      'sub': 'Direct NetMirror Portal (Zero Ads)',
-      'color': Colors.red,
       'lang': 'hindi',
     },
     {
       'key': 'vidbolt',
       'name': 'VidBolt VIP Ultra HD',
-      'sub': 'Fast Hindi Dub + High Bitrate',
+      'sub': 'Dual Audio Hindi + 1080p High Bitrate',
       'color': Colors.orangeAccent,
       'lang': 'hindi',
     },
@@ -149,27 +142,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       isVideoPlaying = false;
     });
 
-    // 🚀 STEP 1: If Native NetMirror is chosen, invoke Kotlin MethodChannel
-    if (currentServerKey == 'netmirror_native') {
-      final directLink = await CNCVerseService.getStreamUrl(
-        title: widget.movieTitle,
-        mediaType: widget.mediaType,
-        provider: 'netflix',
-        season: widget.season,
-        episode: widget.episode,
-      );
-
-      if (directLink != null && directLink.isNotEmpty) {
-        nativeDirectStreamUrl = directLink;
-        _initNativeHtmlPlayer(directLink);
-        return;
-      } else {
-        // Fallback to Vidbolt if native scraper did not find stream
-        currentServerKey = 'vidbolt';
-      }
-    }
-
-    _initFallbackWebView();
+    _initPureBlackWebView();
   }
 
   void _switchServer(String newServerKey) {
@@ -180,71 +153,61 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _startHideTimer();
   }
 
-  // 🎬 NATIVE DIRECT STREAM HTML5 PLAYER (ZERO ADS, 100% CLEAN)
-  void _initNativeHtmlPlayer(String streamUrl) {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
-      ..setUserAgent(
-        "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
-      )
-      ..addJavaScriptChannel(
-        'VideoState',
-        onMessageReceived: (JavaScriptMessage message) {
-          if (message.message == 'playing' && mounted) {
-            setState(() {
-              isVideoPlaying = true;
-              isPageLoading = false;
-            });
-          }
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageFinished: (String url) {
-            if (mounted) setState(() => isPageLoading = false);
-            _controller.runJavaScript('''
-              var v = document.getElementById('native-video');
-              if (v) {
-                v.play().catch(function(){});
-                v.addEventListener('playing', function() {
-                  VideoState.postMessage('playing');
-                });
-              }
-            ''');
-          },
-        ),
-      );
-
-    final html = '''
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            video { width: 100%; height: 100%; object-fit: contain; background: #000; }
-          </style>
-        </head>
-        <body>
-          <video id="native-video" src="$streamUrl" autoplay playsinline controls></video>
-        </body>
-      </html>
-    ''';
-
-    _controller.loadHtmlString(html, baseUrl: 'https://hannutv.app');
-
-    if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
+  // 🚀 GENERATE THE EXACT STREAM URL FOR EACH SERVER
+  String _generateTargetUrl() {
+    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
+      return widget.customUrl!;
     }
+
+    final id = widget.tmdbId;
+    final s = widget.season;
+    final e = widget.episode;
+    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+
+    // 🌟 1. NETMIRROR OFFICIAL NET27 DIRECT HASH ENGINE
+    if (currentServerKey == 'netmirror_net27') {
+      return isTv
+          ? 'https://net27.cc/#w=$id-tv-$s-$e'
+          : 'https://net27.cc/#w=$id-movie';
+    }
+
+    // 🌟 2. VIDBOLT ULTRA HD (FORCED DUAL AUDIO & 1080P)
+    if (currentServerKey == 'vidbolt') {
+      return isTv
+          ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
+          : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
+    }
+
+    // 🌟 3. OLLY STREAM VIP
+    if (currentServerKey == 'olly') {
+      return isTv
+          ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
+          : 'https://ollyembed.pages.dev/movie/$id?server=1';
+    }
+
+    // 🌟 4. VEGA 4K MULTI-AUDIO
+    if (currentServerKey == 'vega') {
+      return isTv
+          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
+          : 'https://vidsrc.to/embed/movie/$id';
+    }
+
+    // 🌟 5. FLIXORENT ENGLISH
+    if (currentServerKey == 'flixorent') {
+      return isTv
+          ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
+          : 'https://vidsrc.pro/embed/movie/$id';
+    }
+
+    // 🌟 6. VIDLINK ENGLISH
+    return isTv
+        ? 'https://vidlink.pro/tv/$id/$s/$e'
+        : 'https://vidlink.pro/movie/$id';
   }
 
-  // 🌐 ULTRA FAST EMBED WEBVIEW ENGINE (VIDBOLT 1080P, NETMIRROR LIVE, OLLY, VEGA)
-  void _initFallbackWebView() {
-    final targetUrl = _generateFallbackUrl();
-    final cleanTitle = widget.movieTitle.replaceAll("'", "\\'");
+  // 🎬 PURE BLACK ZERO-WHITE-SCREEN WEBVIEW ENGINE WITH AUDIO UNLOCKER
+  void _initPureBlackWebView() {
+    final targetUrl = _generateTargetUrl();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -271,16 +234,37 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🛡️ WORLD'S BEST AD-KILLER + NETMIRROR/VIDBOLT INJECTION
+            // 🛡️ WORLD'S BEST AD-KILLER + DUAL AUDIO UNLOCKER + ZERO WHITE FLASH
             String jsCode = '''
+              // 1. Force Pure Black Screen
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
+
+              // 2. Kill Popups completely
               window.open = function() { return null; };
               window.alert = function() { return null; };
               window.confirm = function() { return null; };
 
+              // 3. Audio & Subtitle Track Auto-Unlocker
               setInterval(function() {
-                // Kill AdBlock warnings & logo
+                var vids = document.getElementsByTagName('video');
+                if (vids.length > 0) {
+                  var v = vids[0];
+                  v.style.backgroundColor = '#000000';
+                  
+                  // Unmute and Enable Multi Audio
+                  v.muted = false;
+                  v.volume = 1.0;
+
+                  if (v.paused) {
+                    v.play().catch(function(){});
+                  }
+                  if (v.currentTime > 0 && !v.paused) {
+                    VideoState.postMessage('playing');
+                  }
+                }
+
+                // 4. Kill AdBlock warnings, overlays & NetMirror headers
                 document.querySelectorAll('div, section, modal, aside, p, h2, span, header, nav').forEach(el => {
                   let text = el.innerText.toLowerCase();
                   if (text.includes('adblock') || 
@@ -298,7 +282,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   }
                 });
 
-                // Remove banner ads & click overlays
+                // Remove banner ads & overlays
                 document.querySelectorAll('div, a, span, img').forEach(el => {
                   let style = window.getComputedStyle(el);
                   if ((style.position === 'fixed' || style.position === 'absolute') && 
@@ -308,32 +292,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     el.remove();
                   }
                 });
-
-                // NetMirror Auto Search and Click
-                if (window.location.hostname.includes('netmirror.center') && !window._netMirrorExecuted) {
-                  var searchInput = document.querySelector('input[type="search"], input[placeholder*="Search"], input[name="q"], .search-input');
-                  if (searchInput && searchInput.value !== '$cleanTitle') {
-                    window._netMirrorExecuted = true;
-                    searchInput.value = '$cleanTitle';
-                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
-                    searchInput.dispatchEvent(new Event('change', { bubbles: true }));
-                    var form = searchInput.closest('form');
-                    if (form) form.dispatchEvent(new Event('submit', { bubbles: true }));
-                  }
-                }
-
-                // Auto Play Trigger
-                var vids = document.getElementsByTagName('video');
-                if (vids.length > 0) {
-                  var v = vids[0];
-                  v.style.backgroundColor = '#000000';
-                  if (v.paused) {
-                    v.play().catch(function(){});
-                  }
-                  if (v.currentTime > 0 && !v.paused) {
-                    VideoState.postMessage('playing');
-                  }
-                }
               }, 300);
             ''';
             _controller.runJavaScript(jsCode);
@@ -354,6 +312,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             }
 
             if (url.contains('hannutv.app') ||
+                url.contains('net27.cc') ||
+                url.contains('net52.cc') ||
+                url.contains('net77.cc') ||
                 url.contains('netmirror') ||
                 url.contains('vidbolt') ||
                 url.contains('ollyembed') ||
@@ -371,39 +332,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         ),
       );
 
-    if (currentServerKey == 'netmirror_live') {
-      _controller.loadRequest(
-        Uri.parse(targetUrl),
-        headers: {
-          'Referer': 'https://netmirror.center/',
-          'Origin': 'https://netmirror.center',
-        },
-      );
-    } else {
-      final embedHtml = '''
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
-              iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
-            </style>
-          </head>
-          <body>
-            <iframe 
-              id="player-frame"
-              src="$targetUrl" 
-              allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
-              allowfullscreen>
-            </iframe>
-          </body>
-        </html>
-      ''';
-
-      _controller.loadHtmlString(embedHtml, baseUrl: 'https://hannutv.app');
-    }
+    // Load with Net27 / NetMirror Referer Headers
+    _controller.loadRequest(
+      Uri.parse(targetUrl),
+      headers: {
+        'Referer': 'https://net27.cc/',
+        'Origin': 'https://net27.cc',
+      },
+    );
 
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController)
@@ -411,59 +347,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
-  String _generateFallbackUrl() {
-    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
-      return widget.customUrl!;
-    }
-
-    final id = widget.tmdbId;
-    final s = widget.season;
-    final e = widget.episode;
-    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
-    final query = Uri.encodeComponent(widget.movieTitle);
-
-    if (currentServerKey == 'netmirror_live') {
-      return isTv
-          ? 'https://netmirror.center/explore/tv'
-          : 'https://netmirror.center/explore/movie';
-    }
-    if (currentServerKey == 'vidbolt') {
-      return isTv
-          ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
-          : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
-    }
-    if (currentServerKey == 'olly') {
-      return isTv
-          ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
-          : 'https://ollyembed.pages.dev/movie/$id?server=1';
-    }
-    if (currentServerKey == 'vega') {
-      return isTv
-          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.to/embed/movie/$id';
-    }
-    if (currentServerKey == 'flixorent') {
-      return isTv
-          ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.pro/embed/movie/$id';
-    }
-    return isTv
-        ? 'https://vidlink.pro/tv/$id/$s/$e'
-        : 'https://vidlink.pro/movie/$id';
-  }
-
   void _seekRelative(int seconds) {
     _startHideTimer();
     final js = '''
       (function() {
-        var v = document.getElementById('native-video');
-        if (!v) {
-          var frame = document.getElementById('player-frame');
-          var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
-          v = doc ? doc.querySelector('video') : document.querySelector('video');
-        }
-        if (v) {
-          v.currentTime += $seconds;
+        var vids = document.getElementsByTagName('video');
+        if (vids.length > 0) {
+          vids[0].currentTime += $seconds;
         }
       })();
     ''';
@@ -514,9 +404,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                           Navigator.pop(context);
                           setState(() {
                             selectedLanguage = 'hindi';
-                            currentServerKey = 'netmirror_native';
+                            currentServerKey = 'netmirror_net27';
                           });
-                          _switchServer('netmirror_native');
+                          _switchServer('netmirror_net27');
                         },
                       ),
                       const SizedBox(width: 8),
@@ -579,9 +469,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void toggleCrop() {
     setState(() => isCropped = !isCropped);
     _controller.runJavaScript('''
-      var v = document.getElementById('native-video') || document.querySelector('video');
-      if (v) {
-        v.style.objectFit = '${isCropped ? "cover" : "contain"}';
+      var vids = document.getElementsByTagName('video');
+      if (vids.length > 0) {
+        vids[0].style.objectFit = '${isCropped ? "cover" : "contain"}';
       }
     ''');
     _startHideTimer();
@@ -613,7 +503,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // 1. PURE BLACK WEBVIEW CONTAINER (NATIVE OR EMBEDDED)
+            // 1. PURE BLACK WEBVIEW CONTAINER (NET27 / NETMIRROR POWERED)
             Positioned.fill(
               child: Container(
                 color: Colors.black,
