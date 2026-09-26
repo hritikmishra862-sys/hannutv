@@ -38,7 +38,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool isPageLoading = true;
   late String currentServerKey;
 
-  // 👑 VIP HARDCODED SERVERS (100% FIXED)
+  // 👑 VIP HARDCODED SERVERS
   final List<Map<String, dynamic>> allServers = [
     {
       'key': 'netmirror_vip',
@@ -107,7 +107,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _startHideTimer();
   }
 
-  // 🚀 THE MAGIC URL GENERATOR (10000000000% Deep Hardcoding)
+  // 🚀 GENERATE URL (No API, Direct Bypass)
   String _generateServerUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -118,53 +118,45 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // ⚡ NETMIRROR DIRECT HASH URL (Fixed White Screen & 404)
+    // ⚡ NETMIRROR DIRECT HASH URL
     if (currentServerKey == 'netmirror_vip' || currentServerKey.contains('netmirror')) {
       return isTv
           ? 'https://net27.cc/#w=$id-tv-$s-$e'
           : 'https://net27.cc/#w=$id-movie';
     }
 
-    // ⚡ VIDBOLT (Forced Hindi 1080p)
     if (currentServerKey == 'vidbolt') {
       return isTv
           ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
           : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
     }
 
-    // ⚡ OLLY
     if (currentServerKey == 'olly') {
       return isTv
           ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
           : 'https://ollyembed.pages.dev/movie/$id?server=1';
     }
 
-    // ⚡ VEGA
     if (currentServerKey == 'vega') {
       return isTv
           ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
           : 'https://vidsrc.to/embed/movie/$id';
     }
 
-    // ⚡ FLIXORENT
     return isTv
         ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
         : 'https://vidsrc.pro/embed/movie/$id';
   }
 
-  // 🛡️ THE ULTIMATE BYPASS ENGINE
+  // 🛡️ THE 10000000000% BYPASS ENGINE
   void _initStreamEngine() {
     final targetUrl = _generateServerUrl();
-    
-    // NetMirror Spa (Single Page App) needs direct loading to avoid White Screen.
-    // VidBolt & Olly strict security needs Iframe wrapper.
     bool loadAsIframe = currentServerKey == 'vidbolt' || currentServerKey == 'olly';
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setUserAgent(
-        // Desktop User Agent to bypass mobile restrictions & force HQ players
         "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       )
       ..addJavaScriptChannel(
@@ -186,25 +178,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🔥 AI AUTO-CLICKER, TELEGRAM NUKER & DUAL-AUDIO PROTECTOR
+            // 🔥 AI AUTO-CLICKER & AD-NUKER (Fixed Reconnect & Dual Audio)
             String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
-              // Hide annoying UI elements globally (especially Telegram & generic popups)
+              // Hide only specific garbage elements, DO NOT hide Player Controls (.jw-settings, .vjs-menu)
               var style = document.createElement('style');
               style.innerHTML = `
                 header, footer, nav, aside, .sidebar, .logo, .ad-container, iframe[src*="ads"], 
-                [class*="telegram"], [id*="telegram"], a[href*="t.me"], .popup, .modal { display: none !important; }
+                [class*="telegram"], [id*="telegram"], a[href*="t.me"] { display: none !important; }
                 body, html { overflow: hidden !important; background: black !important; }
               `;
               document.head.appendChild(style);
 
               let targetLang = '${selectedLanguage.toLowerCase()}';
 
-              // 🤖 AUTO-CLICKER & AD-KILLER ENGINE
               setInterval(function() {
-                // 1. Auto click Servers based on user language selection from App
+                // 1. Auto click "Server 1" or "Server 2"
                 let buttons = document.querySelectorAll('button, div.server, .btn, .server-item, li');
                 buttons.forEach(btn => {
                    let text = btn.innerText.toLowerCase();
@@ -215,7 +206,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       window._autoClickedPlay = true;
                    }
 
-                   // Switch to Hindi/Server 1 or English/Server 2 automatically
+                   // Match Server
                    if (targetLang === 'hindi' && (text.includes('server 1') || text.includes('hindi')) && !window._langClicked) {
                       btn.click(); window._langClicked = true;
                    } else if (targetLang === 'english' && (text.includes('server 2') || text.includes('english')) && !window._langClicked) {
@@ -223,35 +214,33 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                    }
                 });
 
-                // 2. 100% Deep Ad & Telegram Popup Killer (Protects Dual Audio Controls)
+                // 2. Kill Popups but IGNORE Player Controls (Allows Dual Audio)
                 document.querySelectorAll('div, a, span, img').forEach(el => {
                   let style = window.getComputedStyle(el);
                   let cls = el.className ? el.className.toString().toLowerCase() : '';
                   let txt = el.innerText ? el.innerText.toLowerCase() : '';
 
-                  // Specifically destroy Telegram overlays by text match
+                  // Kill Telegram overlays
                   if(txt.includes('telegram') || txt.includes('join our') || txt.includes('bet365')) {
                       el.remove();
                       return;
                   }
 
-                  // Destroy absolute overlays that block clicks
                   if ((style.position === 'fixed' || style.position === 'absolute') && 
                       style.zIndex > 500 && 
                       el.tagName !== 'IFRAME' && 
                       el.tagName !== 'VIDEO') {
                     
-                    // 🛡️ PROTECT PLAYER CONTROLS (So Dual Audio / Settings work!)
+                    // 🛡️ DUAL AUDIO PROTECTOR: DO NOT Remove JWPlayer / VideoJS menus
                     if (cls.includes('jw-') || cls.includes('vjs') || cls.includes('plyr') || 
                         cls.includes('control') || cls.includes('setting') || cls.includes('menu')) {
-                        return; // Do not touch player's own UI
+                        return;
                     }
-                    
                     el.remove();
                   }
                 });
 
-                // 3. Auto Play & State Detector
+                // 3. Auto Play Video
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -270,7 +259,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
             
-            // 🚫 HARD BLOCK AD NETWORKS & TELEGRAM REDIRECTS
+            // 🚫 FIXED RECONNECT BUG: DO NOT BLOCK VIDEO STREAMS (.m3u8, .mp4, hakuna)
+            if (url.contains('.m3u8') || url.contains('.mp4') || url.contains('hakunaymatata') || url.contains('videodelivery')) {
+                return NavigationDecision.navigate;
+            }
+
+            // 🚫 BLOCK ADS
             if (url.contains('doubleclick') || url.contains('popads') || 
                 url.contains('onclick') || url.contains('adsterra') || 
                 url.contains('bet365') || url.contains('monetag') ||
@@ -278,13 +272,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 url.contains('t.me') || url.contains('telegram')) {
               return NavigationDecision.prevent;
             }
+
             return NavigationDecision.navigate;
           },
         ),
       );
 
     if (loadAsIframe) {
-      // ⚡ IFRAME METHOD (For VidBolt & Olly)
       String spoofedBaseUrl = currentServerKey == 'vidbolt' ? 'https://vidbolt.pro/' : 'https://hannutv.app/';
       final embedHtml = '''
         <!DOCTYPE html>
@@ -304,7 +298,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       ''';
       _controller.loadHtmlString(embedHtml, baseUrl: spoofedBaseUrl);
     } else {
-      // ⚡ DIRECT METHOD (For NetMirror - Fixes White Screen & SPA issues)
       _controller.loadRequest(Uri.parse(targetUrl));
     }
 
@@ -366,7 +359,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             onSelected: (val) {
                               setModalState(() => selectedLanguage = 'hindi');
                               setState(() => selectedLanguage = 'hindi');
-                              // Automatically reloads NetMirror with Hindi Dual Audio (Server 1) priority
                               _initStreamEngine(); 
                             },
                           ),
@@ -378,7 +370,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             onSelected: (val) {
                               setModalState(() => selectedLanguage = 'english');
                               setState(() => selectedLanguage = 'english');
-                              // Automatically reloads NetMirror with English Dual Audio (Server 2) priority
                               _initStreamEngine();
                             },
                           ),
@@ -459,7 +450,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           behavior: HitTestBehavior.opaque,
           child: Stack(
             children: [
-              // 1. WEBVIEW CONTAINER
               Positioned.fill(
                 child: Container(
                   color: Colors.black,
@@ -467,7 +457,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
               ),
 
-              // 2. HANNUTV WATERMARK LOGO
               Positioned(
                 top: 16,
                 right: 16,
@@ -488,7 +477,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
               ),
 
-              // 3. BUFFERING / CONNECTING BADGE
               if (isPageLoading && !isVideoPlaying)
                 Positioned(
                   bottom: 40,
@@ -520,7 +508,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   ),
                 ),
 
-              // 4. TOP CONTROLS (BACK & MOVIE TITLE)
               if (showControls)
                 Positioned(
                   top: 16,
@@ -555,7 +542,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   ),
                 ),
 
-              // 5. CENTER FAST SEEK BUTTONS (-10s / +10s)
               if (showControls)
                 Center(
                   child: Row(
@@ -590,7 +576,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   ),
                 ),
 
-              // 6. BOTTOM CONTROLS (SERVER SWITCHER & CROP)
               if (showControls)
                 Positioned(
                   bottom: 16,
