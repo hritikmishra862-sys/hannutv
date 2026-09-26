@@ -162,6 +162,16 @@ class DashboardPageState extends State<DashboardPage> {
     ).then((_) => setState(() {}));
   }
 
+  // 🚀 DIRECT NETMIRROR WEBSITE PORTAL LAUNCHER
+  void _openDirectNetMirrorPortal() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const NetMirrorWebPortal(),
+      ),
+    );
+  }
+
   Widget _buildHorizontalList(String title, List moviesData) {
     if (moviesData.isEmpty) return const SizedBox();
     return Column(
@@ -271,7 +281,7 @@ class DashboardPageState extends State<DashboardPage> {
                                     style: const TextStyle(color: Colors.white),
                                     autofocus: true,
                                     decoration: InputDecoration(
-                                      hintText: 'Search NetMirror & HANNUTV...',
+                                      hintText: 'Search TMDB Database...',
                                       border: InputBorder.none,
                                       prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
                                       suffixIcon: IconButton(
@@ -296,6 +306,11 @@ class DashboardPageState extends State<DashboardPage> {
                                 ),
                               ),
                         if (!isSearching) ...[
+                          IconButton(
+                            icon: const Icon(Icons.flash_on, color: Colors.redAccent, size: 28),
+                            tooltip: "Live NetMirror Website",
+                            onPressed: _openDirectNetMirrorPortal, // ⚡ Opens Direct Website Portal
+                          ),
                           IconButton(
                             icon: const Icon(Icons.search, color: Colors.white, size: 28),
                             onPressed: () => setState(() => isSearching = true),
@@ -379,7 +394,7 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 HANNUTV (NetMirror Official)', netmirrorLiveFeed),
+              _buildHorizontalList('🔥 HANNUTV Live (NetMirror Feed)', netmirrorLiveFeed),
               _buildHorizontalList('Trending Now', trendingList),
               if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
               _buildHorizontalList('Action Movies', actionList),
@@ -466,8 +481,57 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // 🚀 DIRECT PLAY VIA NETMIRROR VIP API
-  void launchPlayer(String title, {int? season, int? episode}) {
+  // 🚀 DEEP LOGIC: PLAY KARNE SE PEHLE SERVER DIKHAO
+  void _showServerSelectionAndPlay(String title, {int? season, int? episode}) {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("Select Server to Play", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 16),
+              ListTile(
+                leading: const Icon(Icons.flash_on, color: Colors.redAccent, size: 30),
+                title: const Text("HANNUTV VIP (NetMirror)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text("Official API Direct Stream (No 404 Error)", style: TextStyle(color: Colors.grey)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _launchPlayerFinal(title, 'netmirror_vip', season: season, episode: episode);
+                },
+              ),
+              const Divider(color: Colors.white24),
+              ListTile(
+                leading: const Icon(Icons.high_quality, color: Colors.orangeAccent, size: 30),
+                title: const Text("VidBolt Ultra HD", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text("1080p Hindi Fast Server", style: TextStyle(color: Colors.grey)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _launchPlayerFinal(title, 'vidbolt', season: season, episode: episode);
+                },
+              ),
+              const Divider(color: Colors.white24),
+              ListTile(
+                leading: const Icon(Icons.speed, color: Colors.purpleAccent, size: 30),
+                title: const Text("Olly Embed VIP", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                subtitle: const Text("Fast HLS Hindi Stream", style: TextStyle(color: Colors.grey)),
+                onTap: () {
+                  Navigator.pop(context);
+                  _launchPlayerFinal(title, 'olly', season: season, episode: episode);
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  void _launchPlayerFinal(String title, String serverKey, {int? season, int? episode}) {
     continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
     final type = widget.mediaItem['mediaType'] ?? 'movie';
@@ -486,7 +550,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           season: season ?? 1,
           episode: episode ?? 1,
           movieTitle: title,
-          preferredServer: 'netmirror_vip', // DIRECT VIP SERVER
+          preferredServer: serverKey, // The server user selected!
         ),
       ),
     );
@@ -525,9 +589,9 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                               Expanded(
                                 child: ElevatedButton.icon(
                                   style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(vertical: 14)),
-                                  onPressed: () => launchPlayer(details?['title'] ?? 'Movie'),
+                                  onPressed: () => _showServerSelectionAndPlay(details?['title'] ?? 'Movie'), // 🔥 Server Selector Trigger
                                   icon: const Icon(Icons.play_arrow, color: Colors.white),
-                                  label: const Text('Play Movie (HD)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                                  label: const Text('Select Server & Play', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ],
@@ -567,7 +631,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                       subtitle: Text(ep['overview'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                       trailing: IconButton(
                                         icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32),
-                                        onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}', season: selectedSeason, episode: ep['episodeNumber']),
+                                        onPressed: () => _showServerSelectionAndPlay('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}', season: selectedSeason, episode: ep['episodeNumber']),
                                       ),
                                     );
                                   },
@@ -579,6 +643,60 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                 ],
               ),
             ),
+    );
+  }
+}
+
+// 🌐 NETMIRROR DIRECT LIVE PORTAL WIDGET
+class NetMirrorWebPortal extends StatefulWidget {
+  const NetMirrorWebPortal({Key? key}) : super(key: key);
+  @override
+  State<NetMirrorWebPortal> createState() => _NetMirrorWebPortalState();
+}
+
+class _NetMirrorWebPortalState extends State<NetMirrorWebPortal> {
+  late WebViewController _portalController;
+  bool isPortalLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _portalController = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageFinished: (String url) {
+            setState(() => isPageLoading = false);
+            // 🛡️ Remove NetMirror Ads & Logos
+            _portalController.runJavaScript('''
+              setInterval(function() {
+                document.querySelectorAll('iframe[src*="ads"], div[class*="ad"], .logo').forEach(el => el.remove());
+              }, 500);
+            ''');
+          },
+        ),
+      )
+      ..loadRequest(Uri.parse('https://netmirror.center/'));
+  }
+
+  bool isPageLoading = true;
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        title: const Text("HANNUTV Live (NetMirror)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        backgroundColor: Colors.black87,
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Stack(
+        children: [
+          WebViewWidget(controller: _portalController),
+          if (isPageLoading) const Center(child: CircularProgressIndicator(color: Colors.red)),
+        ],
+      ),
     );
   }
 }
