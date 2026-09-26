@@ -1,16 +1,11 @@
 package com.horis.cncverse
 
-import android.content.Context
 import android.util.Log
-import okhttp3.FormBody
-import okhttp3.OkHttpClient
-import okhttp3.Request
-import okhttp3.Response
 import org.json.JSONObject
+import java.net.HttpURLConnection
+import java.net.URL
 import java.net.URLEncoder
-import java.util.Base64
 import java.util.UUID
-import java.util.concurrent.TimeUnit
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.sync.Mutex
 import kotlinx.coroutines.sync.withLock
@@ -34,14 +29,6 @@ object Utils {
     private const val TAG = "CNCVerseUtils"
     const val USER_AGENT = "Mozilla/5.0 (Linux; Android 13; Pixel 5 Build/TQ3A.230901.001; wv) AppleWebKit/537.36 (KHTML, like Gecko) Version/4.0 Chrome/144.0.7559.132 Safari/537.36 /OS.Gatu v3.0"
 
-    val baseClient: OkHttpClient = OkHttpClient.Builder()
-        .connectTimeout(30, TimeUnit.SECONDS)
-        .readTimeout(30, TimeUnit.SECONDS)
-        .writeTimeout(30, TimeUnit.SECONDS)
-        .followRedirects(true)
-        .followSslRedirects(true)
-        .build()
-
     val newTvBaseHeaders = mapOf(
         "Cache-Control" to "no-cache, no-store, must-revalidate",
         "Pragma" to "no-cache",
@@ -52,43 +39,27 @@ object Utils {
     )
 
     val newTvDomains = listOf(
-        "aHR0cHM6Ly9tb2JpbGVkZXRlY3RzLmNvbQ==",
-        "aHR0cHM6Ly9tb2JpbGVkZXRlY3QuYXBw",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LmFydA==",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LmNj",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LmNsaWNr",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0Lmluaw==",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LmxpdmU=",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnBybw==",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNob3A=",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNpdGU=",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNwYWNl",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnN0b3Jl",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnZpcA==",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0Lndpa2k=",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0Lnh5eg==",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5hcnQ=",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5jYw==",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5pbmZv",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5pbms=",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5saXZl",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5wcm8=",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5zdG9yZQ==",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy50b3A=",
-        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy54eXo="
+        "aHR0cHM6Ly9tb2JpbGVkZXRlY3RzLmNvbQ==", "aHR0cHM6Ly9tb2JpbGVkZXRlY3QuYXBw",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0LmFydA==", "aHR0cHM6Ly9tb2JpZGV0ZWN0LmNj",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0LmNsaWNr", "aHR0cHM6Ly9tb2JpZGV0ZWN0Lmluaw==",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0LmxpdmU=", "aHR0cHM6Ly9tb2JpZGV0ZWN0LnBybw==",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNob3A=", "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNpdGU==",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnNwYWNl", "aHR0cHM6Ly9tb2JpZGV0ZWN0LnN0b3Jl",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0LnZpcA==", "aHR0cHM6Ly9tb2JpZGV0ZWN0Lndpa2k=",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0Lnh5eg==", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5hcnQ=",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5jYw==", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5pbmZv",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5pbms=", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5saXZl",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5wcm8=", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy5zdG9yZQ==",
+        "aHR0cHM6Ly9tb2JpZGV0ZWN0cy50b3A=", "aHR0cHM6Ly9tb2JpZGV0ZWN0cy54eXo="
     )
 
     private var resolvedApiUrl: String = ""
 
     fun decodeBase64(value: String): String {
         return try {
-            String(Base64.getDecoder().decode(value))
+            String(android.util.Base64.decode(value, android.util.Base64.DEFAULT))
         } catch (e: Exception) {
-            try {
-                String(android.util.Base64.decode(value, android.util.Base64.DEFAULT))
-            } catch (_: Exception) {
-                value
-            }
+            value
         }
     }
 
@@ -130,34 +101,37 @@ object Utils {
         }
 
         val newCookie = try {
-            val headers = mapOf(
-                "Accept" to "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,image/apng,*/*;q=0.8",
-                "Accept-Language" to "en-US,en;q=0.9",
-                "Connection" to "keep-alive",
-                "Content-Type" to "application/x-www-form-urlencoded",
-                "Origin" to "https://net77.cc",
-                "Referer" to "https://net77.cc/verify2",
-                "User-Agent" to USER_AGENT
-            )
-            val formBody = FormBody.Builder()
-                .add("g-recaptcha-response", UUID.randomUUID().toString())
-                .build()
+            val url = URL("https://net52.cc/verify.php")
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.instanceFollowRedirects = false
+            connection.doOutput = true
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
 
-            val noRedirectClient = baseClient.newBuilder()
-                .followRedirects(false)
-                .followSslRedirects(false)
-                .build()
+            connection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8")
+            connection.setRequestProperty("Accept-Language", "en-US,en;q=0.9")
+            connection.setRequestProperty("Connection", "keep-alive")
+            connection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded")
+            connection.setRequestProperty("Origin", "https://net77.cc")
+            connection.setRequestProperty("Referer", "https://net77.cc/verify2")
+            connection.setRequestProperty("User-Agent", USER_AGENT)
 
-            val requestBuilder = Request.Builder().url("https://net52.cc/verify.php").post(formBody)
-            headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
-
-            noRedirectClient.newCall(requestBuilder.build()).execute().use { response ->
-                response.headers.values("Set-Cookie")
-                    .firstOrNull { it.startsWith("t_hash_t=") }
-                    ?.substringAfter("t_hash_t=")
-                    ?.substringBefore(";")
-                    .orEmpty()
+            val postData = "g-recaptcha-response=${UUID.randomUUID()}"
+            connection.outputStream.use { os ->
+                os.write(postData.toByteArray(Charsets.UTF_8))
             }
+
+            var extractedCookie = ""
+            val headerFields = connection.headerFields
+            val cookiesHeader = headerFields["Set-Cookie"] ?: headerFields["set-cookie"]
+            
+            cookiesHeader?.forEach { cookieString ->
+                if (cookieString.startsWith("t_hash_t=")) {
+                    extractedCookie = cookieString.substringAfter("t_hash_t=").substringBefore(";")
+                }
+            }
+            extractedCookie
         } catch (e: Exception) {
             NetflixMirrorStorage.clearCookie()
             ""
@@ -169,43 +143,63 @@ object Utils {
         return newCookie
     }
 
-    fun get(url: String, headers: Map<String, String> = emptyMap(), cookies: Map<String, String> = emptyMap()): Response {
-        val requestBuilder = Request.Builder().url(url)
-        headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
-        if (cookies.isNotEmpty()) {
-            val cookieStr = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
-            requestBuilder.addHeader("Cookie", cookieStr)
-        }
-        return baseClient.newCall(requestBuilder.build()).execute()
-    }
-
-    fun getText(url: String, headers: Map<String, String> = emptyMap(), cookies: Map<String, String> = emptyMap()): String {
+    fun getText(urlString: String, headers: Map<String, String> = emptyMap(), cookies: Map<String, String> = emptyMap()): String {
         return try {
-            get(url, headers, cookies).use { it.body?.string() ?: "" }
+            val url = URL(urlString)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "GET"
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+
+            headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+            if (cookies.isNotEmpty()) {
+                val cookieStr = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                connection.setRequestProperty("Cookie", cookieStr)
+            }
+
+            if (connection.responseCode in 200..399) {
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } else {
+                connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "getText failed: $url -> ${e.localizedMessage}")
+            Log.e(TAG, "getText failed: $urlString -> ${e.localizedMessage}")
             ""
         }
     }
 
-    fun post(url: String, data: Map<String, String> = emptyMap(), headers: Map<String, String> = emptyMap(), cookies: Map<String, String> = emptyMap()): Response {
-        val formBuilder = FormBody.Builder()
-        data.forEach { (k, v) -> formBuilder.add(k, v) }
-
-        val requestBuilder = Request.Builder().url(url).post(formBuilder.build())
-        headers.forEach { (k, v) -> requestBuilder.addHeader(k, v) }
-        if (cookies.isNotEmpty()) {
-            val cookieStr = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
-            requestBuilder.addHeader("Cookie", cookieStr)
-        }
-        return baseClient.newCall(requestBuilder.build()).execute()
-    }
-
-    fun postText(url: String, data: Map<String, String> = emptyMap(), headers: Map<String, String> = emptyMap(), cookies: Map<String, String> = emptyMap()): String {
+    fun postText(urlString: String, data: Map<String, String> = emptyMap(), headers: Map<String, String> = emptyMap(), cookies: Map<String, String> = emptyMap()): String {
         return try {
-            post(url, data, headers, cookies).use { it.body?.string() ?: "" }
+            val url = URL(urlString)
+            val connection = url.openConnection() as HttpURLConnection
+            connection.requestMethod = "POST"
+            connection.connectTimeout = 15000
+            connection.readTimeout = 15000
+            connection.doOutput = true
+
+            headers.forEach { (k, v) -> connection.setRequestProperty(k, v) }
+            if (cookies.isNotEmpty()) {
+                val cookieStr = cookies.entries.joinToString("; ") { "${it.key}=${it.value}" }
+                connection.setRequestProperty("Cookie", cookieStr)
+            }
+
+            val postData = data.entries.joinToString("&") {
+                "${URLEncoder.encode(it.key, "UTF-8")}=${URLEncoder.encode(it.value, "UTF-8")}"
+            }
+
+            if (postData.isNotEmpty()) {
+                connection.outputStream.use { os ->
+                    os.write(postData.toByteArray(Charsets.UTF_8))
+                }
+            }
+
+            if (connection.responseCode in 200..399) {
+                connection.inputStream.bufferedReader().use { it.readText() }
+            } else {
+                connection.errorStream?.bufferedReader()?.use { it.readText() } ?: ""
+            }
         } catch (e: Exception) {
-            Log.e(TAG, "postText failed: $url -> ${e.localizedMessage}")
+            Log.e(TAG, "postText failed: $urlString -> ${e.localizedMessage}")
             ""
         }
     }
