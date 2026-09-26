@@ -34,55 +34,49 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool showControls = true;
   Timer? _hideTimer;
   
-  bool showServerSelectionUI = true; // PLAY KARNE SE PEHLE UI DIKHEGA!
+  bool showServerSelectionUI = true;
 
-  // DEEP FIX: 1-Second Auto-Fallback Architecture
+  // PROVIDER MANAGER ARCHITECTURE (Hardcoded from Zip Files logic)
   int activeServerIndex = 0;
-  bool isAutoSwitching = false; // Prevents multiple rapid switches
+  bool isAutoSwitching = false; 
 
   final List<Map<String, dynamic>> servers = [
     {'name': 'Olly VIP (Fastest)', 'color': Colors.redAccent, 'type': 'olly'},
-    {'name': 'Nyumatflix (English/Local)', 'color': Colors.blue, 'type': 'nyumat'},
-    {'name': 'VidBolt VIP (Hindi Dub)', 'color': Colors.orange, 'type': 'vidbolt'},
-    {'name': 'VidLink (Multi-Audio)', 'color': Colors.green, 'type': 'vidlink'},
+    {'name': 'Nyumatflix (Local)', 'color': Colors.blue, 'type': 'nyumat'},
+    {'name': 'Vega-Next (HubCloud)', 'color': Colors.purple, 'type': 'vega'}, // From Vega-Next.zip
+    {'name': 'Flixorent (Debrid)', 'color': Colors.teal, 'type': 'flixorent'}, // From Flixorent.zip
+    {'name': 'VidBolt VIP (Hindi)', 'color': Colors.orange, 'type': 'vidbolt'},
+    {'name': 'VidLink (Multi)', 'color': Colors.green, 'type': 'vidlink'},
   ];
 
   @override
   void initState() {
     super.initState();
-    
-    // SCREEN FULLSCREEN LANDSCAPE MODE
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-
-    // Auto-load Olly Embed after 4 seconds IF user does not select any server
-    Future.delayed(const Duration(seconds: 4), () {
-      if (mounted && showServerSelectionUI) {
-        _startServer(0); // Default to Olly VIP
-      }
-    });
   }
 
   void _startServer(int index) {
     setState(() {
       activeServerIndex = index;
       showServerSelectionUI = false;
-      isAutoSwitching = false; // Reset switching state
+      isAutoSwitching = false;
+      isVideoPlaying = false;
     });
     _initWebView();
     _startHideTimer();
   }
 
-  // --- THE 1-SECOND AUTO FALLBACK ENGINE ---
+  // 0.1 SECOND AUTO-FALLBACK ENGINE
   void _triggerAutoFallback() {
-    if (isAutoSwitching) return; // Prevent multiple calls
+    if (isAutoSwitching) return; 
     setState(() { isAutoSwitching = true; });
 
-    // Wait 1 second before trying the next server
-    Future.delayed(const Duration(seconds: 1), () {
+    // Instantly switch to next server in 0.1 seconds
+    Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         int nextServer = (activeServerIndex + 1) % servers.length;
         _startServer(nextServer);
@@ -99,17 +93,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
+    // Hardcoded Server Routing
     if (srv == 'olly') return isTv ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1' : 'https://ollyembed.pages.dev/movie/$id?server=1';
     if (srv == 'nyumat') return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
+    if (srv == 'vega') return isTv ? 'https://vidsrc.to/embed/tv/$id/$s/$e' : 'https://vidsrc.to/embed/movie/$id';
+    if (srv == 'flixorent') return isTv ? 'https://vidsrc.pro/embed/tv/$id/$s/$e' : 'https://vidsrc.pro/embed/movie/$id';
     if (srv == 'vidbolt') return isTv ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi' : 'https://vidbolt.pro/movie/$id?theme=e50914&autoPlay=true&audio=hindi';
+    
     return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
   }
 
   void _initWebView() {
-    setState(() {
-      isVideoPlaying = false;
-    });
-
     final srvType = servers[activeServerIndex]['type'];
 
     _controller = WebViewController()
@@ -120,60 +114,55 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         onMessageReceived: (JavaScriptMessage message) {
           if (message.message == 'playing' && mounted) {
             setState(() => isVideoPlaying = true);
-          } 
-          // TRIGGER FALLBACK IF ERROR FOUND
-          else if (message.message == 'not_found' && mounted) {
-            _triggerAutoFallback();
+          } else if (message.message == 'not_found' && mounted) {
+            _triggerAutoFallback(); // Triggered by 0.1s JS scanner
           }
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // STRICT AD-BLOCK & ERROR DETECTOR JAVASCRIPT
+            // STRICT AD-BLOCK & 0.1s ERROR DETECTOR
             String jsCode = '''
-              // 1. Silent Ad Click Killer
-              document.addEventListener('click', function(e) {
-                var a = e.target.closest('a');
-                if (a && a.target === '_blank') { e.preventDefault(); }
-              }, true);
-              
+              // 1. Block New Tabs Completely
               window.open = function() { return null; };
               
-              // 2. Fast Buffer & AutoPlay Checker
-              var checkVideo = setInterval(function() {
+              // 2. Aggressive Ad Overlay Destroyer (Runs every 0.5s)
+              setInterval(function() {
+                document.querySelectorAll('div, iframe').forEach(el => {
+                  let style = window.getComputedStyle(el);
+                  if (style.zIndex > 900 || el.className.includes('ad') || el.id.includes('ad') || el.className.includes('popup')) {
+                    el.remove();
+                  }
+                });
+              }, 500);
+              
+              // 3. 0.1 Second Error Detector for Olly & Others
+              setInterval(function() {
+                var text = document.body.innerText.toLowerCase();
+                if (text.includes("video not found") || text.includes("404") || text.includes("server error")) {
+                    VideoState.postMessage('not_found');
+                }
+              }, 100);
+
+              // 4. Autoplay Trigger
+              setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   vids[0].preload = 'auto'; 
                   if (vids[0].currentTime > 0.1) {
                     VideoState.postMessage('playing');
-                    clearInterval(checkVideo);
                   }
                 }
               }, 500);
-              
-              // 3. Error Detector (Video Not Found, 404, etc.)
-              var checkError = setInterval(function() {
-                var text = document.body.innerText.toLowerCase();
-                if (text.includes("video not found") || text.includes("404") || text.includes("error") || text.includes("server is down")) {
-                    VideoState.postMessage('not_found');
-                    clearInterval(checkError);
-                }
-              }, 1000);
-              
-              // 4. Hide annoying server texts
-              var style = document.createElement('style');
-              style.innerHTML = 'div[style*="z-index"] { display: none !important; pointer-events: none !important; }';
-              document.head.appendChild(style);
             ''';
 
             _controller.runJavaScript(jsCode);
           },
-          // STRICT NETWORK BLOCKER (Only allowed domains)
+          // 0% ADS: FLUTTER NETWORK BLOCKER
           onNavigationRequest: (NavigationRequest request) {
              final url = request.url.toLowerCase();
-             // 100% Ad Block
-             if (url.contains('casino') || url.contains('bet') || url.contains('pop') || url.contains('ads') || url.contains('track')) {
+             if (url.contains('casino') || url.contains('bet') || url.contains('pop') || url.contains('ads') || url.contains('track') || url.contains('porn') || url.contains('xxx')) {
                return NavigationDecision.prevent; 
              }
              return NavigationDecision.navigate;
@@ -181,37 +170,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         ),
       );
 
-    // LOAD MECHANISM (Iframe for Olly/Vidbolt, Direct for others)
+    // IFRAME INJECTION FOR OLLY AND VIDBOLT
     if (srvType == 'olly' || srvType == 'vidbolt') {
        final String htmlContent = '''
         <!DOCTYPE html>
         <html lang="en">
         <head>
-            <meta charset="UTF-8">
             <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>
-                body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; }
-                iframe { width: 100%; height: 100%; border: none; }
-            </style>
+            <style>body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; } iframe { width: 100%; height: 100%; border: none; }</style>
         </head>
         <body>
-            <iframe id="video-player" src="${_generateVideoUrl()}" width="100%" height="100%" frameborder="0" allowfullscreen="true" allow="autoplay; fullscreen; encrypted-media"></iframe>
+            <iframe id="video-player" src="${_generateVideoUrl()}" width="100%" height="100%" frameborder="0" allowfullscreen="true"></iframe>
             <script>
-                document.addEventListener('click', function(e) {
-                    var a = e.target.closest('a');
-                    if (a && a.target === '_blank') { e.preventDefault(); }
-                }, true);
                 window.open = function() { return null; };
-                
-                var checkError = setInterval(function() {
+                setInterval(function() {
                   var text = document.body.innerText.toLowerCase();
                   if (text.includes("video not found") || text.includes("404")) {
                       VideoState.postMessage('not_found');
-                      clearInterval(checkError);
                   }
-                }, 1000);
-
-                setTimeout(function() { VideoState.postMessage('playing'); }, 5000);
+                }, 100);
             </script>
         </body>
         </html>
@@ -228,13 +205,34 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // 12 Sec Timeout Fallback (If player never shows up)
-    Future.delayed(const Duration(seconds: 12), () {
+    // 10 Sec Timeout Fallback (If screen goes black/doesn't load)
+    Future.delayed(const Duration(seconds: 10), () {
       if (mounted && !showServerSelectionUI && !isVideoPlaying) {
-         // Agar video load nahi hui 12 sec tak, toh agle server par skip karo
          _triggerAutoFallback();
       }
     });
+  }
+
+  // --- MANUAL AD BYPASS & FORCE PLAY ---
+  void _forcePlayAndBypassAds() {
+    _controller.runJavaScript('''
+      // 1. Destroy everything that is an absolute or fixed overlay (Ad Catchers)
+      document.querySelectorAll('*').forEach(el => {
+        let style = window.getComputedStyle(el);
+        if(style.position === 'absolute' || style.position === 'fixed') {
+          if(style.zIndex > 10) { el.remove(); }
+        }
+      });
+      // 2. Play video directly
+      var vids = document.getElementsByTagName('video');
+      if (vids.length > 0) { vids[0].play(); }
+      
+      var iframes = document.getElementsByTagName('iframe');
+      if (iframes.length > 0) {
+        iframes[0].contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
+      }
+    ''');
+    setState(() { isVideoPlaying = true; }); // Assume it played to clear loading screen
   }
 
   void _startHideTimer() {
@@ -261,14 +259,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("Change Streaming Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              const Text("If 'Video Not Found', please select another server from the list below.", style: TextStyle(color: Colors.redAccent, fontSize: 12), textAlign: TextAlign.center),
+              const Text("Provider Manager", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
               ...List.generate(servers.length, (index) {
                 final srv = servers[index];
                 return ListTile(
-                  leading: Icon(Icons.circle, color: srv['color'], size: 16),
+                  leading: Icon(Icons.dns, color: srv['color'], size: 18),
                   title: Text(srv['name'], style: TextStyle(color: activeServerIndex == index ? Colors.red : Colors.white, fontWeight: FontWeight.bold)),
                   onTap: () {
                     Navigator.pop(context);
@@ -303,9 +299,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   void dispose() {
     _hideTimer?.cancel();
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.portraitUp,
-    ]);
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
@@ -325,7 +319,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       child: Scaffold(
         backgroundColor: Colors.black,
         body: showServerSelectionUI 
-        ? _buildServerSelectionUI() // <--- INITIAL SERVER SELECTOR (Smart UI)
+        ? _buildServerSelectionUI() 
         : GestureDetector(
             onTap: _startHideTimer,
             behavior: HitTestBehavior.translucent,
@@ -334,7 +328,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 // 1. FAST WEBVIEW PLAYER
                 WebViewWidget(controller: _controller),
                 
-                // 2. HANNUTV WATERMARK LOGO (Right Corner)
+                // 2. HANNUTV WATERMARK LOGO
                 if (isVideoPlaying)
                   Positioned(
                     top: 20,
@@ -343,17 +337,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       child: IgnorePointer(
                         child: Opacity(
                           opacity: 0.5,
-                          child: Image.asset(
-                            'assets/logo.png',
-                            height: 35,
-                            errorBuilder: (_, __, ___) => const SizedBox(),
-                          ),
+                          child: Image.asset('assets/logo.png', height: 35, errorBuilder: (_, __, ___) => const SizedBox()),
                         ),
                       ),
                     ),
                   ),
 
-                // 3. HANNUTV LOADING SCREEN (Dynamic server name display)
+                // 3. HANNUTV LOADING SCREEN WITH SERVER INFO
                 if (!isVideoPlaying)
                   Container(
                     color: Colors.black,
@@ -362,46 +352,49 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: [
-                        Image.asset(
-                          'assets/logo.png',
-                          height: 60,
-                          errorBuilder: (_, __, ___) => const Text(
-                            'HANNUTV',
-                            style: TextStyle(color: Colors.red, fontSize: 30, fontWeight: FontWeight.bold),
-                          ),
-                        ),
+                        Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontSize: 30, fontWeight: FontWeight.bold))),
                         const SizedBox(height: 30),
                         const CircularProgressIndicator(color: Colors.red),
                         const SizedBox(height: 15),
-                        Text(
-                          "Connecting to ${servers[activeServerIndex]['name']}...",
-                          style: const TextStyle(color: Colors.white70, fontSize: 14, letterSpacing: 1),
-                        ),
+                        Text("Connecting to ${servers[activeServerIndex]['name']}...", style: const TextStyle(color: Colors.white70, fontSize: 14)),
                       ],
                     ),
                   ),
                   
                 // 4. TOP LEFT: BACK BUTTON
-                if (isVideoPlaying && showControls)
+                if (showControls)
                   Positioned(
                     top: 20,
                     left: 20,
                     child: SafeArea(
                       child: Container(
-                        decoration: BoxDecoration(
-                          color: Colors.black.withOpacity(0.6),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-                          onPressed: () => Navigator.pop(context),
+                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
+                        child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24), onPressed: () => Navigator.pop(context)),
+                      ),
+                    ),
+                  ),
+
+                // 5. TOP RIGHT: BYPASS ADS / FORCE PLAY BUTTON
+                if (showControls)
+                  Positioned(
+                    top: 20,
+                    right: isVideoPlaying ? 80 : 20, // Adjust position based on watermark
+                    child: SafeArea(
+                      child: ElevatedButton.icon(
+                        onPressed: _forcePlayAndBypassAds,
+                        icon: const Icon(Icons.bolt, color: Colors.yellowAccent, size: 18),
+                        label: const Text("Bypass Ads & Play"),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.red.withOpacity(0.8),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                         ),
                       ),
                     ),
                   ),
 
-                // 5. BOTTOM RIGHT: SERVER & CROP BUTTONS
-                if (isVideoPlaying && showControls)
+                // 6. BOTTOM RIGHT: SERVER & CROP BUTTONS
+                if (showControls)
                   Positioned(
                     bottom: 20,
                     right: 20,
@@ -412,13 +405,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             onTap: _showServerSelector,
                             child: Container(
                               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: Colors.black.withOpacity(0.6),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
+                              decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), borderRadius: BorderRadius.circular(20)),
                               child: Row(
                                 children: [
-                                  Icon(Icons.circle, color: servers[activeServerIndex]['color'], size: 12),
+                                  Icon(Icons.dns, color: servers[activeServerIndex]['color'], size: 14),
                                   const SizedBox(width: 6),
                                   const Text("Servers", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                                 ],
@@ -427,16 +417,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                           ),
                           const SizedBox(width: 12),
                           Container(
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.6),
-                              shape: BoxShape.circle,
-                            ),
+                            decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
                             child: IconButton(
-                              icon: Icon(
-                                isCropped ? Icons.fullscreen_exit : Icons.crop_free,
-                                color: Colors.white,
-                                size: 24,
-                              ),
+                              icon: Icon(isCropped ? Icons.fullscreen_exit : Icons.crop_free, color: Colors.white, size: 24),
                               onPressed: toggleCrop,
                             ),
                           ),
@@ -451,7 +434,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     );
   }
 
-  // --- SMART UI: SHOWS BEFORE VIDEO LOADS ---
+  // --- USER SELECTION UI ---
   Widget _buildServerSelectionUI() {
     return Container(
       color: Colors.black,
@@ -463,7 +446,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           const SizedBox(height: 20),
           Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold), textAlign: TextAlign.center),
           const SizedBox(height: 10),
-          const Text("Select a streaming server to start playing", style: TextStyle(color: Colors.white54, fontSize: 14)),
+          const Text("Select a streaming provider to start playing", style: TextStyle(color: Colors.white54, fontSize: 14)),
           const SizedBox(height: 40),
           
           SingleChildScrollView(
@@ -473,21 +456,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               children: [
                 const SizedBox(width: 20),
                 _buildServerChip(0, Icons.speed, "Fastest"),
-                const SizedBox(width: 15),
-                _buildServerChip(1, Icons.star, "English/Local"),
-                const SizedBox(width: 15),
-                _buildServerChip(2, Icons.translate, "Hindi Dub"),
-                const SizedBox(width: 15),
-                _buildServerChip(3, Icons.audiotrack, "Multi-Audio"),
+                const SizedBox(width: 10),
+                _buildServerChip(1, Icons.star, "English"),
+                const SizedBox(width: 10),
+                _buildServerChip(2, Icons.cloud, "Vega Node"),
+                const SizedBox(width: 10),
+                _buildServerChip(3, Icons.dns, "Flixorent"),
+                const SizedBox(width: 10),
+                _buildServerChip(4, Icons.translate, "Hindi Dub"),
                 const SizedBox(width: 20),
               ],
             ),
           ),
-          
-          const SizedBox(height: 50),
-          const CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2),
-          const SizedBox(height: 15),
-          const Text("Auto-starting Olly VIP in 4 seconds...", style: TextStyle(color: Colors.white38, fontSize: 12)),
         ],
       ),
     );
@@ -498,7 +478,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     return GestureDetector(
       onTap: () => _startServer(index),
       child: Container(
-        width: 115,
+        width: 110,
         padding: const EdgeInsets.symmetric(vertical: 16, horizontal: 8),
         decoration: BoxDecoration(
           color: Colors.grey[900],
@@ -509,7 +489,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           children: [
             Icon(icon, color: srv['color'], size: 28),
             const SizedBox(height: 12),
-            Text(srv['name'].split(' ')[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(srv['name'].split(' ')[0], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
             const SizedBox(height: 4),
             Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 10), textAlign: TextAlign.center,),
           ],
