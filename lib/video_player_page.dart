@@ -21,7 +21,7 @@ class VideoPlayerPage extends StatefulWidget {
     required this.episode,
     required this.movieTitle,
     this.customUrl,
-    this.preferredServer = 'netmirror_vip',
+    this.preferredServer = 'vidbolt',
   }) : super(key: key);
 
   @override
@@ -35,57 +35,52 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool isCropped = false;
   bool showControls = true;
   Timer? _hideTimer;
-  bool isPageLoading = true;
-  late String currentServerKey;
+  Timer? _aiFallbackTimer;
 
-  // 👑 VIP HARDCODED SERVERS
+  bool isAiResolving = true;
+  String aiStatusText = "AI Engine: Scanning & Auto-Bypassing Ads...";
+  int currentServerIndex = 0;
+
+  // 🤖 5 ULTRA FAST ZERO-AD DIRECT EMBED PROVIDERS
   final List<Map<String, dynamic>> allServers = [
-    {
-      'key': 'netmirror_vip',
-      'name': 'HANNUTV VIP (NetMirror)',
-      'sub': 'Official Direct URL (No White Screen / 404)',
-      'color': Colors.redAccent,
-      'lang': 'hindi',
-    },
     {
       'key': 'vidbolt',
       'name': 'VidBolt VIP Ultra HD',
-      'sub': '1080p Hindi Dub + High Bitrate',
+      'sub': 'Fast Hindi Dub + 1080p Stream (No Ads)',
+      'color': Colors.redAccent,
+    },
+    {
+      'key': 'vidsrc_icu',
+      'name': 'HANNUTV Cloud Node',
+      'sub': 'Superfast HLS Multi-Audio',
       'color': Colors.orangeAccent,
-      'lang': 'hindi',
     },
     {
-      'key': 'olly',
-      'name': 'Olly Stream VIP',
-      'sub': 'Fast HLS Hindi Direct (No Ads)',
-      'color': Colors.purpleAccent,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'vega',
+      'key': 'vidsrc_to',
       'name': 'Vega Multi-Audio 4K',
       'sub': 'Dual Audio Hindi/Eng Cloud',
-      'color': Colors.teal,
-      'lang': 'hindi',
+      'color': Colors.purpleAccent,
     },
     {
-      'key': 'flixorent',
-      'name': 'Flixorent Ultra',
-      'sub': 'English Subtitles 1080p',
+      'key': 'vidlink',
+      'name': 'VidLink English Pro',
+      'sub': 'English HD Direct Node',
+      'color': Colors.green,
+    },
+    {
+      'key': 'superembed',
+      'name': 'Multi-Stream VIP',
+      'sub': 'Instant 1-Click Stream',
       'color': Colors.blueAccent,
-      'lang': 'english',
-    }
+    },
   ];
-
-  String selectedLanguage = 'hindi';
-
-  List<Map<String, dynamic>> get currentServers =>
-      allServers.where((s) => s['lang'] == selectedLanguage).toList();
 
   @override
   void initState() {
     super.initState();
-    currentServerKey = widget.preferredServer;
+    // Match requested server
+    int initialIndex = allServers.indexWhere((s) => s['key'] == widget.preferredServer);
+    currentServerIndex = initialIndex != -1 ? initialIndex : 0;
 
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
@@ -93,22 +88,46 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    _initStreamEngine();
+    _initAiStreamPlayer();
     _startHideTimer();
   }
 
-  void _switchServer(String newServerKey) {
+  void _initAiStreamPlayer() {
+    _aiFallbackTimer?.cancel();
     setState(() {
-      currentServerKey = newServerKey;
-      isPageLoading = true;
+      isAiResolving = true;
       isVideoPlaying = false;
+      aiStatusText = "AI Sentinel: Connecting to ${allServers[currentServerIndex]['name']}...";
     });
-    _initStreamEngine();
-    _startHideTimer();
+
+    _buildCleanWebView();
+
+    // 🛡️ BACKGROUND AI SENTINEL (If stream doesn't play in 7s, auto-switch to next server)
+    _aiFallbackTimer = Timer(const Duration(seconds: 7), () {
+      if (mounted && !isVideoPlaying) {
+        _autoFallbackNextServer();
+      }
+    });
   }
 
-  // 🚀 GENERATE URL (No API, Direct Bypass)
-  String _generateServerUrl() {
+  void _autoFallbackNextServer() {
+    if (isVideoPlaying || !mounted) return;
+    setState(() {
+      currentServerIndex = (currentServerIndex + 1) % allServers.length;
+      aiStatusText = "AI Engine: Switching to backup server ${allServers[currentServerIndex]['name']}...";
+    });
+    _initAiStreamPlayer();
+  }
+
+  void _manualSwitchServer(int index) {
+    _aiFallbackTimer?.cancel();
+    setState(() {
+      currentServerIndex = index;
+    });
+    _initAiStreamPlayer();
+  }
+
+  String _generateStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
     }
@@ -117,192 +136,205 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final s = widget.season;
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+    final srvKey = allServers[currentServerIndex]['key'];
 
-    // ⚡ NETMIRROR DIRECT HASH URL
-    if (currentServerKey == 'netmirror_vip' || currentServerKey.contains('netmirror')) {
-      return isTv
-          ? 'https://net27.cc/#w=$id-tv-$s-$e'
-          : 'https://net27.cc/#w=$id-movie';
-    }
-
-    if (currentServerKey == 'vidbolt') {
+    // 1. VidBolt High Bitrate (Hindi + 1080p)
+    if (srvKey == 'vidbolt') {
       return isTv
           ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
           : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
     }
 
-    if (currentServerKey == 'olly') {
+    // 2. VidSrc ICU Fast Embed
+    if (srvKey == 'vidsrc_icu') {
       return isTv
-          ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
-          : 'https://ollyembed.pages.dev/movie/$id?server=1';
+          ? 'https://vidsrc.icu/embed/tv/$id/$s/$e'
+          : 'https://vidsrc.icu/embed/movie/$id';
     }
 
-    if (currentServerKey == 'vega') {
+    // 3. VidSrc TO 4K Cloud
+    if (srvKey == 'vidsrc_to') {
       return isTv
           ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
           : 'https://vidsrc.to/embed/movie/$id';
     }
 
+    // 4. VidLink Pro
+    if (srvKey == 'vidlink') {
+      return isTv
+          ? 'https://vidlink.pro/tv/$id/$s/$e'
+          : 'https://vidlink.pro/movie/$id';
+    }
+
+    // 5. SuperEmbed Multi
     return isTv
-        ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
-        : 'https://vidsrc.pro/embed/movie/$id';
+        ? 'https://multiembed.mov/?video_id=$id&tmdb=1&s=$s&e=$e'
+        : 'https://multiembed.mov/?video_id=$id&tmdb=1';
   }
 
-  // 🛡️ THE 10000000000% BYPASS ENGINE
-  void _initStreamEngine() {
-    final targetUrl = _generateServerUrl();
-    bool loadAsIframe = currentServerKey == 'vidbolt' || currentServerKey == 'olly';
+  void _buildCleanWebView() {
+    final targetUrl = _generateStreamUrl();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
       )
       ..addJavaScriptChannel(
         'VideoState',
         onMessageReceived: (JavaScriptMessage message) {
           if (message.message == 'playing' && mounted) {
+            _aiFallbackTimer?.cancel();
             setState(() {
               isVideoPlaying = true;
-              isPageLoading = false;
+              isAiResolving = false;
             });
           }
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (String url) {
-            if (mounted) setState(() => isPageLoading = true);
-          },
           onPageFinished: (String url) {
-            if (mounted) setState(() => isPageLoading = false);
-
-            // 🔥 AI AUTO-CLICKER & AD-NUKER (Fixed Reconnect & Dual Audio)
+            // 🛡️ WORLD'S BEST BACKGROUND AI AD-KILLER & AUTO-CLICK SCRIPT
             String jsCode = '''
+              // Force Black Screen
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
-              // Hide only specific garbage elements, DO NOT hide Player Controls (.jw-settings, .vjs-menu)
-              var style = document.createElement('style');
-              style.innerHTML = `
-                header, footer, nav, aside, .sidebar, .logo, .ad-container, iframe[src*="ads"], 
-                [class*="telegram"], [id*="telegram"], a[href*="t.me"] { display: none !important; }
-                body, html { overflow: hidden !important; background: black !important; }
-              `;
-              document.head.appendChild(style);
+              // Prevent all redirects and popups
+              window.open = function() { return null; };
+              window.alert = function() { return null; };
+              window.confirm = function() { return null; };
 
-              let targetLang = '${selectedLanguage.toLowerCase()}';
-
+              // AI Real-time Loop (Every 200ms)
               setInterval(function() {
-                // 1. Auto click "Server 1" or "Server 2"
-                let buttons = document.querySelectorAll('button, div.server, .btn, .server-item, li');
-                buttons.forEach(btn => {
-                   let text = btn.innerText.toLowerCase();
-                   
-                   // Click Play if visible
-                   if (text.includes('play') && !window._autoClickedPlay) {
-                      btn.click();
-                      window._autoClickedPlay = true;
-                   }
-
-                   // Match Server
-                   if (targetLang === 'hindi' && (text.includes('server 1') || text.includes('hindi')) && !window._langClicked) {
-                      btn.click(); window._langClicked = true;
-                   } else if (targetLang === 'english' && (text.includes('server 2') || text.includes('english')) && !window._langClicked) {
-                      btn.click(); window._langClicked = true;
-                   }
-                });
-
-                // 2. Kill Popups but IGNORE Player Controls (Allows Dual Audio)
-                document.querySelectorAll('div, a, span, img').forEach(el => {
-                  let style = window.getComputedStyle(el);
-                  let cls = el.className ? el.className.toString().toLowerCase() : '';
-                  let txt = el.innerText ? el.innerText.toLowerCase() : '';
-
-                  // Kill Telegram overlays
-                  if(txt.includes('telegram') || txt.includes('join our') || txt.includes('bet365')) {
-                      el.remove();
-                      return;
-                  }
-
-                  if ((style.position === 'fixed' || style.position === 'absolute') && 
-                      style.zIndex > 500 && 
-                      el.tagName !== 'IFRAME' && 
-                      el.tagName !== 'VIDEO') {
-                    
-                    // 🛡️ DUAL AUDIO PROTECTOR: DO NOT Remove JWPlayer / VideoJS menus
-                    if (cls.includes('jw-') || cls.includes('vjs') || cls.includes('plyr') || 
-                        cls.includes('control') || cls.includes('setting') || cls.includes('menu')) {
-                        return;
-                    }
-                    el.remove();
-                  }
-                });
-
-                // 3. Auto Play Video
+                // A. Video Detection & Force Unmute Play
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
                   v.style.backgroundColor = '#000000';
-                  if (v.paused) {
+                  v.muted = false;
+                  v.volume = 1.0;
+
+                  if (v.paused && !v.ended) {
                     v.play().catch(function(){});
                   }
-                  if (v.currentTime > 0 && !v.paused) {
+                  if (v.currentTime > 0.5 && !v.paused) {
                     VideoState.postMessage('playing');
                   }
                 }
-              }, 500);
+
+                // B. Auto Click Play Buttons & Server Items
+                var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .jw-display-icon-container, [aria-label="Play"], button[title*="Play"], .play-icon, #play-button, .button-play');
+                playBtns.forEach(function(b) {
+                  b.click();
+                });
+
+                // C. Kill All Banner Ads, Modals, Overlays, Floating Frames
+                document.querySelectorAll('div, a, span, img, section, modal, aside, p, header, nav').forEach(el => {
+                  let text = el.innerText ? el.innerText.toLowerCase() : '';
+                  let className = el.className ? el.className.toString().toLowerCase() : '';
+                  let idName = el.id ? el.id.toString().toLowerCase() : '';
+                  let style = window.getComputedStyle(el);
+
+                  // AdBlock Warnings
+                  if (text.includes('adblock') || 
+                      text.includes('ad-blocker') || 
+                      text.includes('disable adblock') || 
+                      text.includes('please disable') ||
+                      text.includes('inside an iframe')) {
+                    if (el.tagName === 'HEADER' || el.tagName === 'NAV') {
+                      el.style.display = 'none';
+                    } else if (!el.querySelector('video') && !el.querySelector('iframe')) {
+                      el.remove();
+                    }
+                  }
+
+                  // Floating Overlays
+                  if ((style.position === 'fixed' || style.position === 'absolute') && 
+                      style.zIndex > 1000 && 
+                      el.tagName !== 'IFRAME' && 
+                      el.tagName !== 'VIDEO' &&
+                      !el.contains(document.querySelector('video'))) {
+                    el.remove();
+                  }
+
+                  // Ads & Banners
+                  if (className.includes('banner') || className.includes('ad-') || className.includes('popup') || idName.includes('ad-')) {
+                    el.remove();
+                  }
+                });
+              }, 200);
             ''';
             _controller.runJavaScript(jsCode);
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
-            
-            // 🚫 FIXED RECONNECT BUG: DO NOT BLOCK VIDEO STREAMS (.m3u8, .mp4, hakuna)
-            if (url.contains('.m3u8') || url.contains('.mp4') || url.contains('hakunaymatata') || url.contains('videodelivery')) {
-                return NavigationDecision.navigate;
-            }
 
-            // 🚫 BLOCK ADS
-            if (url.contains('doubleclick') || url.contains('popads') || 
-                url.contains('onclick') || url.contains('adsterra') || 
-                url.contains('bet365') || url.contains('monetag') ||
-                url.contains('market://') || url.contains('intent://') || 
-                url.contains('t.me') || url.contains('telegram')) {
+            // 🚫 HARD BLOCK AD REDIRECTS & BETTING NETWORKS
+            if (url.contains('doubleclick') ||
+                url.contains('popads') ||
+                url.contains('1xbet') ||
+                url.contains('bet365') ||
+                url.contains('onclick') ||
+                url.contains('monetag') ||
+                url.contains('exoclick') ||
+                url.contains('redirect') ||
+                url.contains('adsterra') ||
+                url.contains('betway') ||
+                url.contains('parimatch') ||
+                url.contains('syndication') ||
+                url.contains('traffic')) {
               return NavigationDecision.prevent;
             }
 
-            return NavigationDecision.navigate;
+            // ✅ ALLOW ONLY STREAMING SERVERS
+            if (url.contains('hannutv.app') ||
+                url.contains('vidbolt') ||
+                url.contains('vidsrc') ||
+                url.contains('vidlink') ||
+                url.contains('multiembed') ||
+                url.contains('pages.dev') ||
+                url.contains('stellar.rip') ||
+                url.startsWith('about:blank') ||
+                url.startsWith('data:')) {
+              return NavigationDecision.navigate;
+            }
+
+            return NavigationDecision.prevent;
           },
         ),
       );
 
-    if (loadAsIframe) {
-      String spoofedBaseUrl = currentServerKey == 'vidbolt' ? 'https://vidbolt.pro/' : 'https://hannutv.app/';
-      final embedHtml = '''
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
-              iframe { width: 100vw; height: 100vh; border: none; background-color: #000000; }
-            </style>
-          </head>
-          <body>
-            <iframe src="$targetUrl" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>
-          </body>
-        </html>
-      ''';
-      _controller.loadHtmlString(embedHtml, baseUrl: spoofedBaseUrl);
-    } else {
-      _controller.loadRequest(Uri.parse(targetUrl));
-    }
+    // Fullcontainer HTML Iframe wrapper for maximum security & 0% white screen
+    final embedHtml = '''
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
+            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
+          </style>
+        </head>
+        <body>
+          <iframe 
+            id="player-frame"
+            src="$targetUrl" 
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
+            allowfullscreen>
+          </iframe>
+        </body>
+      </html>
+    ''';
+
+    _controller.loadHtmlString(embedHtml, baseUrl: 'https://hannutv.app');
 
     if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
     }
   }
 
@@ -310,14 +342,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _startHideTimer();
     final js = '''
       (function() {
-        var v = null;
-        var iframes = document.getElementsByTagName('iframe');
-        if(iframes.length > 0) {
-           var doc = iframes[0].contentDocument || iframes[0].contentWindow.document;
-           if(doc) v = doc.querySelector('video');
+        var frame = document.getElementById('player-frame');
+        var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
+        var vids = doc ? doc.getElementsByTagName('video') : document.getElementsByTagName('video');
+        if (vids.length > 0) {
+          vids[0].currentTime += $seconds;
         }
-        if(!v) v = document.querySelector('video');
-        if (v) v.currentTime += $seconds;
       })();
     ''';
     _controller.runJavaScript(js);
@@ -336,72 +366,55 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
       builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final list = currentServers;
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Switch Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                      Row(
-                        children: [
-                          ChoiceChip(
-                            label: const Text("Hindi"),
-                            selected: selectedLanguage == 'hindi',
-                            selectedColor: Colors.redAccent,
-                            onSelected: (val) {
-                              setModalState(() => selectedLanguage = 'hindi');
-                              setState(() => selectedLanguage = 'hindi');
-                              _initStreamEngine(); 
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: const Text("English"),
-                            selected: selectedLanguage == 'english',
-                            selectedColor: Colors.blueAccent,
-                            onSelected: (val) {
-                              setModalState(() => selectedLanguage = 'english');
-                              setState(() => selectedLanguage = 'english');
-                              _initStreamEngine();
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  ...List.generate(list.length, (index) {
-                    final srv = list[index];
-                    final isSelected = currentServerKey == srv['key'];
-                    return ListTile(
-                      leading: Icon(
-                        isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                        color: isSelected ? Colors.greenAccent : Colors.grey,
-                      ),
-                      title: Text(srv['name'], style: TextStyle(color: isSelected ? Colors.redAccent : Colors.white, fontWeight: FontWeight.bold)),
-                      subtitle: Text(srv['sub'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (currentServerKey != srv['key']) {
-                          _switchServer(srv['key']);
-                        } else {
-                          _startHideTimer();
-                        }
-                      },
-                    );
-                  }),
-                ],
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text(
+                "Change Streaming Engine",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
-            );
-          }
+              const SizedBox(height: 16),
+              ...List.generate(allServers.length, (index) {
+                final srv = allServers[index];
+                final isSelected = currentServerIndex == index;
+                return ListTile(
+                  leading: Icon(
+                    isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
+                    color: isSelected ? Colors.greenAccent : Colors.grey,
+                  ),
+                  title: Text(
+                    srv['name'],
+                    style: TextStyle(
+                      color: isSelected ? Colors.redAccent : Colors.white,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  subtitle: Text(
+                    srv['sub'],
+                    style: const TextStyle(color: Colors.grey, fontSize: 12),
+                  ),
+                  onTap: () {
+                    Navigator.pop(context);
+                    if (currentServerIndex != index) {
+                      _manualSwitchServer(index);
+                    } else {
+                      _startHideTimer();
+                    }
+                  },
+                );
+              }),
+            ],
+          ),
         );
       },
     ).then((_) => _startHideTimer());
@@ -410,14 +423,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void toggleCrop() {
     setState(() => isCropped = !isCropped);
     _controller.runJavaScript('''
-      var v = null;
-      var iframes = document.getElementsByTagName('iframe');
-      if(iframes.length > 0) {
-         var doc = iframes[0].contentDocument || iframes[0].contentWindow.document;
-         if(doc) v = doc.querySelector('video');
+      var frame = document.getElementById('player-frame');
+      var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
+      var vids = doc ? doc.getElementsByTagName('video') : document.getElementsByTagName('video');
+      if (vids.length > 0) {
+        vids[0].style.objectFit = '${isCropped ? "cover" : "contain"}';
       }
-      if(!v) v = document.querySelector('video');
-      if (v) v.style.objectFit = '${isCropped ? "cover" : "contain"}';
     ''');
     _startHideTimer();
   }
@@ -425,17 +436,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _aiFallbackTimer?.cancel();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentSrv = allServers.firstWhere(
-      (s) => s['key'] == currentServerKey,
-      orElse: () => allServers[0],
-    );
+    final currentSrv = allServers[currentServerIndex];
 
     return PopScope(
       canPop: false,
@@ -445,197 +455,216 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       },
       child: Scaffold(
         backgroundColor: Colors.black,
-        body: GestureDetector(
-          onTap: _startHideTimer,
-          behavior: HitTestBehavior.opaque,
-          child: Stack(
-            children: [
-              // 1. WEBVIEW CONTAINER
+        body: Stack(
+          children: [
+            // 1. PURE BLACK WEBVIEW CONTAINER (0% WHITE FLASH)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black,
+                child: WebViewWidget(controller: _controller),
+              ),
+            ),
+
+            // 2. HANNUTV WATERMARK LOGO
+            Positioned(
+              top: 16,
+              right: 16,
+              child: SafeArea(
+                child: IgnorePointer(
+                  child: Opacity(
+                    opacity: 0.5,
+                    child: Image.asset(
+                      'assets/logo.png',
+                      height: 30,
+                      errorBuilder: (_, __, ___) => const Text(
+                        'HANNUTV',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+
+            // 3. SMART AI SENTINEL OVERLAY (Until video starts playing)
+            if (isAiResolving && !isVideoPlaying)
               Positioned.fill(
                 child: Container(
                   color: Colors.black,
-                  child: WebViewWidget(controller: _controller),
-                ),
-              ),
-
-              // 2. HANNUTV WATERMARK LOGO
-              Positioned(
-                top: 16,
-                right: 16,
-                child: SafeArea(
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: 0.5,
-                      child: Image.asset(
-                        'assets/logo.png',
-                        height: 30,
-                        errorBuilder: (_, __, ___) => const Text(
-                          'HANNUTV',
-                          style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 12),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              // 3. BUFFERING / CONNECTING BADGE
-              if (isPageLoading && !isVideoPlaying)
-                Positioned(
-                  bottom: 40,
-                  left: 20,
-                  child: SafeArea(
-                    child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.redAccent, width: 1),
-                      ),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2),
-                          ),
-                          const SizedBox(width: 10),
-                          Text(
-                            "Connecting: ${currentSrv['name']}...",
-                            style: const TextStyle(color: Colors.white, fontSize: 12),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-
-              // 4. TOP CONTROLS (BACK & MOVIE TITLE)
-              if (showControls)
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  right: 80,
-                  child: SafeArea(
-                    child: Row(
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
                       children: [
-                        Container(
-                          decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle),
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22),
-                            onPressed: () => Navigator.pop(context),
+                        const SizedBox(
+                          width: 45,
+                          height: 45,
+                          child: CircularProgressIndicator(
+                            color: Colors.redAccent,
+                            strokeWidth: 3,
                           ),
                         ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            widget.movieTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              shadows: [Shadow(color: Colors.black, blurRadius: 6)],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
+                        const SizedBox(height: 20),
+                        Text(
+                          aiStatusText,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 14,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          "Active Node: ${currentSrv['name']}",
+                          style: const TextStyle(
+                            color: Colors.grey,
+                            fontSize: 12,
                           ),
                         ),
                       ],
                     ),
                   ),
                 ),
+              ),
 
-              // 5. CENTER FAST SEEK BUTTONS (-10s / +10s)
-              if (showControls)
-                Center(
+            // 4. TOP CONTROLS (BACK & MOVIE TITLE)
+            if (showControls)
+              Positioned(
+                top: 16,
+                left: 16,
+                right: 80,
+                child: SafeArea(
                   child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      GestureDetector(
-                        onTap: () => _seekRelative(-10),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: const Icon(Icons.replay_10, color: Colors.white, size: 36),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.6),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.arrow_back,
+                              color: Colors.white, size: 22),
+                          onPressed: () => Navigator.pop(context),
                         ),
                       ),
-                      const SizedBox(width: 80),
-                      GestureDetector(
-                        onTap: () => _seekRelative(10),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white24),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Text(
+                          widget.movieTitle,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(color: Colors.black, blurRadius: 6)
+                            ],
                           ),
-                          child: const Icon(Icons.forward_10, color: Colors.white, size: 36),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
                   ),
                 ),
+              ),
 
-              // 6. BOTTOM CONTROLS (SERVER SWITCHER & CROP)
-              if (showControls)
-                Positioned(
-                  bottom: 16,
-                  right: 16,
-                  child: SafeArea(
-                    child: Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        GestureDetector(
-                          onTap: _showServerSelector,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(20),
-                              border: Border.all(color: Colors.redAccent, width: 1.2),
-                            ),
-                            child: Row(
-                              children: [
-                                const Icon(Icons.swap_horiz, color: Colors.redAccent, size: 16),
-                                const SizedBox(width: 6),
-                                Text(
-                                  "Server: ${currentSrv['name']}",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
+            // 5. CENTER FAST SEEK BUTTONS (-10s / +10s)
+            if (showControls)
+              Center(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    GestureDetector(
+                      onTap: () => _seekRelative(-10),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white24),
                         ),
-                        const SizedBox(width: 10),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: Icon(
-                              isCropped ? Icons.fullscreen_exit : Icons.crop_free,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            onPressed: toggleCrop,
-                          ),
-                        ),
-                      ],
+                        child: const Icon(Icons.replay_10,
+                            color: Colors.white, size: 36),
+                      ),
                     ),
+                    const SizedBox(width: 80),
+                    GestureDetector(
+                      onTap: () => _seekRelative(10),
+                      child: Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(
+                          color: Colors.black54,
+                          shape: BoxShape.circle,
+                          border: Border.all(color: Colors.white24),
+                        ),
+                        child: const Icon(Icons.forward_10,
+                            color: Colors.white, size: 36),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+            // 6. BOTTOM CONTROLS (SERVER SWITCHER & CROP)
+            if (showControls)
+              Positioned(
+                bottom: 16,
+                right: 16,
+                child: SafeArea(
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      GestureDetector(
+                        onTap: _showServerSelector,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: Colors.black.withOpacity(0.8),
+                            borderRadius: BorderRadius.circular(20),
+                            border:
+                                Border.all(color: Colors.redAccent, width: 1.2),
+                          ),
+                          child: Row(
+                            children: [
+                              const Icon(Icons.swap_horiz,
+                                  color: Colors.redAccent, size: 16),
+                              const SizedBox(width: 6),
+                              Text(
+                                "Engine: ${currentSrv['name']}",
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      Container(
+                        decoration: BoxDecoration(
+                          color: Colors.black.withOpacity(0.7),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          icon: Icon(
+                            isCropped ? Icons.fullscreen_exit : Icons.crop_free,
+                            color: Colors.white,
+                            size: 20,
+                          ),
+                          onPressed: toggleCrop,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-            ],
-          ),
+              ),
+          ],
         ),
       ),
     );
