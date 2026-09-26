@@ -36,7 +36,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   
   bool showServerSelectionUI = true;
 
-  // PROVIDER MANAGER
+  // HARDCODED PROVIDER MANAGER ARCHITECTURE
   int activeServerIndex = 0;
   bool isAutoSwitching = false; 
 
@@ -70,7 +70,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _startHideTimer();
   }
 
-  // 0.1 SECOND AUTO-FALLBACK ENGINE
+  // 0.1 SECOND AGGRESSIVE AUTO-FALLBACK ENGINE
   void _triggerAutoFallback() {
     if (isAutoSwitching) return; 
     setState(() { isAutoSwitching = true; });
@@ -93,17 +93,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
+    // SERVER ROUTING (Hardcoded Base URLs)
     if (srv == 'olly') return isTv ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1' : 'https://ollyembed.pages.dev/movie/$id?server=1';
     if (srv == 'nyumat') return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
     if (srv == 'vega') return isTv ? 'https://vidsrc.to/embed/tv/$id/$s/$e' : 'https://vidsrc.to/embed/movie/$id';
     if (srv == 'flixorent') return isTv ? 'https://vidsrc.pro/embed/tv/$id/$s/$e' : 'https://vidsrc.pro/embed/movie/$id';
     if (srv == 'vidbolt') return isTv ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi' : 'https://vidbolt.pro/movie/$id?theme=e50914&autoPlay=true&audio=hindi';
+    
     return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
   }
 
   void _initWebView() {
     final srvType = servers[activeServerIndex]['type'];
-    final currentHost = Uri.parse(_generateVideoUrl()).host; // Main server host
+    final currentHost = Uri.parse(_generateVideoUrl()).host; 
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -114,61 +116,58 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           if (message.message == 'playing' && mounted) {
             setState(() => isVideoPlaying = true);
           } else if (message.message == 'not_found' && mounted) {
-            _triggerAutoFallback();
+            _triggerAutoFallback(); 
           }
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // THE ULTIMATE AD-KILLER & BLACK SCREEN FIXER
+            // DOM NUKE: AD KILLER & BLACK SCREEN SOLVER
             String jsCode = '''
-              // 1. Completely disable window.open to stop new tabs
+              // 1. Kill Popup Triggers completely
               window.open = function() { return null; };
               
-              // 2. Intercept all clicks to prevent hijack
-              document.addEventListener('click', function(e) {
-                var a = e.target.closest('a');
-                if (a && a.target === '_blank') { 
-                  e.preventDefault(); 
-                  e.stopPropagation();
-                }
-              }, true);
-
-              // 3. Black Screen Fix: Force Video Tag to Front & Destroy Ad Overlays
+              // 2. Aggressively push video to front and kill overlays (Fixes audio playing but no video)
               setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
-                  // Make video absolute top priority
-                  vids[0].style.zIndex = '999999';
-                  vids[0].style.position = 'absolute';
-                  vids[0].style.top = '0';
-                  vids[0].style.left = '0';
-                  vids[0].style.width = '100%';
-                  vids[0].style.height = '100%';
-                  vids[0].style.display = 'block';
-                  vids[0].style.visibility = 'visible';
-                  vids[0].style.opacity = '1';
+                  var v = vids[0];
+                  v.style.position = 'fixed';
+                  v.style.top = '0px';
+                  v.style.left = '0px';
+                  v.style.width = '100vw';
+                  v.style.height = '100vh';
+                  v.style.zIndex = '2147483647'; // Maximum possible z-index
+                  v.style.background = 'black';
+                  v.style.display = 'block';
+                  v.style.visibility = 'visible';
+                  v.style.opacity = '1';
                   
-                  // Auto trigger play message if moving
-                  if (vids[0].currentTime > 0.1) {
+                  // Auto-detect if video is actually moving
+                  if (v.currentTime > 0 && !v.paused) {
                     VideoState.postMessage('playing');
                   }
                 }
                 
-                // Destroy high z-index ad divs
-                document.querySelectorAll('div').forEach(el => {
+                // Destroy invisible ad layers that block clicks
+                document.querySelectorAll('div, span, a, iframe:not(#video-player)').forEach(el => {
                   let style = window.getComputedStyle(el);
-                  if (style.zIndex > 100 && el.tagName !== 'VIDEO') {
-                    el.remove();
+                  if (style.zIndex > 1000 && el.tagName !== 'VIDEO') {
+                    el.style.display = 'none';
+                    el.style.pointerEvents = 'none';
                   }
                 });
-              }, 500);
+              }, 300);
               
-              // 4. Ultra-Fast Error Detector
+              // 3. 0.1s Fast Error Scanner
               setInterval(function() {
                 var text = document.body.innerText.toLowerCase();
-                if (text.includes("video not found") || text.includes("404") || text.includes("server error") || text.includes("reload")) {
+                if (text.includes("video not found") || 
+                    text.includes("404") || 
+                    text.includes("server error") || 
+                    text.includes("playback disabled") || 
+                    text.includes("restricted sandbox")) {
                     VideoState.postMessage('not_found');
                 }
               }, 100);
@@ -177,25 +176,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             _controller.runJavaScript(jsCode);
           },
           
-          // STRICT FLUTTER LEVEL NETWORK BLOCKER
-          // Agar player redirect hokar kisi ghatiya ad site par ja raha hai, usko block kar dega
+          // STRICT FLUTTER LEVEL NETWORK BLOCKER (Stops tab hijacking completely)
           onNavigationRequest: (NavigationRequest request) {
              final url = request.url.toLowerCase();
              
-             // Agar main video URL se bahar ja raha hai aur usme ad/bet keywords hain -> BLOCK
+             // If URL tries to navigate away from HannuTV or the active Server -> BLOCK IT
              if (!url.contains(currentHost) && !url.contains('hannutv.app')) {
-                 if (url.contains('casino') || url.contains('bet') || url.contains('pop') || 
-                     url.contains('ads') || url.contains('track') || url.contains('porn') || 
-                     url.contains('xxx') || url.contains('redirect')) {
-                   return NavigationDecision.prevent; 
-                 }
+                 return NavigationDecision.prevent; // Stops the ad tab from opening
              }
              return NavigationDecision.navigate;
           },
+          onWebResourceError: (WebResourceError error) {
+             // If the page itself fails to load, fallback instantly
+             _triggerAutoFallback();
+          }
         ),
       );
 
-    // IFRAME WRAPPER FOR EMBED SITES
+    // IFRAME WRAPPER - REMOVED SANDBOX ATTRIBUTE TO FIX VIDBOLT ERROR
     if (srvType == 'olly' || srvType == 'vidbolt' || srvType == 'vega' || srvType == 'flixorent') {
        final String htmlContent = '''
         <!DOCTYPE html>
@@ -205,12 +203,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             <style>body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; } iframe { width: 100%; height: 100%; border: none; }</style>
         </head>
         <body>
-            <iframe id="video-player" src="${_generateVideoUrl()}" width="100%" height="100%" frameborder="0" allowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
+            <!-- No sandbox tag here, Flutter handles the blocking now -->
+            <iframe id="video-player" src="${_generateVideoUrl()}" width="100%" height="100%" frameborder="0" allowfullscreen="true"></iframe>
             <script>
                 window.open = function() { return null; };
                 setInterval(function() {
                   var text = document.body.innerText.toLowerCase();
-                  if (text.includes("video not found") || text.includes("404")) {
+                  if (text.includes("video not found") || text.includes("404") || text.includes("playback disabled")) {
                       VideoState.postMessage('not_found');
                   }
                 }, 100);
@@ -230,8 +229,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // 10 Sec absolute fallback
-    Future.delayed(const Duration(seconds: 10), () {
+    // 12 Sec absolute fallback if stream is completely dead
+    Future.delayed(const Duration(seconds: 12), () {
       if (mounted && !showServerSelectionUI && !isVideoPlaying) {
          _triggerAutoFallback();
       }
@@ -241,24 +240,27 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   // --- MANUAL AD KILLER & FORCE PLAY ---
   void _forcePlayAndBypassAds() {
     _controller.runJavaScript('''
-      // Nuke everything except the video tag
-      document.querySelectorAll('div, a, span, img').forEach(el => {
-        let style = window.getComputedStyle(el);
-        if(style.position === 'absolute' || style.position === 'fixed') {
-           el.remove();
-        }
-      });
-      // Force Play
+      // 1. Force the video tag to play
       var vids = document.getElementsByTagName('video');
       if (vids.length > 0) { 
         vids[0].play(); 
-        vids[0].style.zIndex = '999999';
+        vids[0].style.zIndex = '2147483647';
         vids[0].style.display = 'block';
+        vids[0].style.visibility = 'visible';
+        vids[0].style.opacity = '1';
       }
+      // 2. If it's inside an iframe, send a play command
       var iframes = document.getElementsByTagName('iframe');
       if (iframes.length > 0) {
         iframes[0].contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
       }
+      // 3. Nuke overlays again instantly
+      document.querySelectorAll('div, a, span, img').forEach(el => {
+        let style = window.getComputedStyle(el);
+        if(style.position === 'absolute' || style.position === 'fixed' || style.zIndex > 100) {
+           el.remove();
+        }
+      });
     ''');
     setState(() { isVideoPlaying = true; }); 
   }
