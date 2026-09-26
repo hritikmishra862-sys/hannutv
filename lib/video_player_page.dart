@@ -33,14 +33,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool isCropped = false;
   bool showControls = true;
   Timer? _hideTimer;
+  
+  bool hasAutoSwitched = false; // To stop infinite fallback loops
 
-  // DEEP FIX: OLLY EMBED ADDED AS VIP AD-FREE SERVER
+  // DEEP FIX: VIDBOLT ADDED AS VIP SERVER (WITH DEFAULT HINDI AUDIO)
   int activeServerIndex = 0;
   final List<Map<String, dynamic>> servers = [
-    {'name': 'Olly VIP (Ad-Free / Fast)', 'color': Colors.redAccent, 'type': 'olly'},
-    {'name': 'Server 2 (Dual Audio Mix)', 'color': Colors.green, 'type': 'vidlink'},
-    {'name': 'Server 3 (Auto Server)', 'color': Colors.orange, 'type': 'vidsrc_net'},
-    {'name': 'Server 4 (Backup)', 'color': Colors.blue, 'type': 'stellar'},
+    {'name': 'VidBolt VIP (Auto Hindi/Fast)', 'color': Colors.redAccent, 'type': 'vidbolt'},
+    {'name': 'Premium Server (English/Dual)', 'color': Colors.blue, 'type': 'stellar'},
+    {'name': 'Server 3 (Multi-Audio)', 'color': Colors.green, 'type': 'vidlink'},
+    {'name': 'Auto Server (Backup)', 'color': Colors.orange, 'type': 'vidsrc_net'},
   ];
 
   @override
@@ -67,17 +69,21 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 1. OLLY EMBED (Ad-Free API added from your request)
-    if (srv == 'olly') return isTv ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1' : 'https://ollyembed.pages.dev/movie/$id?server=1';
+    // 1. VIDBOLT API (Primary VIP - Direct Hindi Parameter Added)
+    if (srv == 'vidbolt') {
+      return isTv 
+          ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi' 
+          : 'https://vidbolt.pro/movie/$id?theme=e50914&autoPlay=true&audio=hindi';
+    }
     
-    // 2. VidLink (Dual Audio support inside player)
+    // 2. STELLAR (Fallback 1)
+    if (srv == 'stellar') return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
+
+    // 3. VIDLINK (Fallback 2 - Dual Audio inside player)
     if (srv == 'vidlink') return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
     
-    // 3. VidSrc Net
-    if (srv == 'vidsrc_net') return isTv ? 'https://vidsrc.net/embed/tv?tmdb=$id&season=$s&episode=$e' : 'https://vidsrc.net/embed/movie?tmdb=$id';
-    
-    // 4. Stellar (English Backup)
-    return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
+    // 4. VIDSRC NET (Backup)
+    return isTv ? 'https://vidsrc.net/embed/tv?tmdb=$id&season=$s&episode=$e' : 'https://vidsrc.net/embed/movie?tmdb=$id';
   }
 
   void _initWebView() {
@@ -93,28 +99,44 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         onMessageReceived: (JavaScriptMessage message) {
           if (message.message == 'playing' && mounted) {
             setState(() => isVideoPlaying = true);
+          } 
+          // DEEP AUTO-FALLBACK: Agar VidBolt par movie na mile, toh Stellar par switch kardo
+          else if (message.message == 'not_found' && !hasAutoSwitched && mounted) {
+            hasAutoSwitched = true; 
+            setState(() {
+              activeServerIndex = 1; // Auto-shift to Stellar
+            });
+            _initWebView(); // Reload automatically
           }
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // DEEP FIX: INVISIBLE AD KILLER & FAST BUFFERING
+            // DEEP JAVASCRIPT INJECTION: Ad Killer, AutoPlay & "Video Not Found" Detector
             _controller.runJavaScript('''
-              // 1. Silent Ad Click Killer
+              // 1. Silent Ad Click Killer (Prevents popup ads from opening)
               document.addEventListener('click', function(e) {
                 var a = e.target.closest('a');
                 if (a && a.target === '_blank') { e.preventDefault(); }
               }, true);
               
-              // 2. Kill Popups
               window.open = function() { return null; };
               
-              // 3. Fast Buffer and Status Checker
+              // 2. Video Not Found Auto-Detector
+              var checkError = setInterval(function() {
+                var bodyText = document.body.innerText || "";
+                if (bodyText.includes("Video Not Found") || bodyText.includes("404") || bodyText.includes("not found")) {
+                  VideoState.postMessage('not_found');
+                  clearInterval(checkError);
+                }
+              }, 1000);
+              
+              // 3. Fast Buffer & State Checker
               var checkVideo = setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
-                  vids[0].preload = 'auto'; // FAST BUFFER
+                  vids[0].preload = 'auto'; 
                   if (vids[0].currentTime > 0.1) {
                     VideoState.postMessage('playing');
                     clearInterval(checkVideo);
@@ -122,17 +144,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 }
               }, 500);
               
-              // 4. Hide server text overlays
+              // 4. Hide server text overlays (To clean the UI)
               var style = document.createElement('style');
               style.innerHTML = 'div[style*="z-index"] { display: none !important; pointer-events: none !important; }';
               document.head.appendChild(style);
             ''');
           },
-          // SMART NETWORK BLOCKER: Sirf obvious ads ko block karega
+          // STRICT AD BLOCKER (WHITELIST MODE) - VidBolt added to allowed list
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
-            if (url.contains('casino') || url.contains('bet') || url.contains('tracking') || url.contains('pop')) {
-              return NavigationDecision.prevent;
+            // Sirf trusted servers ko load hone do, baaki sab (ads) block.
+            if (!url.contains('vidbolt') && !url.contains('vidlink') && !url.contains('vidsrc') && !url.contains('stellar')) {
+              return NavigationDecision.prevent; 
             }
             return NavigationDecision.navigate;
           },
@@ -143,13 +166,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         headers: {'Referer': 'https://hannutv.app/'},
       );
 
-    // Audio Autoplay Bypass
+    // Audio Autoplay Bypass for Android
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // 12 Second fallback loading timeout
-    Future.delayed(const Duration(seconds: 12), () {
+    // Fallback loading timeout (Player screen dikhane ke liye)
+    Future.delayed(const Duration(seconds: 10), () {
       if (mounted && !isVideoPlaying) {
         setState(() => isVideoPlaying = true);
       }
@@ -182,7 +205,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             children: [
               const Text("Select Streaming Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              const Text("Olly VIP is completely Ad-Free. For Dual Audio (Hindi), try Server 2 and click the ⚙️ icon inside the player.", style: TextStyle(color: Colors.redAccent, fontSize: 12), textAlign: TextAlign.center),
+              const Text("Note: VidBolt tries to load Hindi Audio automatically. If it fails, the app will switch to Premium Server.", style: TextStyle(color: Colors.redAccent, fontSize: 12), textAlign: TextAlign.center),
               const SizedBox(height: 16),
               ...List.generate(servers.length, (index) {
                 final srv = servers[index];
@@ -192,7 +215,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   onTap: () {
                     Navigator.pop(context);
                     if (activeServerIndex != index) {
-                      setState(() => activeServerIndex = index);
+                      setState(() {
+                        activeServerIndex = index;
+                        hasAutoSwitched = false; // Reset fallback trigger
+                      });
                       _initWebView(); 
                     } else {
                       _startHideTimer();
@@ -232,16 +258,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   @override
   Widget build(BuildContext context) {
-    // POPSCOPE: Deep logic to return to video if ad redirects the page
+    // POPSCOPE: Ad-Hijack protection.
     return PopScope(
       canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
-        // Agar ad ki wajah se page aage chala gaya hai, toh back daba kar video pe wapas aao
         if (await _controller.canGoBack()) {
           _controller.goBack();
         } else {
-          // Warna screen close kardo
           Navigator.of(context).pop();
         }
       },
@@ -252,21 +276,21 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           behavior: HitTestBehavior.translucent,
           child: Stack(
             children: [
-              // 1. FAST RAW WEBVIEW PLAYER
+              // 1. FAST RAW WEBVIEW PLAYER (VIDBOLT INTEGRATED)
               WebViewWidget(controller: _controller),
               
-              // 2. WATERMARK LOGO (Right Corner) - Always visible, semi-transparent
+              // 2. RIGHT CORNER WATERMARK LOGO (Transparent)
               if (isVideoPlaying)
                 Positioned(
                   top: 20,
                   right: 20,
                   child: SafeArea(
-                    child: IgnorePointer( // Touch ko video tak pass hone dega
+                    child: IgnorePointer(
                       child: Opacity(
-                        opacity: 0.6, // Transparent effect
+                        opacity: 0.5,
                         child: Image.asset(
                           'assets/logo.png',
-                          height: 35, // Chota watermark size
+                          height: 35,
                           errorBuilder: (_, __, ___) => const SizedBox(),
                         ),
                       ),
@@ -324,7 +348,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               // 5. BOTTOM RIGHT: SERVER & CROP BUTTONS (Auto Hides in 3s)
               if (isVideoPlaying && showControls)
                 Positioned(
-                  bottom: 20, // Niche move kiya taaki Watermark se overlap na ho
+                  bottom: 20,
                   right: 20,
                   child: SafeArea(
                     child: Row(
