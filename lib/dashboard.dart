@@ -32,7 +32,6 @@ class DashboardPageState extends State<DashboardPage> {
 
   bool isLoading = true;
   bool isSearching = false;
-  bool isNetMirrorSearchActive = false;
   final TextEditingController searchController = TextEditingController();
 
   Timer? _debounce;
@@ -40,13 +39,11 @@ class DashboardPageState extends State<DashboardPage> {
   Timer? _carouselTimer;
   int _currentPage = 0;
 
-  // OTT Watch Provider Channels
   final List<Map<String, dynamic>> ottPlatforms = [
-    {"name": "🔥 HANNUTV (NetMirror)", "color": Colors.red, "providerId": "hannutv", "cncProvider": "netflix"},
-    {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8", "cncProvider": "netflix"},
-    {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119", "cncProvider": "prime"},
-    {"name": "HOTSTAR", "color": Colors.green, "providerId": "122", "cncProvider": "hotstar"},
-    {"name": "DISNEY+", "color": Colors.blue, "providerId": "337", "cncProvider": "disney"},
+    {"name": "🔥 HANNUTV LIVE", "color": Colors.red, "providerId": "hannutv"},
+    {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
+    {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
+    {"name": "HOTSTAR", "color": Colors.green, "providerId": "122"},
   ];
 
   @override
@@ -81,8 +78,7 @@ class DashboardPageState extends State<DashboardPage> {
     super.dispose();
   }
 
-  // 🚀 Deep Logic: Saving specific OTT Provider name for Native Scraper
-  List parseData(http.Response response, {String? forceMediaType, String cncProvider = 'netflix'}) {
+  List parseData(http.Response response, {String? forceMediaType}) {
     if (response.statusCode != 200) return [];
     final List rawData = json.decode(response.body)['results'] ?? [];
     return rawData
@@ -98,14 +94,12 @@ class DashboardPageState extends State<DashboardPage> {
                   ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}'
                   : '',
               'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
-              'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
               'mediaType': forceMediaType ?? (m['media_type'] ?? 'movie'),
-              'cncProvider': cncProvider, // ⚡ Passes exact OTT to Kotlin
             })
         .toList();
   }
 
-  Future<void> loadAllDashboards({String? providerId, String cncProvider = 'netflix'}) async {
+  Future<void> loadAllDashboards({String? providerId}) async {
     setState(() => isLoading = true);
     try {
       String base = 'https://api.themoviedb.org/3';
@@ -127,12 +121,12 @@ class DashboardPageState extends State<DashboardPage> {
       ]);
 
       setState(() {
-        trendingList = parseData(responses[0], forceMediaType: (providerId != null && providerId != 'hannutv') ? 'tv' : null, cncProvider: cncProvider);
-        netmirrorLiveFeed = parseData(responses[1], cncProvider: cncProvider);
-        actionList = parseData(responses[2], forceMediaType: 'movie', cncProvider: cncProvider);
-        comedyList = parseData(responses[3], forceMediaType: 'tv', cncProvider: cncProvider);
-        horrorList = parseData(responses[4], forceMediaType: 'movie', cncProvider: cncProvider);
-        dramaList = parseData(responses[5], forceMediaType: 'tv', cncProvider: cncProvider);
+        trendingList = parseData(responses[0], forceMediaType: (providerId != null && providerId != 'hannutv') ? 'tv' : null);
+        netmirrorLiveFeed = parseData(responses[1]);
+        actionList = parseData(responses[2], forceMediaType: 'movie');
+        comedyList = parseData(responses[3], forceMediaType: 'tv');
+        horrorList = parseData(responses[4], forceMediaType: 'movie');
+        dramaList = parseData(responses[5], forceMediaType: 'tv');
         isLoading = false;
       });
     } catch (e) {
@@ -155,27 +149,34 @@ class DashboardPageState extends State<DashboardPage> {
       final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
       final res = await http.get(Uri.parse(url), headers: kApiHeaders);
       setState(() {
-        searchResults = parseData(res, cncProvider: 'netflix'); 
+        searchResults = parseData(res);
         isLoading = false;
       });
     });
   }
 
-  Future<void> _openTelegram() async {
-    if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication)) {
-      debugPrint('Telegram error');
-    }
-  }
-
   void openMediaDetails(Map media) {
     Navigator.push(
       context,
+      MaterialPageRoute(builder: (context) => MediaDetailScreen(mediaItem: media)),
+    ).then((_) => setState(() {}));
+  }
+
+  // 🚀 DIRECT HANNUTV (NETMIRROR) LIVE SEARCH
+  void launchNetMirrorDirectSearch(String query) {
+    Navigator.push(
+      context,
       MaterialPageRoute(
-        builder: (context) => MediaDetailScreen(mediaItem: media),
+        builder: (context) => VideoPlayerPage(
+          tmdbId: 0,
+          mediaType: 'movie',
+          season: 1,
+          episode: 1,
+          movieTitle: query,
+          preferredServer: 'netmirror_live',
+        ),
       ),
-    ).then((_) {
-      setState(() {});
-    });
+    );
   }
 
   Widget _buildHorizontalList(String title, List moviesData) {
@@ -185,10 +186,7 @@ class DashboardPageState extends State<DashboardPage> {
       children: [
         Padding(
           padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-          child: Text(
-            title,
-            style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-          ),
+          child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         ),
         SizedBox(
           height: 160,
@@ -211,23 +209,14 @@ class DashboardPageState extends State<DashboardPage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
                           image: DecorationImage(
-                            image: NetworkImage(media['posterUrl'] != ''
-                                ? media['posterUrl']
-                                : 'https://via.placeholder.com/300x450/222222/888888'),
+                            image: NetworkImage(media['posterUrl'] != '' ? media['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
                             fit: BoxFit.cover,
                           ),
                         ),
-                        child: const Center(
-                          child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 40),
-                        ),
+                        child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 40)),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        media['title'] ?? '',
-                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
+                      Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -243,16 +232,7 @@ class DashboardPageState extends State<DashboardPage> {
   Widget build(BuildContext context) {
     return Scaffold(
       extendBodyBehindAppBar: true,
-      appBar: AppBar(
-        backgroundColor: Colors.transparent,
-        elevation: 0,
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.support_agent, color: Colors.red, size: 30),
-            onPressed: _openTelegram,
-          )
-        ],
-      ),
+      appBar: AppBar(backgroundColor: Colors.transparent, elevation: 0),
       body: SingleChildScrollView(
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
@@ -271,11 +251,7 @@ class DashboardPageState extends State<DashboardPage> {
                             return Container(
                               decoration: BoxDecoration(
                                 image: DecorationImage(
-                                  image: NetworkImage(
-                                    trendingList[index]['backdropUrl'] != ''
-                                        ? trendingList[index]['backdropUrl']
-                                        : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600',
-                                  ),
+                                  image: NetworkImage(trendingList[index]['backdropUrl'] != '' ? trendingList[index]['backdropUrl'] : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600'),
                                   fit: BoxFit.cover,
                                 ),
                               ),
@@ -312,9 +288,9 @@ class DashboardPageState extends State<DashboardPage> {
                                     style: const TextStyle(color: Colors.white),
                                     autofocus: true,
                                     decoration: InputDecoration(
-                                      hintText: isNetMirrorSearchActive ? '⚡ HANNUTV Live Search...' : 'Search Movies & Shows...',
+                                      hintText: 'Search Movies & Shows...',
                                       border: InputBorder.none,
-                                      prefixIcon: Icon(isNetMirrorSearchActive ? Icons.flash_on : Icons.search, color: Colors.redAccent),
+                                      prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
                                       suffixIcon: IconButton(
                                         icon: const Icon(Icons.close, color: Colors.white),
                                         onPressed: () {
@@ -326,6 +302,10 @@ class DashboardPageState extends State<DashboardPage> {
                                         },
                                       ),
                                     ),
+                                    onSubmitted: (query) {
+                                       // DIRECT HANNUTV LIVE SEARCH SUBMIT
+                                       if(query.isNotEmpty) launchNetMirrorDirectSearch(query);
+                                    },
                                     onChanged: onSearchChanged,
                                   ),
                                 ),
@@ -333,35 +313,18 @@ class DashboardPageState extends State<DashboardPage> {
                             : Expanded(
                                 child: Align(
                                   alignment: Alignment.centerLeft,
-                                  child: Image.asset(
-                                    'assets/logo.png',
-                                    height: 35,
-                                    errorBuilder: (_, __, ___) => const Text(
-                                      'HANNUTV',
-                                      style: TextStyle(color: Colors.red, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1.5),
-                                    ),
-                                  ),
+                                  child: Image.asset('assets/logo.png', height: 35, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontSize: 24, fontWeight: FontWeight.bold))),
                                 ),
                               ),
                         if (!isSearching) ...[
                           IconButton(
                             icon: const Icon(Icons.flash_on, color: Colors.redAccent, size: 28),
-                            tooltip: "HANNUTV Direct Search",
-                            onPressed: () {
-                              setState(() {
-                                isSearching = true;
-                                isNetMirrorSearchActive = true;
-                              });
-                            },
+                            tooltip: "HANNUTV Live Search",
+                            onPressed: () => _showLiveSearchDialog(context),
                           ),
                           IconButton(
                             icon: const Icon(Icons.search, color: Colors.white, size: 28),
-                            onPressed: () {
-                              setState(() {
-                                isSearching = true;
-                                isNetMirrorSearchActive = false;
-                              });
-                            },
+                            onPressed: () => setState(() => isSearching = true),
                           ),
                         ],
                       ],
@@ -370,25 +333,14 @@ class DashboardPageState extends State<DashboardPage> {
                 ),
                 if (trendingList.isNotEmpty && !isSearching)
                   Positioned(
-                    bottom: 20,
-                    left: 16,
-                    right: 16,
+                    bottom: 20, left: 16, right: 16,
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          trendingList[_currentPage]['title'] ?? 'Title',
-                          style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold),
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(trendingList[_currentPage]['title'] ?? 'Title', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 8),
                         ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(
-                            backgroundColor: Colors.white,
-                            foregroundColor: Colors.black,
-                            padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                          ),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24)),
                           onPressed: () => openMediaDetails(trendingList[_currentPage]),
                           icon: const Icon(Icons.play_arrow, size: 24),
                           label: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
@@ -400,10 +352,7 @@ class DashboardPageState extends State<DashboardPage> {
             ),
             const Padding(
               padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
-              child: Text(
-                'Watch on OTT & Channels',
-                style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold),
-              ),
+              child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
             ),
             SizedBox(
               height: 50,
@@ -423,15 +372,9 @@ class DashboardPageState extends State<DashboardPage> {
                       onPressed: () {
                         searchController.clear();
                         setState(() => isSearching = false);
-                        loadAllDashboards(
-                          providerId: ottPlatforms[index]['providerId'],
-                          cncProvider: ottPlatforms[index]['cncProvider']
-                        );
+                        loadAllDashboards(providerId: ottPlatforms[index]['providerId']);
                       },
-                      child: Text(
-                        ottPlatforms[index]['name'],
-                        style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1),
-                      ),
+                      child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   );
                 },
@@ -444,12 +387,7 @@ class DashboardPageState extends State<DashboardPage> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 3,
-                  childAspectRatio: 0.65,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                ),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 0.65, crossAxisSpacing: 12, mainAxisSpacing: 12),
                 itemCount: searchResults.length,
                 itemBuilder: (context, index) {
                   final movie = searchResults[index];
@@ -458,36 +396,18 @@ class DashboardPageState extends State<DashboardPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Expanded(
-                          child: Container(
-                            decoration: BoxDecoration(
-                              borderRadius: BorderRadius.circular(8),
-                              image: DecorationImage(
-                                image: NetworkImage(movie['posterUrl'] != ''
-                                    ? movie['posterUrl']
-                                    : 'https://via.placeholder.com/300x450/222222/888888'),
-                                fit: BoxFit.cover,
-                              ),
-                            ),
-                          ),
-                        ),
+                        Expanded(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), image: DecorationImage(image: NetworkImage(movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover)))),
                         const SizedBox(height: 6),
-                        Text(
-                          movie['title'] ?? '',
-                          style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
+                        Text(movie['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   );
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 HANNUTV (NetMirror Live Feed)', netmirrorLiveFeed),
+              _buildHorizontalList('🔥 HANNUTV Live (NetMirror Feed)', netmirrorLiveFeed),
               _buildHorizontalList('Trending Now', trendingList),
-              if (continueWatchingList.isNotEmpty)
-                _buildHorizontalList('Continue Watching', continueWatchingList),
+              if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
               _buildHorizontalList('Action Movies', actionList),
               _buildHorizontalList('Comedy Shows', comedyList),
               _buildHorizontalList('Horror Movies', horrorList),
@@ -499,9 +419,43 @@ class DashboardPageState extends State<DashboardPage> {
       ),
     );
   }
+
+  void _showLiveSearchDialog(BuildContext context) {
+    TextEditingController liveSearchController = TextEditingController();
+    showDialog(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          backgroundColor: Colors.grey[900],
+          title: const Text("⚡ HANNUTV Live Search", style: TextStyle(color: Colors.white)),
+          content: TextField(
+            controller: liveSearchController,
+            style: const TextStyle(color: Colors.white),
+            autofocus: true,
+            decoration: const InputDecoration(hintText: "Directly search inside NetMirror...", hintStyle: TextStyle(color: Colors.grey)),
+            onSubmitted: (val) {
+              Navigator.pop(context);
+              if (val.isNotEmpty) launchNetMirrorDirectSearch(val);
+            },
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text("Cancel", style: TextStyle(color: Colors.grey))),
+            ElevatedButton(
+              style: ElevatedButton.styleFrom(backgroundColor: Colors.red),
+              onPressed: () {
+                Navigator.pop(context);
+                if (liveSearchController.text.isNotEmpty) launchNetMirrorDirectSearch(liveSearchController.text);
+              },
+              child: const Text("Search", style: TextStyle(color: Colors.white)),
+            ),
+          ],
+        );
+      },
+    );
+  }
 }
 
-// ── DETAILS SCREEN WITH NATIVE NETMIRROR 1-CLICK HD PLAY ───────────
+// ── DETAILS SCREEN WITH AUTO NETMIRROR DIRECT PLAY ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -528,32 +482,18 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     final id = widget.mediaItem['id'];
 
     try {
-      final response = await http.get(
-        Uri.parse('https://api.themoviedb.org/3/$mediaType/$id?language=en-US'),
-        headers: kApiHeaders,
-      );
+      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/$mediaType/$id?language=en-US'), headers: kApiHeaders);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
           details = {
             'title': data['title'] ?? data['name'] ?? '',
             'overview': data['overview'] ?? '',
-            'backdropUrl': data['backdrop_path'] != null
-                ? 'https://image.tmdb.org/t/p/original${data['backdrop_path']}'
-                : '',
-            'seasons': data['seasons'] != null
-                ? (data['seasons'] as List)
-                    .map((s) => {
-                          'seasonNumber': s['season_number'],
-                          'episodeCount': s['episode_count']
-                        })
-                    .toList()
-                : [],
+            'backdropUrl': data['backdrop_path'] != null ? 'https://image.tmdb.org/t/p/original${data['backdrop_path']}' : '',
+            'seasons': data['seasons'] != null ? (data['seasons'] as List).map((s) => {'seasonNumber': s['season_number'], 'episodeCount': s['episode_count']}).toList() : [],
           };
           isLoadingDetails = false;
-          if ((mediaType == 'tv' || mediaType == 'series') &&
-              details!['seasons'] != null &&
-              (details!['seasons'] as List).isNotEmpty) {
+          if ((mediaType == 'tv' || mediaType == 'series') && details!['seasons'] != null && (details!['seasons'] as List).isNotEmpty) {
             selectedSeason = widget.mediaItem['savedSeason'] ?? details!['seasons'][0]['seasonNumber'];
             if (selectedSeason != null) fetchEpisodes(selectedSeason!);
           }
@@ -572,21 +512,11 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
       selectedSeason = seasonNumber;
     });
     try {
-      final response = await http.get(
-        Uri.parse('https://api.themoviedb.org/3/tv/${widget.mediaItem['id']}/season/$seasonNumber?language=en-US'),
-        headers: kApiHeaders,
-      );
+      final response = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.mediaItem['id']}/season/$seasonNumber?language=en-US'), headers: kApiHeaders);
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
-          episodes = (data['episodes'] as List? ?? []).map((ep) => {
-                'episodeNumber': ep['episode_number'],
-                'name': ep['name'],
-                'overview': ep['overview'],
-                'stillUrl': ep['still_path'] != null
-                    ? 'https://image.tmdb.org/t/p/w500${ep['still_path']}'
-                    : '',
-              }).toList();
+          episodes = (data['episodes'] as List? ?? []).map((ep) => {'episodeNumber': ep['episode_number'], 'name': ep['name'], 'overview': ep['overview'], 'stillUrl': ep['still_path'] != null ? 'https://image.tmdb.org/t/p/w500${ep['still_path']}' : ''}).toList();
           isLoadingEpisodes = false;
         });
       } else {
@@ -597,7 +527,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // 🚀 DIRECT 1-CLICK HD PLAY (NETMIRROR NATIVE KOTLIN BRIDGE)
+  // 🚀 DIRECT PLAY VIA NETMIRROR ULTRA LIVE
   void launchPlayer(String title, {int? season, int? episode}) {
     continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
@@ -608,9 +538,6 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
     continueWatchingList.insert(0, currentMedia);
 
-    // ⚡ Deep Logic: Fetching the exact saved OTT Provider (netflix, prime, hotstar)
-    String scraperProvider = widget.mediaItem['cncProvider'] ?? 'netflix';
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -619,50 +546,10 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           mediaType: type,
           season: season ?? 1,
           episode: episode ?? 1,
-          movieTitle: title,
-          provider: scraperProvider, // Pass the exact OTT name to Kotlin 
+          movieTitle: title, // This title goes DIRECTLY to NetMirror search!
+          preferredServer: 'netmirror_live',
         ),
       ),
-    );
-  }
-
-  void _showDownloadPopup(BuildContext context, String contentTitle) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                "Download: $contentTitle",
-                style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.download, color: Colors.red),
-                title: const Text("1080p (Full HD)"),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.download, color: Colors.white70),
-                title: const Text("720p (HD)"),
-                onTap: () => Navigator.pop(context),
-              ),
-              ListTile(
-                leading: const Icon(Icons.download, color: Colors.white70),
-                title: const Text("480p (SD)"),
-                onTap: () => Navigator.pop(context),
-              ),
-            ],
-          ),
-        );
-      },
     );
   }
 
@@ -681,95 +568,42 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                 children: [
                   Container(
                     height: 300,
-                    decoration: BoxDecoration(
-                      image: DecorationImage(
-                        image: NetworkImage(details != null && details!['backdropUrl'] != ''
-                            ? details!['backdropUrl']
-                            : (widget.mediaItem['backdropUrl'] ?? '')),
-                        fit: BoxFit.cover,
-                      ),
-                    ),
-                    child: Container(
-                      decoration: const BoxDecoration(
-                        gradient: LinearGradient(
-                          begin: Alignment.bottomCenter,
-                          end: Alignment.topCenter,
-                          colors: [Color(0xFF0F0F0F), Colors.transparent],
-                        ),
-                      ),
-                    ),
+                    decoration: BoxDecoration(image: DecorationImage(image: NetworkImage(details != null && details!['backdropUrl'] != '' ? details!['backdropUrl'] : (widget.mediaItem['backdropUrl'] ?? '')), fit: BoxFit.cover)),
+                    child: Container(decoration: const BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [Color(0xFF0F0F0F), Colors.transparent]))),
                   ),
                   Padding(
                     padding: const EdgeInsets.all(16.0),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          details?['title'] ?? widget.mediaItem['title'] ?? '',
-                          style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold),
-                        ),
+                        Text(details?['title'] ?? widget.mediaItem['title'] ?? '', style: const TextStyle(fontSize: 26, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 8),
-                        Text(
-                          details?['overview'] ?? '',
-                          style: const TextStyle(color: Colors.grey, fontSize: 14, height: 1.4),
-                        ),
+                        Text(details?['overview'] ?? '', style: const TextStyle(color: Colors.grey, fontSize: 14, height: 1.4)),
                         const SizedBox(height: 20),
                         if (mediaType == 'movie') ...[
                           Row(
                             children: [
                               Expanded(
                                 child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.red,
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                  ),
+                                  style: ElevatedButton.styleFrom(backgroundColor: Colors.red, padding: const EdgeInsets.symmetric(vertical: 14)),
                                   onPressed: () => launchPlayer(details?['title'] ?? 'Movie'),
                                   icon: const Icon(Icons.play_arrow, color: Colors.white),
-                                  label: const Text(
-                                    'Play Movie (HD)',
-                                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                  ),
-                                ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: ElevatedButton.icon(
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.grey[800],
-                                    padding: const EdgeInsets.symmetric(vertical: 14),
-                                  ),
-                                  onPressed: () => _showDownloadPopup(context, details?['title'] ?? 'Movie'),
-                                  icon: const Icon(Icons.download, color: Colors.white),
-                                  label: const Text(
-                                    'Download',
-                                    style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold),
-                                  ),
+                                  label: const Text('Play Movie (HD)', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                                 ),
                               ),
                             ],
                           ),
-                        ] else if ((mediaType == 'tv' || mediaType == 'series') &&
-                            details?['seasons'] != null &&
-                            (details!['seasons'] as List).isNotEmpty) ...[
+                        ] else if ((mediaType == 'tv' || mediaType == 'series') && details?['seasons'] != null && (details!['seasons'] as List).isNotEmpty) ...[
                           Container(
                             padding: const EdgeInsets.symmetric(horizontal: 16),
-                            decoration: BoxDecoration(
-                              color: Colors.grey[900],
-                              borderRadius: BorderRadius.circular(8),
-                            ),
+                            decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(8)),
                             child: DropdownButton<int>(
                               value: selectedSeason,
                               isExpanded: true,
                               underline: const SizedBox(),
                               dropdownColor: Colors.grey[900],
                               items: (details!['seasons'] as List).map<DropdownMenuItem<int>>((season) {
-                                return DropdownMenuItem<int>(
-                                  value: season['seasonNumber'],
-                                  child: Text(
-                                    'Season ${season['seasonNumber']}  (${season['episodeCount']} Episodes)',
-                                    style: const TextStyle(color: Colors.white),
-                                  ),
-                                );
+                                return DropdownMenuItem<int>(value: season['seasonNumber'], child: Text('Season ${season['seasonNumber']}  (${season['episodeCount']} Episodes)', style: const TextStyle(color: Colors.white)));
                               }).toList(),
                               onChanged: (int? newValue) {
                                 if (newValue != null) fetchEpisodes(newValue);
@@ -780,10 +614,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                           const Text('Episodes', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
                           const SizedBox(height: 10),
                           isLoadingEpisodes
-                              ? const Padding(
-                                  padding: EdgeInsets.all(20.0),
-                                  child: Center(child: CircularProgressIndicator(color: Colors.red)),
-                                )
+                              ? const Padding(padding: EdgeInsets.all(20.0), child: Center(child: CircularProgressIndicator(color: Colors.red)))
                               : ListView.builder(
                                   shrinkWrap: true,
                                   physics: const NeverScrollableScrollPhysics(),
@@ -792,38 +623,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                     final ep = episodes[index];
                                     return ListTile(
                                       contentPadding: const EdgeInsets.symmetric(vertical: 8),
-                                      leading: ClipRRect(
-                                        borderRadius: BorderRadius.circular(4),
-                                        child: Image.network(
-                                          ep['stillUrl'] != ''
-                                              ? ep['stillUrl']
-                                              : 'https://via.placeholder.com/300x168/222222/888888?text=EP',
-                                          width: 110,
-                                          height: 70,
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
-                                      title: Text(
-                                        '${ep['episodeNumber']}. ${ep['name']}',
-                                        style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
-                                      ),
-                                      subtitle: Text(
-                                        ep['overview'] ?? '',
-                                        maxLines: 2,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(fontSize: 12, color: Colors.grey),
-                                      ),
-                                      tileColor: (selectedSeason == widget.mediaItem['savedSeason'] &&
-                                              ep['episodeNumber'] == widget.mediaItem['savedEpisode'])
-                                          ? Colors.grey[850]
-                                          : null,
+                                      leading: ClipRRect(borderRadius: BorderRadius.circular(4), child: Image.network(ep['stillUrl'] != '' ? ep['stillUrl'] : 'https://via.placeholder.com/300x168/222222/888888?text=EP', width: 110, height: 70, fit: BoxFit.cover)),
+                                      title: Text('${ep['episodeNumber']}. ${ep['name']}', style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                                      subtitle: Text(ep['overview'] ?? '', maxLines: 2, overflow: TextOverflow.ellipsis, style: const TextStyle(fontSize: 12, color: Colors.grey)),
                                       trailing: IconButton(
                                         icon: const Icon(Icons.play_circle_fill, color: Colors.white, size: 32),
-                                        onPressed: () => launchPlayer(
-                                          'S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}',
-                                          season: selectedSeason,
-                                          episode: ep['episodeNumber'],
-                                        ),
+                                        onPressed: () => launchPlayer('S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}', season: selectedSeason, episode: ep['episodeNumber']),
                                       ),
                                     );
                                   },

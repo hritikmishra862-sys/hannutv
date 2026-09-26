@@ -4,37 +4,6 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-/// ⚡ NATIVE METHODCHANNEL SERVICE FOR NETMIRROR CNCVERSE
-class CNCVerseService {
-  static const MethodChannel _channel =
-      MethodChannel('com.horis.cncverse/stream');
-
-  static Future<String?> getStreamUrl({
-    required String title,
-    required String mediaType,
-    required String provider, // ⚡ Deep Logic: Now fully dynamic
-    int season = 1,
-    int episode = 1,
-  }) async {
-    try {
-      final String? url = await _channel.invokeMethod<String>('getStreamUrl', {
-        'title': title,
-        'mediaType': mediaType,
-        'provider': provider,
-        'season': season,
-        'episode': episode,
-      });
-      return url;
-    } on PlatformException catch (e) {
-      debugPrint("CNCVerse Native MethodChannel Error: \${e.message}");
-      return null;
-    } catch (e) {
-      debugPrint("CNCVerse General Error: \$e");
-      return null;
-    }
-  }
-}
-
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
   final String mediaType;
@@ -42,7 +11,6 @@ class VideoPlayerPage extends StatefulWidget {
   final int episode;
   final String movieTitle;
   final String? customUrl;
-  final String provider; // ⚡ Accept dynamic OTT provider
   final String preferredServer;
 
   const VideoPlayerPage({
@@ -53,8 +21,7 @@ class VideoPlayerPage extends StatefulWidget {
     required this.episode,
     required this.movieTitle,
     this.customUrl,
-    this.provider = 'netflix',
-    this.preferredServer = 'netmirror_native',
+    this.preferredServer = 'netmirror_live',
   }) : super(key: key);
 
   @override
@@ -70,58 +37,28 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Timer? _hideTimer;
   bool isPageLoading = true;
   late String currentServerKey;
-  String? resolvedDirectStreamUrl;
 
-  // 👑 VIP SERVERS WITH NATIVE NETMIRROR FIRST
+  // 🤖 VIP HARDCODED SERVERS
   final List<Map<String, dynamic>> allServers = [
     {
-      'key': 'netmirror_native',
-      'name': 'HANNUTV VIP (Native Direct)',
-      'sub': 'Native Kotlin Scraper Engine (Zero Ads)',
+      'key': 'netmirror_live',
+      'name': 'HANNUTV Ultra (NetMirror Live)',
+      'sub': '1080p Pure Stream (No Ads)',
       'color': Colors.redAccent,
-      'lang': 'hindi',
     },
     {
-      'key': 'vidbolt',
+      'key': 'vidbolt_hd',
       'name': 'VidBolt VIP Ultra HD',
-      'sub': '1080p Hindi Dub Stream',
-      'color': Colors.orangeAccent,
-      'lang': 'hindi',
+      'sub': 'High Bitrate Multi-Audio',
+      'color': Colors.orange,
     },
     {
       'key': 'olly',
       'name': 'Olly Stream VIP',
-      'sub': 'Fast HLS Hindi Direct',
+      'sub': 'Fast Server',
       'color': Colors.purpleAccent,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'vega',
-      'name': 'Vega Multi-Audio 4K',
-      'sub': 'Dual Audio Hindi/Eng Cloud',
-      'color': Colors.teal,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'flixorent',
-      'name': 'Flixorent Ultra',
-      'sub': 'English Subtitles 1080p',
-      'color': Colors.blueAccent,
-      'lang': 'english',
-    },
-    {
-      'key': 'vidlink',
-      'name': 'VidLink English Pro',
-      'sub': 'English HD Direct Node',
-      'color': Colors.green,
-      'lang': 'english',
-    },
+    }
   ];
-
-  String selectedLanguage = 'hindi';
-
-  List<Map<String, dynamic>> get currentServers =>
-      allServers.where((s) => s['lang'] == selectedLanguage).toList();
 
   @override
   void initState() {
@@ -134,116 +71,63 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     ]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
-    _loadStreamEngine();
+    _initWebView();
     _startHideTimer();
-  }
-
-  Future<void> _loadStreamEngine() async {
-    setState(() {
-      isPageLoading = true;
-      isVideoPlaying = false;
-    });
-
-    if (currentServerKey == 'netmirror_native') {
-      final directLink = await CNCVerseService.getStreamUrl(
-        title: widget.movieTitle,
-        mediaType: widget.mediaType,
-        provider: widget.provider, // ⚡ Passing the exact provider to Kotlin
-        season: widget.season,
-        episode: widget.episode,
-      );
-
-      if (directLink != null && directLink.isNotEmpty) {
-        resolvedDirectStreamUrl = directLink;
-        _initNativeHtmlPlayer(directLink);
-        return;
-      } else {
-        // Fallback to Vidbolt if Kotlin native fails to extract
-        currentServerKey = 'vidbolt';
-      }
-    }
-
-    _initFallbackWebView();
   }
 
   void _switchServer(String newServerKey) {
     setState(() {
       currentServerKey = newServerKey;
+      isPageLoading = true;
+      isVideoPlaying = false;
     });
-    _loadStreamEngine();
+    _initWebView();
     _startHideTimer();
   }
 
-  // ⚡ NATIVE DIRECT STREAM HTML5 PLAYER (ZERO ADS, 100% CLEAN)
-  void _initNativeHtmlPlayer(String streamUrl) {
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.black)
-      ..setUserAgent(
-        "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
-      )
-      ..addJavaScriptChannel(
-        'VideoState',
-        onMessageReceived: (JavaScriptMessage message) {
-          if (message.message == 'playing' && mounted) {
-            setState(() {
-              isVideoPlaying = true;
-              isPageLoading = false;
-            });
-          }
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageFinished: (String url) {
-            if (mounted) setState(() => isPageLoading = false);
-            _controller.runJavaScript('''
-              var v = document.getElementById('native-video');
-              if (v) {
-                v.play().catch(function(e){ console.log(e); });
-                v.addEventListener('playing', function() {
-                  VideoState.postMessage('playing');
-                });
-              }
-            ''');
-          },
-        ),
-      );
-
-    final html = '''
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { width: 100%; height: 100%; background: #000; overflow: hidden; display: flex; align-items: center; justify-content: center; }
-            video { width: 100%; height: 100%; object-fit: contain; background: #000; outline: none; }
-          </style>
-        </head>
-        <body>
-          <video id="native-video" src="\$streamUrl" autoplay playsinline controls controlsList="nodownload"></video>
-        </body>
-      </html>
-    ''';
-
-    _controller.loadHtmlString(html, baseUrl: 'https://hannutv.app');
-
-    if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
+  String _generateVideoUrl() {
+    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
+      return widget.customUrl!;
     }
+
+    final id = widget.tmdbId;
+    final s = widget.season;
+    final e = widget.episode;
+    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+    
+    // 100% Match query for NetMirror
+    String cleanTitle = widget.movieTitle.replaceAll(RegExp(r'[^a-zA-Z0-9\s]'), '');
+    final query = Uri.encodeComponent(cleanTitle);
+
+    // 🚀 1. NETMIRROR LIVE DIRECT PORTAL (The Master Bypass)
+    if (currentServerKey == 'netmirror_live') {
+      // It opens search page, and our JS will auto-click the result
+      return isTv 
+        ? 'https://netmirror.center/search?keyword=$query tv'
+        : 'https://netmirror.center/search?keyword=$query';
+    }
+
+    // 🚀 2. VIDBOLT ULTRA HD
+    if (currentServerKey == 'vidbolt_hd') {
+      return isTv
+          ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
+          : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
+    }
+
+    // 🚀 3. OLLY
+    return isTv
+        ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
+        : 'https://ollyembed.pages.dev/movie/$id?server=1';
   }
 
-  // 🛡️ FALLBACK WEBVIEW ENGINE (VIDBOLT, OLLY, VEGA, FLIXORENT)
-  void _initFallbackWebView() {
-    final targetUrl = _generateFallbackUrl();
+  void _initWebView() {
+    final targetUrl = _generateVideoUrl();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setUserAgent(
-        "Mozilla/5.0 (Linux; Android 13; Pixel 7 Pro) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36", // Desktop UA avoids mobile limits
       )
       ..addJavaScriptChannel(
         'VideoState',
@@ -264,132 +148,109 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
+            // 🛡️ THE 1200000000000% LOGIC JS BYPASS ENGINE
             String jsCode = '''
+              // Force Dark Background
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
+
+              // Kill Alerts
               window.open = function() { return null; };
               window.alert = function() { return null; };
-              window.confirm = function() { return null; };
+
+              // 1. IF ON SEARCH PAGE -> AUTO CLICK FIRST RESULT
+              if (window.location.href.includes('search')) {
+                 let cards = document.querySelectorAll('a.film-poster, .flw-item a, .item a, a[href*="/movie/"], a[href*="/tv/"]');
+                 if (cards.length > 0 && !window._cardClicked) {
+                    window._cardClicked = true;
+                    // For TV shows, we must ensure it goes to right season/episode. 
+                    // But first, let's just click the media.
+                    window.location.href = cards[0].href;
+                 }
+              }
+
+              // 2. ULTIMATE AD & LOGO NUKER
+              var style = document.createElement('style');
+              style.innerHTML = `
+                header, footer, nav, aside, .sidebar, .logo, .ad, iframe[src*="ads"] { 
+                  display: none !important; 
+                }
+                body, html { overflow: hidden !important; background: black !important; }
+              `;
+              document.head.appendChild(style);
 
               setInterval(function() {
-                document.querySelectorAll('div, section, modal, aside, p, h2, span, header, nav').forEach(el => {
-                  let text = el.innerText.toLowerCase();
-                  if (text.includes('adblock') || text.includes('ad-blocker') || text.includes('disable adblock') || text.includes('inside an iframe')) {
-                    if (!el.querySelector('video') && !el.querySelector('iframe')) {
-                      el.remove();
-                    }
-                  }
-                });
-
+                // Remove Popups
                 document.querySelectorAll('div, a, span, img').forEach(el => {
                   let style = window.getComputedStyle(el);
-                  if ((style.position === 'fixed' || style.position === 'absolute') && style.zIndex > 1000 && el.tagName !== 'IFRAME' && el.tagName !== 'VIDEO') {
+                  if ((style.position === 'fixed' || style.position === 'absolute') && 
+                      style.zIndex > 1000 && 
+                      el.tagName !== 'IFRAME' && 
+                      el.tagName !== 'VIDEO') {
                     el.remove();
                   }
                 });
 
+                // Find Main Player Iframe and force Fullscreen
+                var iframes = document.getElementsByTagName('iframe');
+                for(let i=0; i<iframes.length; i++) {
+                   if(iframes[i].src.includes('player') || iframes[i].src.includes('embed') || iframes[i].id === 'iframe-embed') {
+                      iframes[i].style.position = 'fixed';
+                      iframes[i].style.top = '0';
+                      iframes[i].style.left = '0';
+                      iframes[i].style.width = '100vw';
+                      iframes[i].style.height = '100vh';
+                      iframes[i].style.zIndex = '999999';
+                      VideoState.postMessage('playing');
+                   }
+                }
+
+                // Detect native video tags
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
-                  var v = vids[0];
-                  v.style.backgroundColor = '#000000';
-                  if (v.paused) v.play().catch(function(){});
-                  if (v.currentTime > 0 && !v.paused) {
+                  vids[0].style.backgroundColor = '#000000';
+                  if (vids[0].currentTime > 0 && !vids[0].paused) {
                     VideoState.postMessage('playing');
                   }
                 }
-              }, 300);
+              }, 500);
             ''';
             _controller.runJavaScript(jsCode);
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            if (url.contains('doubleclick') || url.contains('popads') || url.contains('1xbet') || url.contains('bet365') || url.contains('onclick') || url.contains('monetag') || url.contains('exoclick') || url.contains('redirect') || url.contains('adsterra')) {
+            // 🚫 HARD BLOCK AD NETWORKS
+            if (url.contains('doubleclick') || url.contains('popads') ||
+                url.contains('1xbet') || url.contains('bet365') ||
+                url.contains('onclick') || url.contains('monetag') ||
+                url.contains('adsterra') || url.contains('redirect')) {
               return NavigationDecision.prevent;
             }
-
-            if (url.contains('hannutv.app') || url.contains('vidbolt') || url.contains('ollyembed') || url.contains('pages.dev') || url.contains('vidsrc') || url.contains('vidlink') || url.contains('stellar.rip') || url.startsWith('about:blank') || url.startsWith('data:')) {
-              return NavigationDecision.navigate;
-            }
-
-            return NavigationDecision.prevent;
+            return NavigationDecision.navigate;
           },
         ),
       );
 
-    final embedHtml = '''
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
-            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
-          </style>
-        </head>
-        <body>
-          <iframe id="player-frame" src="\$targetUrl" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
-        </body>
-      </html>
-    ''';
-
-    _controller.loadHtmlString(embedHtml, baseUrl: 'https://hannutv.app');
+    _controller.loadRequest(Uri.parse(targetUrl));
 
     if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
+      (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
-  }
-
-  String _generateFallbackUrl() {
-    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
-      return widget.customUrl!;
-    }
-
-    final id = widget.tmdbId;
-    final s = widget.season;
-    final e = widget.episode;
-    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
-
-    if (currentServerKey == 'vidbolt') {
-      return isTv
-          ? 'https://vidbolt.pro/tv/\$id/\$s/\$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
-          : 'https://vidbolt.pro/movie/\$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
-    }
-    if (currentServerKey == 'olly') {
-      return isTv
-          ? 'https://ollyembed.pages.dev/tv/\$id/\$s/\$e?server=1'
-          : 'https://ollyembed.pages.dev/movie/\$id?server=1';
-    }
-    if (currentServerKey == 'vega') {
-      return isTv
-          ? 'https://vidsrc.to/embed/tv/\$id/\$s/\$e'
-          : 'https://vidsrc.to/embed/movie/\$id';
-    }
-    if (currentServerKey == 'flixorent') {
-      return isTv
-          ? 'https://vidsrc.pro/embed/tv/\$id/\$s/\$e'
-          : 'https://vidsrc.pro/embed/movie/\$id';
-    }
-    return isTv
-        ? 'https://vidlink.pro/tv/\$id/\$s/\$e'
-        : 'https://vidlink.pro/movie/\$id';
   }
 
   void _seekRelative(int seconds) {
     _startHideTimer();
     final js = '''
       (function() {
-        var v = document.getElementById('native-video');
-        if (!v) {
-          var frame = document.getElementById('player-frame');
-          var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
-          v = doc ? doc.querySelector('video') : document.querySelector('video');
+        var iframes = document.getElementsByTagName('iframe');
+        var v = null;
+        if(iframes.length > 0) {
+           var doc = iframes[0].contentDocument || iframes[0].contentWindow.document;
+           if(doc) v = doc.querySelector('video');
         }
-        if (v) {
-          v.currentTime += \$seconds;
-        }
+        if(!v) v = document.querySelector('video');
+        if (v) v.currentTime += $seconds;
       })();
     ''';
     _controller.runJavaScript(js);
@@ -408,82 +269,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
-        final list = currentServers;
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Switch Video Server",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      ChoiceChip(
-                        label: const Text("Hindi"),
-                        selected: selectedLanguage == 'hindi',
-                        selectedColor: Colors.redAccent,
-                        onSelected: (val) {
-                          Navigator.pop(context);
-                          setState(() {
-                            selectedLanguage = 'hindi';
-                            currentServerKey = 'netmirror_native';
-                          });
-                          _switchServer('netmirror_native');
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text("English"),
-                        selected: selectedLanguage == 'english',
-                        selectedColor: Colors.blueAccent,
-                        onSelected: (val) {
-                          Navigator.pop(context);
-                          setState(() {
-                            selectedLanguage = 'english';
-                            currentServerKey = 'flixorent';
-                          });
-                          _switchServer('flixorent');
-                        },
-                      ),
-                    ],
-                  ),
-                ],
-              ),
+              const Text("Select Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
               const SizedBox(height: 16),
-              ...List.generate(list.length, (index) {
-                final srv = list[index];
+              ...List.generate(allServers.length, (index) {
+                final srv = allServers[index];
                 final isSelected = currentServerKey == srv['key'];
                 return ListTile(
-                  leading: Icon(
-                    isSelected
-                        ? Icons.check_circle
-                        : Icons.radio_button_unchecked,
-                    color: isSelected ? Colors.greenAccent : Colors.grey,
-                  ),
-                  title: Text(
-                    srv['name'],
-                    style: TextStyle(
-                      color: isSelected ? Colors.redAccent : Colors.white,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  subtitle: Text(
-                    srv['sub'],
-                    style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
+                  leading: Icon(isSelected ? Icons.check_circle : Icons.radio_button_unchecked, color: isSelected ? Colors.greenAccent : Colors.grey),
+                  title: Text(srv['name'], style: TextStyle(color: isSelected ? Colors.redAccent : Colors.white, fontWeight: FontWeight.bold)),
+                  subtitle: Text(srv['sub'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
                   onTap: () {
                     Navigator.pop(context);
                     if (currentServerKey != srv['key']) {
@@ -504,10 +305,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void toggleCrop() {
     setState(() => isCropped = !isCropped);
     _controller.runJavaScript('''
-      var v = document.getElementById('native-video') || document.querySelector('video');
-      if (v) {
-        v.style.objectFit = '\${isCropped ? "cover" : "contain"}';
-      }
+      var v = document.querySelector('iframe').contentDocument.querySelector('video') || document.querySelector('video');
+      if (v) v.style.objectFit = '${isCropped ? "cover" : "contain"}';
     ''');
     _startHideTimer();
   }
@@ -516,17 +315,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void dispose() {
     _hideTimer?.cancel();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
-        overlays: SystemUiOverlay.values);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentSrv = allServers.firstWhere(
-      (s) => s['key'] == currentServerKey,
-      orElse: () => allServers[0],
-    );
+    final currentSrv = allServers.firstWhere((s) => s['key'] == currentServerKey, orElse: () => allServers[0]);
 
     return PopScope(
       canPop: false,
@@ -541,157 +336,58 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           behavior: HitTestBehavior.opaque,
           child: Stack(
             children: [
-              // 1. PURE BLACK WEBVIEW CONTAINER (NATIVE OR EMBEDDED)
               Positioned.fill(
-                child: Container(
-                  color: Colors.black,
-                  child: WebViewWidget(controller: _controller),
-                ),
+                child: Container(color: Colors.black, child: WebViewWidget(controller: _controller)),
               ),
-
-              // 2. HANNUTV WATERMARK LOGO
               Positioned(
-                top: 16,
-                right: 16,
-                child: SafeArea(
-                  child: IgnorePointer(
-                    child: Opacity(
-                      opacity: 0.5,
-                      child: Image.asset(
-                        'assets/logo.png',
-                        height: 30,
-                        errorBuilder: (_, __, ___) => const Text(
-                          'HANNUTV',
-                          style: TextStyle(
-                            color: Colors.red,
-                            fontWeight: FontWeight.bold,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                top: 16, right: 16,
+                child: SafeArea(child: IgnorePointer(child: Opacity(opacity: 0.5, child: Image.asset('assets/logo.png', height: 30)))),
               ),
-
-              // 3. BUFFERING / CONNECTING BADGE
               if (isPageLoading && !isVideoPlaying)
                 Positioned(
-                  bottom: 40,
-                  left: 20,
+                  bottom: 40, left: 20,
                   child: SafeArea(
                     child: Container(
-                      padding:
-                          const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: Colors.black87,
-                        borderRadius: BorderRadius.circular(20),
-                        border: Border.all(color: Colors.redAccent, width: 1),
-                      ),
+                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.redAccent, width: 1)),
                       child: Row(
                         mainAxisSize: MainAxisSize.min,
                         children: [
-                          const SizedBox(
-                            width: 14,
-                            height: 14,
-                            child: CircularProgressIndicator(
-                                color: Colors.red, strokeWidth: 2),
-                          ),
+                          const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2)),
                           const SizedBox(width: 10),
-                          Text(
-                            "Connecting: \${currentSrv['name']}...",
-                            style: const TextStyle(
-                                color: Colors.white, fontSize: 12),
-                          ),
+                          Text("Connecting: ${currentSrv['name']}...", style: const TextStyle(color: Colors.white, fontSize: 12)),
                         ],
                       ),
                     ),
                   ),
                 ),
-
-              // 4. TOP CONTROLS (BACK & MOVIE TITLE)
               if (showControls)
                 Positioned(
-                  top: 16,
-                  left: 16,
-                  right: 80,
+                  top: 16, left: 16, right: 80,
                   child: SafeArea(
                     child: Row(
                       children: [
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.6),
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: const Icon(Icons.arrow_back,
-                                color: Colors.white, size: 22),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ),
+                        Container(decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle), child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22), onPressed: () => Navigator.pop(context))),
                         const SizedBox(width: 12),
-                        Expanded(
-                          child: Text(
-                            widget.movieTitle,
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                              shadows: [
-                                Shadow(color: Colors.black, blurRadius: 6)
-                              ],
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
+                        Expanded(child: Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
                       ],
                     ),
                   ),
                 ),
-
-              // 5. CENTER FAST SEEK BUTTONS (-10s / +10s)
               if (showControls)
                 Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      GestureDetector(
-                        onTap: () => _seekRelative(-10),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: const Icon(Icons.replay_10,
-                              color: Colors.white, size: 36),
-                        ),
-                      ),
+                      GestureDetector(onTap: () => _seekRelative(-10), child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.replay_10, color: Colors.white, size: 36))),
                       const SizedBox(width: 80),
-                      GestureDetector(
-                        onTap: () => _seekRelative(10),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.white24),
-                          ),
-                          child: const Icon(Icons.forward_10,
-                              color: Colors.white, size: 36),
-                        ),
-                      ),
+                      GestureDetector(onTap: () => _seekRelative(10), child: Container(padding: const EdgeInsets.all(12), decoration: BoxDecoration(color: Colors.black54, shape: BoxShape.circle), child: const Icon(Icons.forward_10, color: Colors.white, size: 36))),
                     ],
                   ),
                 ),
-
-              // 6. BOTTOM CONTROLS (SERVER SWITCHER & CROP)
               if (showControls)
                 Positioned(
-                  bottom: 16,
-                  right: 16,
+                  bottom: 16, right: 16,
                   child: SafeArea(
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
@@ -699,46 +395,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         GestureDetector(
                           onTap: _showServerSelector,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(
-                              color: Colors.black.withOpacity(0.8),
-                              borderRadius: BorderRadius.circular(20),
-                              border:
-                                  Border.all(color: Colors.redAccent, width: 1.2),
-                            ),
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                            decoration: BoxDecoration(color: Colors.black.withOpacity(0.8), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.redAccent, width: 1.2)),
                             child: Row(
                               children: [
-                                const Icon(Icons.swap_horiz,
-                                    color: Colors.redAccent, size: 16),
+                                const Icon(Icons.swap_horiz, color: Colors.redAccent, size: 16),
                                 const SizedBox(width: 6),
-                                Text(
-                                  "Server: \${currentSrv['name']}",
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 12,
-                                  ),
-                                ),
+                                Text("Engine: ${currentSrv['name']}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
                               ],
                             ),
                           ),
                         ),
                         const SizedBox(width: 10),
-                        Container(
-                          decoration: BoxDecoration(
-                            color: Colors.black.withOpacity(0.7),
-                            shape: BoxShape.circle,
-                          ),
-                          child: IconButton(
-                            icon: Icon(
-                              isCropped ? Icons.fullscreen_exit : Icons.crop_free,
-                              color: Colors.white,
-                              size: 20,
-                            ),
-                            onPressed: toggleCrop,
-                          ),
-                        ),
+                        Container(decoration: BoxDecoration(color: Colors.black.withOpacity(0.7), shape: BoxShape.circle), child: IconButton(icon: Icon(isCropped ? Icons.fullscreen_exit : Icons.crop_free, color: Colors.white, size: 20), onPressed: toggleCrop)),
                       ],
                     ),
                   ),
