@@ -38,6 +38,16 @@ class DashboardPageState extends State<DashboardPage> {
   Timer? _carouselTimer;
   int _currentPage = 0;
 
+  // OTT Watch Provider Channels (Pantyflix Hub, Netflix, Prime, etc.)
+  final List<Map<String, dynamic>> ottPlatforms = [
+    {"name": "🔥 PANTYFLIX VIP", "color": Colors.red, "providerId": "pantyflix"},
+    {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
+    {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
+    {"name": "HOTSTAR", "color": Colors.green, "providerId": "122"},
+    {"name": "SONYLIV", "color": Colors.orange, "providerId": "237"},
+    {"name": "ZEE5", "color": Colors.purple, "providerId": "232"},
+  ];
+
   @override
   void initState() {
     super.initState();
@@ -86,26 +96,37 @@ class DashboardPageState extends State<DashboardPage> {
                   ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}'
                   : '',
               'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
+              'year': (m['release_date'] ?? m['first_air_date'] ?? '')
+                  .toString()
+                  .split('-')
+                  .first,
               'mediaType': forceMediaType ?? (m['media_type'] ?? 'movie'),
             })
         .toList();
   }
 
-  Future<void> loadAllDashboards() async {
+  Future<void> loadAllDashboards({String? providerId}) async {
     setState(() => isLoading = true);
     try {
       String base = 'https://api.themoviedb.org/3';
+      String prov = (providerId != null && providerId != 'pantyflix')
+          ? '&with_watch_providers=$providerId&watch_region=IN'
+          : '';
+
+      String trendUrl = (providerId != null && providerId != 'pantyflix')
+          ? '$base/discover/tv?language=en-US&sort_by=popularity.desc$prov'
+          : '$base/trending/all/day?language=en-US';
 
       var responses = await Future.wait([
-        http.get(Uri.parse('$base/trending/all/day?language=en-US'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28&sort_by=popularity.desc'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=35&sort_by=popularity.desc'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=27&sort_by=popularity.desc'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=18&sort_by=popularity.desc'), headers: kApiHeaders),
+        http.get(Uri.parse(trendUrl), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=35$prov&sort_by=popularity.desc'), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=27$prov&sort_by=popularity.desc'), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=18$prov&sort_by=popularity.desc'), headers: kApiHeaders),
       ]);
 
       setState(() {
-        trendingList = parseData(responses[0]);
+        trendingList = parseData(responses[0], forceMediaType: (providerId != null && providerId != 'pantyflix') ? 'tv' : null);
         actionList = parseData(responses[1], forceMediaType: 'movie');
         comedyList = parseData(responses[2], forceMediaType: 'tv');
         horrorList = parseData(responses[3], forceMediaType: 'movie');
@@ -145,7 +166,7 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // 🚀 DIRECT LAUNCH PLAYER
+  // 🚀 DIRECT LAUNCH PLAYER (YOUTUBE-STYLE SCREENSHOT UI)
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
@@ -159,7 +180,12 @@ class DashboardPageState extends State<DashboardPage> {
         builder: (context) => VideoPlayerPage(
           tmdbId: tId,
           mediaType: type,
+          season: 1,
+          episode: 1,
           movieTitle: media['title'] ?? 'Title',
+          overview: media['overview'] ?? '',
+          rating: media['rating'] ?? '9.0',
+          year: media['year'] ?? '2024',
         ),
       ),
     ).then((_) => setState(() {}));
@@ -283,7 +309,7 @@ class DashboardPageState extends State<DashboardPage> {
                                     style: const TextStyle(color: Colors.white),
                                     autofocus: true,
                                     decoration: InputDecoration(
-                                      hintText: 'Search Movies & Shows...',
+                                      hintText: 'Search Movies & TV Series...',
                                       border: InputBorder.none,
                                       prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
                                       suffixIcon: IconButton(
@@ -337,6 +363,34 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
+            // OTT FILTERS
+            const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+            SizedBox(
+              height: 50,
+              child: ListView.builder(
+                scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
+                itemCount: ottPlatforms.length,
+                itemBuilder: (context, index) {
+                  return Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    child: ElevatedButton(
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.grey[900],
+                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                        side: BorderSide(color: ottPlatforms[index]['color'], width: 1.5),
+                      ),
+                      onPressed: () {
+                        searchController.clear();
+                        setState(() => isSearching = false);
+                        loadAllDashboards(providerId: ottPlatforms[index]['providerId']); 
+                      },
+                      child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
+                    ),
+                  );
+                },
+              ),
+            ),
+
             if (isLoading)
               const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
             else if (isSearching)
@@ -362,7 +416,7 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 HANNUTV Trending', trendingList),
+              _buildHorizontalList('🔥 Trending Now', trendingList),
               if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
               _buildHorizontalList('Action Movies', actionList),
               _buildHorizontalList('Comedy Shows', comedyList),
