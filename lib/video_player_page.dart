@@ -36,13 +36,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   
   bool showServerSelectionUI = true; // PLAY KARNE SE PEHLE UI DIKHEGA!
 
-  // DEEP FIX: Saare servers add kar diye hain. "Stellar" ki jagah "Nyumatflix" kar diya!
+  // DEEP FIX: 1-Second Auto-Fallback Architecture
   int activeServerIndex = 0;
+  bool isAutoSwitching = false; // Prevents multiple rapid switches
+
   final List<Map<String, dynamic>> servers = [
-    {'name': 'Olly VIP (Ad-Free)', 'color': Colors.redAccent, 'type': 'olly'},
-    {'name': 'Nyumatflix (Premium)', 'color': Colors.blue, 'type': 'nyumat'},
+    {'name': 'Olly VIP (Fastest)', 'color': Colors.redAccent, 'type': 'olly'},
+    {'name': 'Nyumatflix (English/Local)', 'color': Colors.blue, 'type': 'nyumat'},
     {'name': 'VidBolt VIP (Hindi Dub)', 'color': Colors.orange, 'type': 'vidbolt'},
-    {'name': 'VidLink (Dual Audio)', 'color': Colors.green, 'type': 'vidlink'},
+    {'name': 'VidLink (Multi-Audio)', 'color': Colors.green, 'type': 'vidlink'},
   ];
 
   @override
@@ -68,9 +70,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     setState(() {
       activeServerIndex = index;
       showServerSelectionUI = false;
+      isAutoSwitching = false; // Reset switching state
     });
     _initWebView();
     _startHideTimer();
+  }
+
+  // --- THE 1-SECOND AUTO FALLBACK ENGINE ---
+  void _triggerAutoFallback() {
+    if (isAutoSwitching) return; // Prevent multiple calls
+    setState(() { isAutoSwitching = true; });
+
+    // Wait 1 second before trying the next server
+    Future.delayed(const Duration(seconds: 1), () {
+      if (mounted) {
+        int nextServer = (activeServerIndex + 1) % servers.length;
+        _startServer(nextServer);
+      }
+    });
   }
 
   String _generateVideoUrl() {
@@ -82,16 +99,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 1. OLLY EMBED
     if (srv == 'olly') return isTv ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1' : 'https://ollyembed.pages.dev/movie/$id?server=1';
-    
-    // 2. NYUMATFLIX (Stellar Replaced)[cite: 17, 18]
     if (srv == 'nyumat') return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
-
-    // 3. VIDBOLT (Ad-Free iframe logic will be applied)
     if (srv == 'vidbolt') return isTv ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi' : 'https://vidbolt.pro/movie/$id?theme=e50914&autoPlay=true&audio=hindi';
-
-    // 4. VIDLINK
     return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
   }
 
@@ -111,13 +121,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           if (message.message == 'playing' && mounted) {
             setState(() => isVideoPlaying = true);
           } 
+          // TRIGGER FALLBACK IF ERROR FOUND
+          else if (message.message == 'not_found' && mounted) {
+            _triggerAutoFallback();
+          }
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // UNIVERSAL AD-BLOCK & AUTOPLAY JAVASCRIPT
-            _controller.runJavaScript('''
+            // STRICT AD-BLOCK & ERROR DETECTOR JAVASCRIPT
+            String jsCode = '''
               // 1. Silent Ad Click Killer
               document.addEventListener('click', function(e) {
                 var a = e.target.closest('a');
@@ -138,26 +152,36 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 }
               }, 500);
               
-              // 3. Hide annoying server texts
+              // 3. Error Detector (Video Not Found, 404, etc.)
+              var checkError = setInterval(function() {
+                var text = document.body.innerText.toLowerCase();
+                if (text.includes("video not found") || text.includes("404") || text.includes("error") || text.includes("server is down")) {
+                    VideoState.postMessage('not_found');
+                    clearInterval(checkError);
+                }
+              }, 1000);
+              
+              // 4. Hide annoying server texts
               var style = document.createElement('style');
               style.innerHTML = 'div[style*="z-index"] { display: none !important; pointer-events: none !important; }';
               document.head.appendChild(style);
-            ''');
+            ''';
+
+            _controller.runJavaScript(jsCode);
           },
-          // STRICT AD BLOCKER: Sirf trusted servers ko load hone do, baaki sab (ads) block.
+          // STRICT NETWORK BLOCKER (Only allowed domains)
           onNavigationRequest: (NavigationRequest request) {
-             if (srvType != 'olly' && srvType != 'vidbolt') {
-               final url = request.url.toLowerCase();
-               if (url.contains('casino') || url.contains('bet') || url.contains('pop') || url.contains('ads')) {
-                 return NavigationDecision.prevent; 
-               }
+             final url = request.url.toLowerCase();
+             // 100% Ad Block
+             if (url.contains('casino') || url.contains('bet') || url.contains('pop') || url.contains('ads') || url.contains('track')) {
+               return NavigationDecision.prevent; 
              }
              return NavigationDecision.navigate;
           },
         ),
       );
 
-    // DEEP FIX FOR OLLY & VIDBOLT (Requires Iframe)
+    // LOAD MECHANISM (Iframe for Olly/Vidbolt, Direct for others)
     if (srvType == 'olly' || srvType == 'vidbolt') {
        final String htmlContent = '''
         <!DOCTYPE html>
@@ -173,13 +197,20 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         <body>
             <iframe id="video-player" src="${_generateVideoUrl()}" width="100%" height="100%" frameborder="0" allowfullscreen="true" allow="autoplay; fullscreen; encrypted-media"></iframe>
             <script>
-                // Prevent Popups inside Iframe
                 document.addEventListener('click', function(e) {
                     var a = e.target.closest('a');
                     if (a && a.target === '_blank') { e.preventDefault(); }
                 }, true);
                 window.open = function() { return null; };
                 
+                var checkError = setInterval(function() {
+                  var text = document.body.innerText.toLowerCase();
+                  if (text.includes("video not found") || text.includes("404")) {
+                      VideoState.postMessage('not_found');
+                      clearInterval(checkError);
+                  }
+                }, 1000);
+
                 setTimeout(function() { VideoState.postMessage('playing'); }, 5000);
             </script>
         </body>
@@ -187,7 +218,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       ''';
       _controller.loadHtmlString(htmlContent, baseUrl: 'https://hannutv.app/');
     } else {
-      // Nyumatflix & VidLink load directly
       _controller.loadRequest(
         Uri.parse(_generateVideoUrl()),
         headers: {'Referer': 'https://hannutv.app/'},
@@ -198,10 +228,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // 12 Sec Timeout Fallback
+    // 12 Sec Timeout Fallback (If player never shows up)
     Future.delayed(const Duration(seconds: 12), () {
       if (mounted && !showServerSelectionUI && !isVideoPlaying) {
-        setState(() => isVideoPlaying = true);
+         // Agar video load nahi hui 12 sec tak, toh agle server par skip karo
+         _triggerAutoFallback();
       }
     });
   }
@@ -322,7 +353,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     ),
                   ),
 
-                // 3. HANNUTV LOADING SCREEN
+                // 3. HANNUTV LOADING SCREEN (Dynamic server name display)
                 if (!isVideoPlaying)
                   Container(
                     color: Colors.black,
