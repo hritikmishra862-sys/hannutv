@@ -11,7 +11,7 @@ class VideoPlayerPage extends StatefulWidget {
   final int episode;
   final String movieTitle;
   final String? customUrl;
-  final String preferredServer; // 'netmirror_live', 'netmirror_embed', 'vidbolt_hd', 'vega'
+  final String preferredServer; // 'netmirror_portal', 'vidbolt', 'olly', 'vega'
 
   const VideoPlayerPage({
     Key? key,
@@ -21,7 +21,7 @@ class VideoPlayerPage extends StatefulWidget {
     required this.episode,
     required this.movieTitle,
     this.customUrl,
-    this.preferredServer = 'netmirror_live',
+    this.preferredServer = 'netmirror_portal',
   }) : super(key: key);
 
   @override
@@ -38,33 +38,56 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool isPageLoading = true;
   late String currentServerKey;
 
-  // 🤖 VIP HARDCODED SERVERS (NETMIRROR & ULTRA HD)
+  // 🤖 VIP SERVERS (NETMIRROR LIVE INJECTED)
   final List<Map<String, dynamic>> allServers = [
     {
-      'key': 'netmirror_live',
-      'name': 'HANNUTV Ultra (NetMirror Live)',
-      'sub': '1080p Pure Stream (No Ads)',
+      'key': 'netmirror_portal',
+      'name': 'HANNUTV VIP (NetMirror)',
+      'sub': 'Official NetMirror Hub (Zero Ads)',
       'color': Colors.redAccent,
+      'lang': 'hindi',
     },
     {
-      'key': 'netmirror_embed',
-      'name': 'NetMirror Dedicated VIP',
-      'sub': 'Dual Audio Hindi HD',
-      'color': Colors.orange,
-    },
-    {
-      'key': 'vidbolt_hd',
+      'key': 'vidbolt',
       'name': 'VidBolt VIP Ultra HD',
-      'sub': 'High Bitrate Multi-Audio',
-      'color': Colors.purpleAccent,
+      'sub': '1080p Hindi Dub Stream',
+      'color': Colors.orangeAccent,
+      'lang': 'hindi',
     },
     {
-      'key': 'vega_hd',
-      'name': 'Vega Multi 4K',
-      'sub': 'Zero Lag Cloud Stream',
+      'key': 'olly',
+      'name': 'Olly Stream VIP',
+      'sub': 'Fast HLS Hindi Direct',
+      'color': Colors.purpleAccent,
+      'lang': 'hindi',
+    },
+    {
+      'key': 'vega',
+      'name': 'Vega Multi-Audio 4K',
+      'sub': 'Dual Audio Hindi/Eng Cloud',
       'color': Colors.teal,
+      'lang': 'hindi',
+    },
+    {
+      'key': 'flixorent',
+      'name': 'Flixorent Ultra',
+      'sub': 'English Subtitles 1080p',
+      'color': Colors.blueAccent,
+      'lang': 'english',
+    },
+    {
+      'key': 'vidlink',
+      'name': 'VidLink English Pro',
+      'sub': 'English HD Direct Node',
+      'color': Colors.green,
+      'lang': 'english',
     },
   ];
+
+  String selectedLanguage = 'hindi';
+
+  List<Map<String, dynamic>> get currentServers =>
+      allServers.where((s) => s['lang'] == selectedLanguage).toList();
 
   @override
   void initState() {
@@ -102,33 +125,50 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
     final query = Uri.encodeComponent(widget.movieTitle);
 
-    // 🚀 1. NETMIRROR LIVE DIRECT PORTAL
-    if (currentServerKey == 'netmirror_live') {
-      return 'https://netmirror.center/search?q=$query';
-    }
-
-    // 🚀 2. NETMIRROR DIRECT EMBED ENGINE
-    if (currentServerKey == 'netmirror_embed') {
+    // 🚀 1. NETMIRROR OFFICIAL SEARCH & DIRECT PLAY PORTAL
+    if (currentServerKey == 'netmirror_portal') {
       return isTv
-          ? 'https://netmirror.center/embed/tv?id=$id&s=$s&e=$e'
-          : 'https://netmirror.center/embed/movie?id=$id';
+          ? 'https://netmirror.center/explore/tv'
+          : 'https://netmirror.center/explore/movie';
     }
 
-    // 🚀 3. VIDBOLT ULTRA HD (FORCED HIGH QUALITY)
-    if (currentServerKey == 'vidbolt_hd') {
+    // 🚀 2. VIDBOLT 1080P ULTRA HD
+    if (currentServerKey == 'vidbolt') {
       return isTv
           ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
           : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
     }
 
-    // 🚀 4. VEGA 4K STREAM
+    // 🚀 3. OLLY STREAM VIP
+    if (currentServerKey == 'olly') {
+      return isTv
+          ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
+          : 'https://ollyembed.pages.dev/movie/$id?server=1';
+    }
+
+    // 🚀 4. VEGA 4K MULTI-AUDIO
+    if (currentServerKey == 'vega') {
+      return isTv
+          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
+          : 'https://vidsrc.to/embed/movie/$id';
+    }
+
+    // 🚀 5. FLIXORENT ENGLISH
+    if (currentServerKey == 'flixorent') {
+      return isTv
+          ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
+          : 'https://vidsrc.pro/embed/movie/$id';
+    }
+
+    // 🚀 6. VIDLINK ENGLISH
     return isTv
-        ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
-        : 'https://vidsrc.to/embed/movie/$id';
+        ? 'https://vidlink.pro/tv/$id/$s/$e'
+        : 'https://vidlink.pro/movie/$id';
   }
 
   void _initWebView() {
     final targetUrl = _generateVideoUrl();
+    final cleanTitle = widget.movieTitle.replaceAll("'", "\\'");
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -155,21 +195,21 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🛡️ WORLD'S BEST ANDROID AD-KILLER + NETMIRROR DEEP BYPASS ENGINE
+            // 🛡️ WORLD'S BEST AD-KILLER + NETMIRROR DEEP AUTO-SEARCH & PLAY ENGINE
             String jsCode = '''
-              // 1. Force Pure Dark Cinema Mode
+              // 1. Force Pure Cinema Black
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
-              // 2. Kill Popups, Alerts, Prompts completely
+              // 2. Kill Popups & Redirects completely
               window.open = function() { return null; };
               window.alert = function() { return null; };
               window.confirm = function() { return null; };
 
-              // 3. Ultra Nuke NetMirror/Vidbolt Logos, Headers, Footers & Anti-Adblock
+              // 3. Ultra Ad-Blocker & NetMirror Branding Nuke
               setInterval(function() {
-                // Kill AdBlock Detection Modals & Extension warnings
-                document.querySelectorAll('div, section, modal, aside, p, h2, span, header, footer, nav').forEach(el => {
+                // Remove AdBlock warnings & modals
+                document.querySelectorAll('div, section, modal, aside, p, h2, span, header, nav').forEach(el => {
                   let text = el.innerText.toLowerCase();
                   if (text.includes('adblock') || 
                       text.includes('ad-blocker') || 
@@ -178,9 +218,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       text.includes('inside an iframe') ||
                       text.includes('netmirror') ||
                       text.includes('net mirror')) {
-                    
-                    // If it is top header logo of netmirror, hide it
-                    if (el.tagName === 'HEADER' || el.tagName === 'NAV' || el.className.includes('logo') || el.className.includes('header')) {
+                    if (el.tagName === 'HEADER' || el.tagName === 'NAV') {
                       el.style.display = 'none';
                     } else if (!el.querySelector('video') && !el.querySelector('iframe')) {
                       el.remove();
@@ -188,28 +226,31 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   }
                 });
 
-                // Remove ads, banner images and click overlays
+                // Remove banner ads & click overlays
                 document.querySelectorAll('div, a, span, img').forEach(el => {
                   let style = window.getComputedStyle(el);
                   if ((style.position === 'fixed' || style.position === 'absolute') && 
                       style.zIndex > 1000 && 
                       el.tagName !== 'IFRAME' && 
-                      el.tagName !== 'VIDEO' &&
-                      !el.contains(document.querySelector('video'))) {
+                      el.tagName !== 'VIDEO') {
                     el.remove();
                   }
                 });
 
-                // If on NetMirror search page, click the first movie card automatically!
-                if (window.location.href.includes('search')) {
-                  let cards = document.querySelectorAll('.card, .movie-card, .search-result, .item, a[href*="/watch/"], a[href*="/movie/"], a[href*="/tv/"]');
-                  if (cards.length > 0 && !window._cardClicked) {
-                    window._cardClicked = true;
-                    cards[0].click();
+                // 4. NETMIRROR AUTO SEARCH & CLICK INJECTION
+                if (window.location.hostname.includes('netmirror.center') && !window._netMirrorExecuted) {
+                  var searchInput = document.querySelector('input[type="search"], input[placeholder*="Search"], input[name="q"], .search-input');
+                  if (searchInput && searchInput.value !== '$cleanTitle') {
+                    window._netMirrorExecuted = true;
+                    searchInput.value = '$cleanTitle';
+                    searchInput.dispatchEvent(new Event('input', { bubbles: true }));
+                    searchInput.dispatchEvent(new Event('change', { bubbles: true }));
+                    var form = searchInput.closest('form');
+                    if (form) form.dispatchEvent(new Event('submit', { bubbles: true }));
                   }
                 }
 
-                // Auto Play & Video Detection
+                // 5. Auto Video Play Detection
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -228,7 +269,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // Block ads & redirects
+            // Block ads & betting sites
             if (url.contains('doubleclick') ||
                 url.contains('popads') ||
                 url.contains('1xbet') ||
@@ -241,7 +282,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               return NavigationDecision.prevent;
             }
 
-            // Allow safe player URLs
+            // Allow safe media embed URLs
             if (url.contains('hannutv.app') ||
                 url.contains('netmirror') ||
                 url.contains('vidbolt') ||
@@ -304,22 +345,59 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
+        final list = currentServers;
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text(
-                "Change Streaming Engine",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  const Text(
+                    "Switch Video Engine",
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  Row(
+                    children: [
+                      ChoiceChip(
+                        label: const Text("Hindi"),
+                        selected: selectedLanguage == 'hindi',
+                        selectedColor: Colors.redAccent,
+                        onSelected: (val) {
+                          Navigator.pop(context);
+                          setState(() {
+                            selectedLanguage = 'hindi';
+                            currentServerKey = 'netmirror_portal';
+                          });
+                          _switchServer('netmirror_portal');
+                        },
+                      ),
+                      const SizedBox(width: 8),
+                      ChoiceChip(
+                        label: const Text("English"),
+                        selected: selectedLanguage == 'english',
+                        selectedColor: Colors.blueAccent,
+                        onSelected: (val) {
+                          Navigator.pop(context);
+                          setState(() {
+                            selectedLanguage = 'english';
+                            currentServerKey = 'flixorent';
+                          });
+                          _switchServer('flixorent');
+                        },
+                      ),
+                    ],
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
-              ...List.generate(allServers.length, (index) {
-                final srv = allServers[index];
+              ...List.generate(list.length, (index) {
+                final srv = list[index];
                 final isSelected = currentServerKey == srv['key'];
                 return ListTile(
                   leading: Icon(
@@ -390,7 +468,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // 1. PURE BLACK WEBVIEW (NETMIRROR POWERED)
+            // 1. PURE BLACK WEBVIEW CONTAINER (NETMIRROR EMBEDDED)
             Positioned.fill(
               child: Container(
                 color: Colors.black,
@@ -423,7 +501,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               ),
             ),
 
-            // 3. LOADING / BUFFERING
+            // 3. BUFFERING / CONNECTING BADGE
             if (isPageLoading && !isVideoPlaying)
               Positioned(
                 bottom: 40,
@@ -446,7 +524,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         ),
                         const SizedBox(width: 10),
                         Text(
-                          "Loading: ${currentSrv['name']}...",
+                          "Connecting: ${currentSrv['name']}...",
                           style: const TextStyle(color: Colors.white, fontSize: 12),
                         ),
                       ],
@@ -551,7 +629,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                               const Icon(Icons.swap_horiz, color: Colors.redAccent, size: 16),
                               const SizedBox(width: 6),
                               Text(
-                                "Engine: ${currentSrv['name']}",
+                                "Server: ${currentSrv['name']}",
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,

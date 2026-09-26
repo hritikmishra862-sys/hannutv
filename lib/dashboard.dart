@@ -22,7 +22,6 @@ class DashboardPage extends StatefulWidget {
 }
 
 class DashboardPageState extends State<DashboardPage> {
-  // 🌟 NETMIRROR LIVE DATA FEED
   List netmirrorLiveFeed = [];
   List trendingList = [];
   List actionList = [];
@@ -33,7 +32,7 @@ class DashboardPageState extends State<DashboardPage> {
 
   bool isLoading = true;
   bool isSearching = false;
-  bool isNetMirrorSearchActive = false; // Dual Search Engine
+  bool isNetMirrorSearchActive = false; // ⚡ DUAL SEARCH ENGINE
   final TextEditingController searchController = TextEditingController();
 
   Timer? _debounce;
@@ -43,7 +42,7 @@ class DashboardPageState extends State<DashboardPage> {
 
   // OTT Watch Provider Channels
   final List<Map<String, dynamic>> ottPlatforms = [
-    {"name": "🔥 HANNUTV LIVE", "color": Colors.red, "providerId": "hannutv"},
+    {"name": "🔥 HANNUTV (NetMirror)", "color": Colors.red, "providerId": "hannutv"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
     {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
     {"name": "HOTSTAR", "color": Colors.green, "providerId": "122"},
@@ -108,7 +107,7 @@ class DashboardPageState extends State<DashboardPage> {
         .toList();
   }
 
-  // 🚀 LIVE NETMIRROR + TMDB SYNC LOADER
+  // 🚀 LIVE STREAM SYNC LOADER
   Future<void> loadAllDashboards({String? providerId}) async {
     setState(() => isLoading = true);
     try {
@@ -123,7 +122,6 @@ class DashboardPageState extends State<DashboardPage> {
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
-        // NetMirror Live Trending Catalog Feed
         http.get(
           Uri.parse('$base/trending/all/week?language=en-US'),
           headers: kApiHeaders,
@@ -165,7 +163,6 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // 🔍 2 SEARCH MODES (STANDARD & DIRECT NETMIRROR)
   void onSearchChanged(String value) {
     if (value.isEmpty) {
       setState(() {
@@ -353,7 +350,7 @@ class DashboardPageState extends State<DashboardPage> {
                                     autofocus: true,
                                     decoration: InputDecoration(
                                       hintText: isNetMirrorSearchActive
-                                          ? '🔥 HANNUTV Live Search...'
+                                          ? '⚡ HANNUTV Live Search...'
                                           : 'Search Movies & Shows...',
                                       border: InputBorder.none,
                                       prefixIcon: Icon(
@@ -393,10 +390,10 @@ class DashboardPageState extends State<DashboardPage> {
                                 ),
                               ),
                         if (!isSearching) ...[
-                          // 🔍 BUTTON 1: HANNUTV NETMIRROR LIVE SEARCH
+                          // 🔍 1. HANNUTV NETMIRROR LIVE SEARCH BUTTON
                           IconButton(
                             icon: const Icon(Icons.flash_on, color: Colors.redAccent, size: 28),
-                            tooltip: "HANNUTV Live Search",
+                            tooltip: "HANNUTV Direct Search",
                             onPressed: () {
                               setState(() {
                                 isSearching = true;
@@ -404,7 +401,7 @@ class DashboardPageState extends State<DashboardPage> {
                               });
                             },
                           ),
-                          // 🔍 BUTTON 2: GLOBAL SEARCH
+                          // 🔍 2. GLOBAL SEARCH BUTTON
                           IconButton(
                             icon: const Icon(Icons.search, color: Colors.white, size: 28),
                             onPressed: () {
@@ -560,7 +557,7 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 HANNUTV Live (NetMirror Feed)', netmirrorLiveFeed),
+              _buildHorizontalList('🔥 HANNUTV (NetMirror Live Feed)', netmirrorLiveFeed),
               _buildHorizontalList('Trending Now', trendingList),
               if (continueWatchingList.isNotEmpty)
                 _buildHorizontalList('Continue Watching', continueWatchingList),
@@ -577,7 +574,7 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// ── DETAILS SCREEN WITH AUTO NETMIRROR DIRECT PLAY ───────────
+// ── DETAILS SCREEN WITH NETMIRROR PRIORITY 1-CLICK HD PLAY ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -675,7 +672,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // 🚀 DIRECT PLAY VIA NETMIRROR ULTRA LIVE
+  // 🚀 DIRECT 1-CLICK HD PLAY (NETMIRROR LIVE INJECTED)
   void launchPlayer(String title, {int? season, int? episode}) {
     continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
@@ -697,7 +694,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           season: season ?? 1,
           episode: episode ?? 1,
           movieTitle: title,
-          preferredServer: 'netmirror_live',
+          preferredServer: 'netmirror_portal', // NetMirror First Priority
         ),
       ),
     );
@@ -816,7 +813,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                   icon: const Icon(Icons.play_arrow,
                                       color: Colors.white),
                                   label: const Text(
-                                    'Play Movie (HD)',
+                                    'Play Movie (NetMirror HD)',
                                     style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
