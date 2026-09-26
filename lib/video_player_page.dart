@@ -11,7 +11,7 @@ class VideoPlayerPage extends StatefulWidget {
   final int episode;
   final String movieTitle;
   final String? customUrl;
-  final String preferredServer; // 'netmirror', 'vidbolt', 'olly', 'vega', etc.
+  final String preferredServer; // 'netmirror_live', 'netmirror_embed', 'vidbolt_hd', 'vega'
 
   const VideoPlayerPage({
     Key? key,
@@ -21,7 +21,7 @@ class VideoPlayerPage extends StatefulWidget {
     required this.episode,
     required this.movieTitle,
     this.customUrl,
-    this.preferredServer = 'netmirror',
+    this.preferredServer = 'netmirror_live',
   }) : super(key: key);
 
   @override
@@ -35,72 +35,42 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool isCropped = false;
   bool showControls = true;
   Timer? _hideTimer;
-
   bool isPageLoading = true;
-  String selectedLanguage = 'hindi';
   late String currentServerKey;
 
-  // 🤖 STABLE SERVER PROVIDERS
+  // 🤖 VIP HARDCODED SERVERS (NETMIRROR & ULTRA HD)
   final List<Map<String, dynamic>> allServers = [
     {
-      'key': 'netmirror',
-      'name': 'HANNUTV VIP (NetMirror)',
-      'sub': 'Official Ultra Fast Stream',
+      'key': 'netmirror_live',
+      'name': 'HANNUTV Ultra (NetMirror Live)',
+      'sub': '1080p Pure Stream (No Ads)',
       'color': Colors.redAccent,
-      'lang': 'hindi',
     },
     {
-      'key': 'vidbolt',
-      'name': 'VidBolt Node',
-      'sub': 'Hindi Dual Audio',
+      'key': 'netmirror_embed',
+      'name': 'NetMirror Dedicated VIP',
+      'sub': 'Dual Audio Hindi HD',
       'color': Colors.orange,
-      'lang': 'hindi',
     },
     {
-      'key': 'olly',
-      'name': 'Olly Stream',
-      'sub': 'Direct Fast HLS',
-      'color': Colors.pinkAccent,
-      'lang': 'hindi',
+      'key': 'vidbolt_hd',
+      'name': 'VidBolt VIP Ultra HD',
+      'sub': 'High Bitrate Multi-Audio',
+      'color': Colors.purpleAccent,
     },
     {
-      'key': 'vega',
-      'name': 'Vega Multi-Node',
-      'sub': '4K Dual Audio',
-      'color': Colors.purple,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'netmirror_eng',
-      'name': 'HANNUTV English (NetMirror)',
-      'sub': 'Original HD Stream',
-      'color': Colors.blue,
-      'lang': 'english',
-    },
-    {
-      'key': 'flixorent',
-      'name': 'Flixorent Pro',
-      'sub': 'Original Multi-Sub',
+      'key': 'vega_hd',
+      'name': 'Vega Multi 4K',
+      'sub': 'Zero Lag Cloud Stream',
       'color': Colors.teal,
-      'lang': 'english',
-    },
-    {
-      'key': 'vidlink',
-      'name': 'VidLink English',
-      'sub': 'Direct 1080p',
-      'color': Colors.green,
-      'lang': 'english',
     },
   ];
-
-  List<Map<String, dynamic>> get currentServers =>
-      allServers.where((s) => s['lang'] == selectedLanguage).toList();
 
   @override
   void initState() {
     super.initState();
     currentServerKey = widget.preferredServer;
-    
+
     SystemChrome.setPreferredOrientations([
       DeviceOrientation.landscapeLeft,
       DeviceOrientation.landscapeRight,
@@ -130,54 +100,31 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final s = widget.season;
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
-    final queryTitle = Uri.encodeComponent(widget.movieTitle);
+    final query = Uri.encodeComponent(widget.movieTitle);
 
-    // 🚀 1. NETMIRROR DIRECT DEEP INTEGRATION
-    if (currentServerKey == 'netmirror' || currentServerKey == 'netmirror_eng') {
-      return isTv
-          ? 'https://netmirror.center/embed/tv?id=$id&s=$s&e=$e&title=$queryTitle'
-          : 'https://netmirror.center/embed/movie?id=$id&title=$queryTitle';
+    // 🚀 1. NETMIRROR LIVE DIRECT PORTAL
+    if (currentServerKey == 'netmirror_live') {
+      return 'https://netmirror.center/search?q=$query';
     }
 
-    // 🚀 2. VIDBOLT SERVER
-    if (currentServerKey == 'vidbolt') {
+    // 🚀 2. NETMIRROR DIRECT EMBED ENGINE
+    if (currentServerKey == 'netmirror_embed') {
       return isTv
-          ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi'
-          : 'https://vidbolt.pro/movie/$id?theme=e50914&autoPlay=true&audio=hindi';
+          ? 'https://netmirror.center/embed/tv?id=$id&s=$s&e=$e'
+          : 'https://netmirror.center/embed/movie?id=$id';
     }
 
-    // 🚀 3. OLLY SERVER
-    if (currentServerKey == 'olly') {
+    // 🚀 3. VIDBOLT ULTRA HD (FORCED HIGH QUALITY)
+    if (currentServerKey == 'vidbolt_hd') {
       return isTv
-          ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
-          : 'https://ollyembed.pages.dev/movie/$id?server=1';
+          ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
+          : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
     }
 
-    // 🚀 4. VEGA SERVER
-    if (currentServerKey == 'vega') {
-      return isTv
-          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.to/embed/movie/$id';
-    }
-
-    // 🚀 5. FLIXORENT SERVER
-    if (currentServerKey == 'flixorent') {
-      return isTv
-          ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.pro/embed/movie/$id';
-    }
-
-    // 🚀 6. VIDLINK SERVER
-    if (currentServerKey == 'vidlink') {
-      return isTv
-          ? 'https://vidlink.pro/tv/$id/$s/$e'
-          : 'https://vidlink.pro/movie/$id';
-    }
-
-    // DEFAULT FALLBACK
+    // 🚀 4. VEGA 4K STREAM
     return isTv
-        ? 'https://netmirror.center/embed/tv?id=$id&s=$s&e=$e'
-        : 'https://netmirror.center/embed/movie?id=$id';
+        ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
+        : 'https://vidsrc.to/embed/movie/$id';
   }
 
   void _initWebView() {
@@ -187,7 +134,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setUserAgent(
-        "Mozilla/5.0 (Linux; Android 12; Pixel 6 Pro Build/SD1A.210817.036) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Mobile Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
       )
       ..addJavaScriptChannel(
         'VideoState',
@@ -208,46 +155,61 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🛡️ HARDCORE AD-KILLER + ANTI-ADBLOCK BYPASS
+            // 🛡️ WORLD'S BEST ANDROID AD-KILLER + NETMIRROR DEEP BYPASS ENGINE
             String jsCode = '''
-              // 1. Force Pure Dark Mode
+              // 1. Force Pure Dark Cinema Mode
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
-              // 2. Kill Popups completely
+              // 2. Kill Popups, Alerts, Prompts completely
               window.open = function() { return null; };
               window.alert = function() { return null; };
               window.confirm = function() { return null; };
 
-              // 3. Bypass "Disable Adblocker" and remove overlays
+              // 3. Ultra Nuke NetMirror/Vidbolt Logos, Headers, Footers & Anti-Adblock
               setInterval(function() {
-                // Kill AdBlock warnings
-                document.querySelectorAll('div, section, modal, aside, p, h2, span').forEach(el => {
+                // Kill AdBlock Detection Modals & Extension warnings
+                document.querySelectorAll('div, section, modal, aside, p, h2, span, header, footer, nav').forEach(el => {
                   let text = el.innerText.toLowerCase();
                   if (text.includes('adblock') || 
                       text.includes('ad-blocker') || 
                       text.includes('disable adblock') || 
                       text.includes('please disable') ||
                       text.includes('inside an iframe') ||
-                      text.includes('extension')) {
-                    el.style.display = 'none';
-                    el.style.pointerEvents = 'none';
-                    el.remove();
+                      text.includes('netmirror') ||
+                      text.includes('net mirror')) {
+                    
+                    // If it is top header logo of netmirror, hide it
+                    if (el.tagName === 'HEADER' || el.tagName === 'NAV' || el.className.includes('logo') || el.className.includes('header')) {
+                      el.style.display = 'none';
+                    } else if (!el.querySelector('video') && !el.querySelector('iframe')) {
+                      el.remove();
+                    }
                   }
                 });
 
-                // Remove ad overlays and fake buttons
+                // Remove ads, banner images and click overlays
                 document.querySelectorAll('div, a, span, img').forEach(el => {
                   let style = window.getComputedStyle(el);
                   if ((style.position === 'fixed' || style.position === 'absolute') && 
                       style.zIndex > 1000 && 
                       el.tagName !== 'IFRAME' && 
-                      el.tagName !== 'VIDEO') {
+                      el.tagName !== 'VIDEO' &&
+                      !el.contains(document.querySelector('video'))) {
                     el.remove();
                   }
                 });
 
-                // Auto Trigger Play
+                // If on NetMirror search page, click the first movie card automatically!
+                if (window.location.href.includes('search')) {
+                  let cards = document.querySelectorAll('.card, .movie-card, .search-result, .item, a[href*="/watch/"], a[href*="/movie/"], a[href*="/tv/"]');
+                  if (cards.length > 0 && !window._cardClicked) {
+                    window._cardClicked = true;
+                    cards[0].click();
+                  }
+                }
+
+                // Auto Play & Video Detection
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -259,7 +221,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     VideoState.postMessage('playing');
                   }
                 }
-              }, 400);
+              }, 300);
             ''';
             _controller.runJavaScript(jsCode);
           },
@@ -295,38 +257,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
             return NavigationDecision.prevent;
           },
-          onWebResourceError: (WebResourceError error) {
-            // Keep on screen, do NOT auto-switch to prevent loop
-          },
         ),
       );
 
-    // Fullcontainer HTML Iframe wrapper
-    final embedHtml = '''
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
-            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
-          </style>
-        </head>
-        <body>
-          <iframe 
-            id="player-frame"
-            src="$targetUrl" 
-            allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
-            allowfullscreen>
-          </iframe>
-        </body>
-      </html>
-    ''';
-
-    _controller.loadHtmlString(
-      embedHtml,
-      baseUrl: 'https://netmirror.center',
+    _controller.loadRequest(
+      Uri.parse(targetUrl),
+      headers: {
+        'Referer': 'https://netmirror.center/',
+        'Origin': 'https://netmirror.center',
+      },
     );
 
     if (_controller.platform is AndroidWebViewController) {
@@ -339,9 +278,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _startHideTimer();
     final js = '''
       (function() {
-        var frame = document.getElementById('player-frame');
-        var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
-        var vids = doc ? doc.getElementsByTagName('video') : document.getElementsByTagName('video');
+        var vids = document.getElementsByTagName('video');
         if (vids.length > 0) {
           vids[0].currentTime += $seconds;
         }
@@ -367,59 +304,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
       builder: (context) {
-        final list = currentServers;
         return Container(
           padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                children: [
-                  const Text(
-                    "Change Video Server",
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      ChoiceChip(
-                        label: const Text("Hindi"),
-                        selected: selectedLanguage == 'hindi',
-                        selectedColor: Colors.redAccent,
-                        onSelected: (val) {
-                          Navigator.pop(context);
-                          setState(() {
-                            selectedLanguage = 'hindi';
-                            currentServerKey = 'netmirror';
-                          });
-                          _switchServer('netmirror');
-                        },
-                      ),
-                      const SizedBox(width: 8),
-                      ChoiceChip(
-                        label: const Text("English"),
-                        selected: selectedLanguage == 'english',
-                        selectedColor: Colors.blueAccent,
-                        onSelected: (val) {
-                          Navigator.pop(context);
-                          setState(() {
-                            selectedLanguage = 'english';
-                            currentServerKey = 'netmirror_eng';
-                          });
-                          _switchServer('netmirror_eng');
-                        },
-                      ),
-                    ],
-                  ),
-                ],
+              const Text(
+                "Change Streaming Engine",
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
               const SizedBox(height: 16),
-              ...List.generate(list.length, (index) {
-                final srv = list[index];
+              ...List.generate(allServers.length, (index) {
+                final srv = allServers[index];
                 final isSelected = currentServerKey == srv['key'];
                 return ListTile(
                   leading: Icon(
@@ -436,22 +336,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   subtitle: Text(
                     srv['sub'],
                     style: const TextStyle(color: Colors.grey, fontSize: 12),
-                  ),
-                  trailing: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                    decoration: BoxDecoration(
-                      color: Colors.black45,
-                      borderRadius: BorderRadius.circular(6),
-                      border: Border.all(color: srv['color'], width: 1),
-                    ),
-                    child: Text(
-                      selectedLanguage.toUpperCase(),
-                      style: TextStyle(
-                        color: srv['color'],
-                        fontSize: 10,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
                   ),
                   onTap: () {
                     Navigator.pop(context);
@@ -473,9 +357,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void toggleCrop() {
     setState(() => isCropped = !isCropped);
     _controller.runJavaScript('''
-      var frame = document.getElementById('player-frame');
-      var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
-      var vids = doc ? doc.getElementsByTagName('video') : document.getElementsByTagName('video');
+      var vids = document.getElementsByTagName('video');
       if (vids.length > 0) {
         vids[0].style.objectFit = '${isCropped ? "cover" : "contain"}';
       }
@@ -508,7 +390,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // 1. PURE BLACK WEBVIEW CONTAINER
+            // 1. PURE BLACK WEBVIEW (NETMIRROR POWERED)
             Positioned.fill(
               child: Container(
                 color: Colors.black,
@@ -541,7 +423,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               ),
             ),
 
-            // 3. BUFFERING / CONNECTING INDICATOR
+            // 3. LOADING / BUFFERING
             if (isPageLoading && !isVideoPlaying)
               Positioned(
                 bottom: 40,
@@ -669,7 +551,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                               const Icon(Icons.swap_horiz, color: Colors.redAccent, size: 16),
                               const SizedBox(width: 6),
                               Text(
-                                "Server: ${currentSrv['name']}",
+                                "Engine: ${currentSrv['name']}",
                                 style: const TextStyle(
                                   color: Colors.white,
                                   fontWeight: FontWeight.bold,

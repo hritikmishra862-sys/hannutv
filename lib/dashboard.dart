@@ -15,21 +15,6 @@ const Map<String, String> kApiHeaders = {
 
 List<Map> continueWatchingList = [];
 
-// ADMIN CLOUD UPLOADS
-List<Map> customUploadedMovies = [
-  {
-    'id': 9999991,
-    'title': "User Requested Movie",
-    'overview': "Yeh movie admin ne cloud server se upload ki hai.",
-    'posterUrl': "https://via.placeholder.com/300x450/red/white?text=Custom+Upload",
-    'backdropUrl': "https://via.placeholder.com/600x400/red/white?text=Custom+Upload",
-    'rating': "10.0",
-    'year': "2024",
-    'mediaType': "movie",
-    'customUrl': "https://nxsha.screenscape.me/embed?tmdb=10195&type=movie"
-  }
-];
-
 class DashboardPage extends StatefulWidget {
   const DashboardPage({Key? key}) : super(key: key);
   @override
@@ -37,7 +22,8 @@ class DashboardPage extends StatefulWidget {
 }
 
 class DashboardPageState extends State<DashboardPage> {
-  List netmirrorHubList = []; // 🌟 HANNUTV NETMIRROR HOMEPAGE CATALOG
+  // 🌟 NETMIRROR LIVE DATA FEED
+  List netmirrorLiveFeed = [];
   List trendingList = [];
   List actionList = [];
   List comedyList = [];
@@ -47,6 +33,7 @@ class DashboardPageState extends State<DashboardPage> {
 
   bool isLoading = true;
   bool isSearching = false;
+  bool isNetMirrorSearchActive = false; // Dual Search Engine
   final TextEditingController searchController = TextEditingController();
 
   Timer? _debounce;
@@ -54,9 +41,9 @@ class DashboardPageState extends State<DashboardPage> {
   Timer? _carouselTimer;
   int _currentPage = 0;
 
-  // OTT Watch Provider Buttons (HANNUTV VIP is default #1)
+  // OTT Watch Provider Channels
   final List<Map<String, dynamic>> ottPlatforms = [
-    {"name": "🔥 HANNUTV VIP", "color": Colors.red, "providerId": "hannutv"},
+    {"name": "🔥 HANNUTV LIVE", "color": Colors.red, "providerId": "hannutv"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
     {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
     {"name": "HOTSTAR", "color": Colors.green, "providerId": "122"},
@@ -121,6 +108,7 @@ class DashboardPageState extends State<DashboardPage> {
         .toList();
   }
 
+  // 🚀 LIVE NETMIRROR + TMDB SYNC LOADER
   Future<void> loadAllDashboards({String? providerId}) async {
     setState(() => isLoading = true);
     try {
@@ -135,8 +123,9 @@ class DashboardPageState extends State<DashboardPage> {
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
+        // NetMirror Live Trending Catalog Feed
         http.get(
-          Uri.parse('$base/trending/all/week?language=en-US'), // HANNUTV NETMIRROR CATALOG
+          Uri.parse('$base/trending/all/week?language=en-US'),
           headers: kApiHeaders,
         ),
         http.get(
@@ -164,7 +153,7 @@ class DashboardPageState extends State<DashboardPage> {
       setState(() {
         trendingList = parseData(responses[0],
             forceMediaType: (providerId != null && providerId != 'hannutv') ? 'tv' : null);
-        netmirrorHubList = parseData(responses[1]);
+        netmirrorLiveFeed = parseData(responses[1]);
         actionList = parseData(responses[2], forceMediaType: 'movie');
         comedyList = parseData(responses[3], forceMediaType: 'tv');
         horrorList = parseData(responses[4], forceMediaType: 'movie');
@@ -176,6 +165,7 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  // 🔍 2 SEARCH MODES (STANDARD & DIRECT NETMIRROR)
   void onSearchChanged(String value) {
     if (value.isEmpty) {
       setState(() {
@@ -206,24 +196,6 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   void openMediaDetails(Map media) {
-    if (media.containsKey('customUrl')) {
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (context) => VideoPlayerPage(
-            tmdbId: 0,
-            mediaType: 'movie',
-            season: 1,
-            episode: 1,
-            movieTitle: media['title'],
-            customUrl: media['customUrl'],
-            preferredServer: 'netmirror',
-          ),
-        ),
-      );
-      return;
-    }
-
     Navigator.push(
       context,
       MaterialPageRoute(
@@ -368,26 +340,39 @@ class DashboardPageState extends State<DashboardPage> {
                       children: [
                         isSearching
                             ? Expanded(
-                                child: TextField(
-                                  controller: searchController,
-                                  style: const TextStyle(color: Colors.white),
-                                  autofocus: true,
-                                  decoration: InputDecoration(
-                                    hintText: 'Search...',
-                                    border: InputBorder.none,
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(Icons.close,
-                                          color: Colors.white),
-                                      onPressed: () {
-                                        setState(() {
-                                          isSearching = false;
-                                          searchController.clear();
-                                          searchResults.clear();
-                                        });
-                                      },
-                                    ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  decoration: BoxDecoration(
+                                    color: Colors.black87,
+                                    borderRadius: BorderRadius.circular(25),
+                                    border: Border.all(color: Colors.redAccent),
                                   ),
-                                  onChanged: onSearchChanged,
+                                  child: TextField(
+                                    controller: searchController,
+                                    style: const TextStyle(color: Colors.white),
+                                    autofocus: true,
+                                    decoration: InputDecoration(
+                                      hintText: isNetMirrorSearchActive
+                                          ? '🔥 HANNUTV Live Search...'
+                                          : 'Search Movies & Shows...',
+                                      border: InputBorder.none,
+                                      prefixIcon: Icon(
+                                        isNetMirrorSearchActive ? Icons.flash_on : Icons.search,
+                                        color: Colors.redAccent,
+                                      ),
+                                      suffixIcon: IconButton(
+                                        icon: const Icon(Icons.close, color: Colors.white),
+                                        onPressed: () {
+                                          setState(() {
+                                            isSearching = false;
+                                            searchController.clear();
+                                            searchResults.clear();
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    onChanged: onSearchChanged,
+                                  ),
                                 ),
                               )
                             : Expanded(
@@ -407,13 +392,29 @@ class DashboardPageState extends State<DashboardPage> {
                                   ),
                                 ),
                               ),
-                        if (!isSearching)
+                        if (!isSearching) ...[
+                          // 🔍 BUTTON 1: HANNUTV NETMIRROR LIVE SEARCH
                           IconButton(
-                            icon: const Icon(Icons.search,
-                                color: Colors.white, size: 28),
-                            onPressed: () =>
-                                setState(() => isSearching = true),
+                            icon: const Icon(Icons.flash_on, color: Colors.redAccent, size: 28),
+                            tooltip: "HANNUTV Live Search",
+                            onPressed: () {
+                              setState(() {
+                                isSearching = true;
+                                isNetMirrorSearchActive = true;
+                              });
+                            },
                           ),
+                          // 🔍 BUTTON 2: GLOBAL SEARCH
+                          IconButton(
+                            icon: const Icon(Icons.search, color: Colors.white, size: 28),
+                            onPressed: () {
+                              setState(() {
+                                isSearching = true;
+                                isNetMirrorSearchActive = false;
+                              });
+                            },
+                          ),
+                        ],
                       ],
                     ),
                   ),
@@ -559,12 +560,10 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 HANNUTV VIP (NetMirror)', netmirrorHubList),
+              _buildHorizontalList('🔥 HANNUTV Live (NetMirror Feed)', netmirrorLiveFeed),
               _buildHorizontalList('Trending Now', trendingList),
               if (continueWatchingList.isNotEmpty)
                 _buildHorizontalList('Continue Watching', continueWatchingList),
-              if (customUploadedMovies.isNotEmpty)
-                _buildHorizontalList('User Requests', customUploadedMovies),
               _buildHorizontalList('Action Movies', actionList),
               _buildHorizontalList('Comedy Shows', comedyList),
               _buildHorizontalList('Horror Movies', horrorList),
@@ -578,7 +577,7 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// ── DETAILS SCREEN WITH PLATFORM SELECTOR ───────────
+// ── DETAILS SCREEN WITH AUTO NETMIRROR DIRECT PLAY ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -676,78 +675,8 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // 🚀 DIRECT PLAY OR PLATFORM CHOOSER POPUP
-  void showPlatformChooser(String title, {int? season, int? episode}) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (context) {
-        return Container(
-          padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text(
-                "Select Streaming Platform",
-                style: TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              const SizedBox(height: 16),
-              ListTile(
-                leading: const Icon(Icons.flash_on, color: Colors.red, size: 28),
-                title: const Text(
-                  "HANNUTV VIP (NetMirror Direct)",
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                subtitle: const Text("Ultra Fast Hindi & Dual Audio",
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
-                trailing: const Icon(Icons.play_circle_filled, color: Colors.red),
-                onTap: () {
-                  Navigator.pop(context);
-                  launchPlayer(title, server: 'netmirror', season: season, episode: episode);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.bolt, color: Colors.orange, size: 28),
-                title: const Text(
-                  "VidBolt VIP Node",
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                subtitle: const Text("Direct Multi-Audio",
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(context);
-                  launchPlayer(title, server: 'vidbolt', season: season, episode: episode);
-                },
-              ),
-              ListTile(
-                leading: const Icon(Icons.hd, color: Colors.blue, size: 28),
-                title: const Text(
-                  "Olly / Vega Fast Stream",
-                  style: TextStyle(fontWeight: FontWeight.bold, color: Colors.white),
-                ),
-                subtitle: const Text("4K / 1080p Alternate Stream",
-                    style: TextStyle(color: Colors.grey, fontSize: 12)),
-                onTap: () {
-                  Navigator.pop(context);
-                  launchPlayer(title, server: 'olly', season: season, episode: episode);
-                },
-              ),
-            ],
-          ),
-        );
-      },
-    );
-  }
-
-  void launchPlayer(String title,
-      {String server = 'netmirror', int? season, int? episode}) {
+  // 🚀 DIRECT PLAY VIA NETMIRROR ULTRA LIVE
+  void launchPlayer(String title, {int? season, int? episode}) {
     continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
     final type = widget.mediaItem['mediaType'] ?? 'movie';
@@ -768,7 +697,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           season: season ?? 1,
           episode: episode ?? 1,
           movieTitle: title,
-          preferredServer: server,
+          preferredServer: 'netmirror_live',
         ),
       ),
     );
@@ -882,12 +811,12 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                     padding: const EdgeInsets.symmetric(
                                         vertical: 14),
                                   ),
-                                  onPressed: () => showPlatformChooser(
+                                  onPressed: () => launchPlayer(
                                       details?['title'] ?? 'Movie'),
                                   icon: const Icon(Icons.play_arrow,
                                       color: Colors.white),
                                   label: const Text(
-                                    'Play Movie',
+                                    'Play Movie (HD)',
                                     style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,
@@ -1010,7 +939,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                             Icons.play_circle_fill,
                                             color: Colors.white,
                                             size: 32),
-                                        onPressed: () => showPlatformChooser(
+                                        onPressed: () => launchPlayer(
                                           'S${selectedSeason}E${ep['episodeNumber']} - ${ep['name']}',
                                           season: selectedSeason,
                                           episode: ep['episodeNumber'],
