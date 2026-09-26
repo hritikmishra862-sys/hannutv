@@ -36,15 +36,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   
   bool showServerSelectionUI = true;
 
-  // PROVIDER MANAGER ARCHITECTURE (Hardcoded from Zip Files logic)
+  // PROVIDER MANAGER
   int activeServerIndex = 0;
   bool isAutoSwitching = false; 
 
   final List<Map<String, dynamic>> servers = [
     {'name': 'Olly VIP (Fastest)', 'color': Colors.redAccent, 'type': 'olly'},
     {'name': 'Nyumatflix (Local)', 'color': Colors.blue, 'type': 'nyumat'},
-    {'name': 'Vega-Next (HubCloud)', 'color': Colors.purple, 'type': 'vega'}, // From Vega-Next.zip
-    {'name': 'Flixorent (Debrid)', 'color': Colors.teal, 'type': 'flixorent'}, // From Flixorent.zip
+    {'name': 'Vega-Next (HubCloud)', 'color': Colors.purple, 'type': 'vega'}, 
+    {'name': 'Flixorent (Debrid)', 'color': Colors.teal, 'type': 'flixorent'}, 
     {'name': 'VidBolt VIP (Hindi)', 'color': Colors.orange, 'type': 'vidbolt'},
     {'name': 'VidLink (Multi)', 'color': Colors.green, 'type': 'vidlink'},
   ];
@@ -75,7 +75,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     if (isAutoSwitching) return; 
     setState(() { isAutoSwitching = true; });
 
-    // Instantly switch to next server in 0.1 seconds
+    // Instantly switch to next server in 100 milliseconds
     Future.delayed(const Duration(milliseconds: 100), () {
       if (mounted) {
         int nextServer = (activeServerIndex + 1) % servers.length;
@@ -93,18 +93,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // Hardcoded Server Routing
     if (srv == 'olly') return isTv ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1' : 'https://ollyembed.pages.dev/movie/$id?server=1';
     if (srv == 'nyumat') return isTv ? 'https://stellar.rip/en/watch/embed/tv/$id-$s-$e?theme=E50914&title=true&poster=true&autoPlay=true' : 'https://stellar.rip/en/watch/embed/movie/$id?theme=E50914&title=true&poster=true&autoPlay=true';
     if (srv == 'vega') return isTv ? 'https://vidsrc.to/embed/tv/$id/$s/$e' : 'https://vidsrc.to/embed/movie/$id';
     if (srv == 'flixorent') return isTv ? 'https://vidsrc.pro/embed/tv/$id/$s/$e' : 'https://vidsrc.pro/embed/movie/$id';
     if (srv == 'vidbolt') return isTv ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi' : 'https://vidbolt.pro/movie/$id?theme=e50914&autoPlay=true&audio=hindi';
-    
     return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
   }
 
   void _initWebView() {
     final srvType = servers[activeServerIndex]['type'];
+    final currentHost = Uri.parse(_generateVideoUrl()).host; // Main server host
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -115,63 +114,89 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           if (message.message == 'playing' && mounted) {
             setState(() => isVideoPlaying = true);
           } else if (message.message == 'not_found' && mounted) {
-            _triggerAutoFallback(); // Triggered by 0.1s JS scanner
+            _triggerAutoFallback();
           }
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // STRICT AD-BLOCK & 0.1s ERROR DETECTOR
+            // THE ULTIMATE AD-KILLER & BLACK SCREEN FIXER
             String jsCode = '''
-              // 1. Block New Tabs Completely
+              // 1. Completely disable window.open to stop new tabs
               window.open = function() { return null; };
               
-              // 2. Aggressive Ad Overlay Destroyer (Runs every 0.5s)
+              // 2. Intercept all clicks to prevent hijack
+              document.addEventListener('click', function(e) {
+                var a = e.target.closest('a');
+                if (a && a.target === '_blank') { 
+                  e.preventDefault(); 
+                  e.stopPropagation();
+                }
+              }, true);
+
+              // 3. Black Screen Fix: Force Video Tag to Front & Destroy Ad Overlays
               setInterval(function() {
-                document.querySelectorAll('div, iframe').forEach(el => {
+                var vids = document.getElementsByTagName('video');
+                if (vids.length > 0) {
+                  // Make video absolute top priority
+                  vids[0].style.zIndex = '999999';
+                  vids[0].style.position = 'absolute';
+                  vids[0].style.top = '0';
+                  vids[0].style.left = '0';
+                  vids[0].style.width = '100%';
+                  vids[0].style.height = '100%';
+                  vids[0].style.display = 'block';
+                  vids[0].style.visibility = 'visible';
+                  vids[0].style.opacity = '1';
+                  
+                  // Auto trigger play message if moving
+                  if (vids[0].currentTime > 0.1) {
+                    VideoState.postMessage('playing');
+                  }
+                }
+                
+                // Destroy high z-index ad divs
+                document.querySelectorAll('div').forEach(el => {
                   let style = window.getComputedStyle(el);
-                  if (style.zIndex > 900 || el.className.includes('ad') || el.id.includes('ad') || el.className.includes('popup')) {
+                  if (style.zIndex > 100 && el.tagName !== 'VIDEO') {
                     el.remove();
                   }
                 });
               }, 500);
               
-              // 3. 0.1 Second Error Detector for Olly & Others
+              // 4. Ultra-Fast Error Detector
               setInterval(function() {
                 var text = document.body.innerText.toLowerCase();
-                if (text.includes("video not found") || text.includes("404") || text.includes("server error")) {
+                if (text.includes("video not found") || text.includes("404") || text.includes("server error") || text.includes("reload")) {
                     VideoState.postMessage('not_found');
                 }
               }, 100);
-
-              // 4. Autoplay Trigger
-              setInterval(function() {
-                var vids = document.getElementsByTagName('video');
-                if (vids.length > 0) {
-                  vids[0].preload = 'auto'; 
-                  if (vids[0].currentTime > 0.1) {
-                    VideoState.postMessage('playing');
-                  }
-                }
-              }, 500);
             ''';
 
             _controller.runJavaScript(jsCode);
           },
-          // 0% ADS: FLUTTER NETWORK BLOCKER
+          
+          // STRICT FLUTTER LEVEL NETWORK BLOCKER
+          // Agar player redirect hokar kisi ghatiya ad site par ja raha hai, usko block kar dega
           onNavigationRequest: (NavigationRequest request) {
              final url = request.url.toLowerCase();
-             if (url.contains('casino') || url.contains('bet') || url.contains('pop') || url.contains('ads') || url.contains('track') || url.contains('porn') || url.contains('xxx')) {
-               return NavigationDecision.prevent; 
+             
+             // Agar main video URL se bahar ja raha hai aur usme ad/bet keywords hain -> BLOCK
+             if (!url.contains(currentHost) && !url.contains('hannutv.app')) {
+                 if (url.contains('casino') || url.contains('bet') || url.contains('pop') || 
+                     url.contains('ads') || url.contains('track') || url.contains('porn') || 
+                     url.contains('xxx') || url.contains('redirect')) {
+                   return NavigationDecision.prevent; 
+                 }
              }
              return NavigationDecision.navigate;
           },
         ),
       );
 
-    // IFRAME INJECTION FOR OLLY AND VIDBOLT
-    if (srvType == 'olly' || srvType == 'vidbolt') {
+    // IFRAME WRAPPER FOR EMBED SITES
+    if (srvType == 'olly' || srvType == 'vidbolt' || srvType == 'vega' || srvType == 'flixorent') {
        final String htmlContent = '''
         <!DOCTYPE html>
         <html lang="en">
@@ -180,7 +205,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             <style>body, html { margin: 0; padding: 0; width: 100%; height: 100%; background-color: #000; overflow: hidden; } iframe { width: 100%; height: 100%; border: none; }</style>
         </head>
         <body>
-            <iframe id="video-player" src="${_generateVideoUrl()}" width="100%" height="100%" frameborder="0" allowfullscreen="true"></iframe>
+            <iframe id="video-player" src="${_generateVideoUrl()}" width="100%" height="100%" frameborder="0" allowfullscreen="true" sandbox="allow-scripts allow-same-origin allow-presentation"></iframe>
             <script>
                 window.open = function() { return null; };
                 setInterval(function() {
@@ -205,7 +230,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // 10 Sec Timeout Fallback (If screen goes black/doesn't load)
+    // 10 Sec absolute fallback
     Future.delayed(const Duration(seconds: 10), () {
       if (mounted && !showServerSelectionUI && !isVideoPlaying) {
          _triggerAutoFallback();
@@ -213,26 +238,29 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
   }
 
-  // --- MANUAL AD BYPASS & FORCE PLAY ---
+  // --- MANUAL AD KILLER & FORCE PLAY ---
   void _forcePlayAndBypassAds() {
     _controller.runJavaScript('''
-      // 1. Destroy everything that is an absolute or fixed overlay (Ad Catchers)
-      document.querySelectorAll('*').forEach(el => {
+      // Nuke everything except the video tag
+      document.querySelectorAll('div, a, span, img').forEach(el => {
         let style = window.getComputedStyle(el);
         if(style.position === 'absolute' || style.position === 'fixed') {
-          if(style.zIndex > 10) { el.remove(); }
+           el.remove();
         }
       });
-      // 2. Play video directly
+      // Force Play
       var vids = document.getElementsByTagName('video');
-      if (vids.length > 0) { vids[0].play(); }
-      
+      if (vids.length > 0) { 
+        vids[0].play(); 
+        vids[0].style.zIndex = '999999';
+        vids[0].style.display = 'block';
+      }
       var iframes = document.getElementsByTagName('iframe');
       if (iframes.length > 0) {
         iframes[0].contentWindow.postMessage('{"event":"command","func":"playVideo","args":""}', '*');
       }
     ''');
-    setState(() { isVideoPlaying = true; }); // Assume it played to clear loading screen
+    setState(() { isVideoPlaying = true; }); 
   }
 
   void _startHideTimer() {
@@ -289,8 +317,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       var vids = document.getElementsByTagName('video');
       if (vids.length > 0) {
         vids[0].style.objectFit = '${isCropped ? "cover" : "contain"}';
-        vids[0].style.width = '100%';
-        vids[0].style.height = '100%';
       }
     ''');
     _startHideTimer();
@@ -343,7 +369,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     ),
                   ),
 
-                // 3. HANNUTV LOADING SCREEN WITH SERVER INFO
+                // 3. HANNUTV LOADING SCREEN
                 if (!isVideoPlaying)
                   Container(
                     color: Colors.black,
@@ -357,6 +383,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         const CircularProgressIndicator(color: Colors.red),
                         const SizedBox(height: 15),
                         Text("Connecting to ${servers[activeServerIndex]['name']}...", style: const TextStyle(color: Colors.white70, fontSize: 14)),
+                        const SizedBox(height: 30),
+                        // FORCE PLAY BUTTON ON LOADING SCREEN
+                        ElevatedButton.icon(
+                          onPressed: _forcePlayAndBypassAds,
+                          icon: const Icon(Icons.play_arrow),
+                          label: const Text("Force Play"),
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, foregroundColor: Colors.white),
+                        ),
                       ],
                     ),
                   ),
@@ -374,27 +408,27 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     ),
                   ),
 
-                // 5. TOP RIGHT: BYPASS ADS / FORCE PLAY BUTTON
+                // 5. PERMANENT FLOATING "AD KILLER" BUTTON (Visible when controls show)
                 if (showControls)
                   Positioned(
                     top: 20,
-                    right: isVideoPlaying ? 80 : 20, // Adjust position based on watermark
+                    right: isVideoPlaying ? 80 : 20, 
                     child: SafeArea(
                       child: ElevatedButton.icon(
                         onPressed: _forcePlayAndBypassAds,
-                        icon: const Icon(Icons.bolt, color: Colors.yellowAccent, size: 18),
-                        label: const Text("Bypass Ads & Play"),
+                        icon: const Icon(Icons.block, color: Colors.white, size: 16),
+                        label: const Text("Kill Ad & Play"),
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.red.withOpacity(0.8),
                           foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 0),
                         ),
                       ),
                     ),
                   ),
 
                 // 6. BOTTOM RIGHT: SERVER & CROP BUTTONS
-                if (showControls)
+                if (isVideoPlaying && showControls)
                   Positioned(
                     bottom: 20,
                     right: 20,
