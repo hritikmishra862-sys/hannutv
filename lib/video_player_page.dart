@@ -40,48 +40,55 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   int activeServerIndex = 0;
   bool isAutoSwitching = false;
 
-  // 🤖 AI SCANNER SERVERS LIST
+  // 🤖 VIP SERVERS LIST (NETMIRROR & HANNUTV NODES)
   final List<Map<String, dynamic>> allServers = [
     {
-      'name': 'VidBolt VIP',
-      'sub': 'Hindi Dub + Multi',
+      'name': 'HANNUTV Ultra (VIP)',
+      'sub': 'Fast Hindi Dub + 4K',
+      'color': Colors.redAccent,
+      'type': 'netmirror',
+      'lang': 'hindi',
+    },
+    {
+      'name': 'VidBolt VIP Direct',
+      'sub': 'Hindi Dual Audio',
       'color': Colors.orange,
       'type': 'vidbolt',
       'lang': 'hindi',
     },
     {
-      'name': 'Olly Ultra',
-      'sub': 'Fastest HLS',
-      'color': Colors.redAccent,
+      'name': 'Olly Stream Node',
+      'sub': 'Zero Buffering HLS',
+      'color': Colors.pinkAccent,
       'type': 'olly',
       'lang': 'hindi',
     },
     {
-      'name': 'Vega Node',
-      'sub': 'Dual Audio 4K',
+      'name': 'Vega Node 4K',
+      'sub': 'Hindi Multi-Node',
       'color': Colors.purple,
       'type': 'vega',
       'lang': 'hindi',
     },
     {
-      'name': 'Flixorent',
-      'sub': 'Original + Subs',
+      'name': 'HANNUTV Original',
+      'sub': 'English Multi-Audio',
+      'color': Colors.blue,
+      'type': 'netmirror',
+      'lang': 'english',
+    },
+    {
+      'name': 'Flixorent Pro',
+      'sub': 'English + Subtitles',
       'color': Colors.teal,
       'type': 'flixorent',
       'lang': 'english',
     },
     {
-      'name': 'VidLink Pro',
-      'sub': 'English HD',
+      'name': 'VidLink HD',
+      'sub': 'English 1080p',
       'color': Colors.green,
       'type': 'vidlink',
-      'lang': 'english',
-    },
-    {
-      'name': 'Nyumatflix',
-      'sub': 'English Multi',
-      'color': Colors.blue,
-      'type': 'nyumat',
       'lang': 'english',
     },
   ];
@@ -120,11 +127,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   }
 
   void _triggerAutoFallback() {
-    if (isAutoSwitching || !mounted) return;
+    // If video is already playing, NEVER fallback
+    if (isVideoPlaying || isAutoSwitching || !mounted) return;
+
     setState(() => isAutoSwitching = true);
 
-    Future.delayed(const Duration(milliseconds: 1500), () {
-      if (mounted) {
+    Future.delayed(const Duration(milliseconds: 2000), () {
+      if (mounted && !isVideoPlaying) {
         final list = currentServers;
         int next = (activeServerIndex + 1) % list.length;
         _startServer(next);
@@ -140,12 +149,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final list = currentServers;
     final srv = (activeServerIndex < list.length)
         ? list[activeServerIndex]['type']
-        : 'vidbolt';
+        : 'netmirror';
     final id = widget.tmdbId;
     final s = widget.season;
     final e = widget.episode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
+    if (srv == 'netmirror') {
+      return isTv
+          ? 'https://netmirror.center/embed/tv?id=$id&s=$s&e=$e'
+          : 'https://netmirror.center/embed/movie?id=$id';
+    }
     if (srv == 'vidbolt') {
       return isTv
           ? 'https://vidbolt.pro/tv/$id/$s/$e?theme=e50914&autoPlay=true&audio=hindi'
@@ -191,18 +205,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         onMessageReceived: (JavaScriptMessage message) {
           if (message.message == 'playing' && mounted) {
             _fallbackTimer?.cancel();
-            setState(() => isVideoPlaying = true);
+            setState(() {
+              isVideoPlaying = true;
+              isAutoSwitching = false;
+            });
           } else if (message.message == 'not_found' && mounted) {
-            _triggerAutoFallback();
+            if (!isVideoPlaying) {
+              _triggerAutoFallback();
+            }
           }
         },
       )
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageFinished: (String url) {
-            // 🛡️ AI AD-KILLER + AUTO-PLAYER INJECTION
+            // 🛡️ ANTI-IFRAME-BLOCK + ANTI-ADBLOCK BYPASS + AUTO PLAY
             String jsCode = '''
-              // 1. Force Dark & Prevent White/Grey Flash
+              // 1. Force Pure Dark Canvas
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
@@ -211,9 +230,32 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               window.alert = function() { return null; };
               window.confirm = function() { return null; };
 
-              // 3. AI Loop: Click triggers, detect play state & nuke overlays
+              // 3. Bypass Anti-AdBlock & Nuke VidBolt Warnings
               setInterval(function() {
-                // Auto trigger video play
+                // Kill AdBlock & iframe restriction warnings
+                document.querySelectorAll('div, section, modal, aside, p, h2').forEach(el => {
+                  let text = el.innerText.toLowerCase();
+                  if (text.includes('adblock') || 
+                      text.includes('ad-blocker') || 
+                      text.includes('disable adblock') || 
+                      text.includes('please disable') ||
+                      text.includes('built to run inside an iframe') ||
+                      text.includes('inside an iframe') ||
+                      text.includes('extension')) {
+                    el.style.display = 'none';
+                    el.style.pointerEvents = 'none';
+                    el.remove();
+                  }
+                });
+
+                // Remove ad banners
+                document.querySelectorAll('iframe:not(#player-frame), .ad-banner, .popup-overlay').forEach(el => {
+                  el.remove();
+                });
+              }, 300);
+
+              // 4. Video State Detection & Auto Play
+              setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -225,27 +267,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     VideoState.postMessage('playing');
                   }
                 }
-
-                // Remove ad overlays
-                document.querySelectorAll('div, a, span, img').forEach(el => {
-                  let style = window.getComputedStyle(el);
-                  if ((style.position === 'fixed' || style.position === 'absolute') && 
-                      style.zIndex > 1000 && 
-                      el.tagName !== 'IFRAME' && 
-                      el.tagName !== 'VIDEO') {
-                    el.remove();
-                  }
-                });
               }, 400);
 
-              // 4. Server 404 Scanner
+              // 5. 404 Scanner (Only active if video has not started)
               setInterval(function() {
-                var text = document.body.innerText.toLowerCase();
-                if (text.includes("we couldn't find this content") || 
-                    text.includes("video not found") || 
-                    text.includes("media not available") || 
-                    text.includes("404 not found")) {
-                  VideoState.postMessage('not_found');
+                var vids = document.getElementsByTagName('video');
+                if (vids.length === 0 || vids[0].paused) {
+                  var text = document.body.innerText.toLowerCase();
+                  if (text.includes("we couldn't find this content") || 
+                      text.includes("video not found") || 
+                      text.includes("media not available") || 
+                      text.includes("404 not found")) {
+                    VideoState.postMessage('not_found');
+                  }
                 }
               }, 1000);
             ''';
@@ -254,7 +288,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // Block common ad redirects
+            // Block ad redirects
             if (url.contains('doubleclick') ||
                 url.contains('popads') ||
                 url.contains('1xbet') ||
@@ -267,8 +301,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               return NavigationDecision.prevent;
             }
 
-            // Allow safe streaming embeds
+            // Allow safe player URLs
             if (url.contains('hannutv.app') ||
+                url.contains('netmirror') ||
                 url.contains('vidbolt') ||
                 url.contains('ollyembed') ||
                 url.contains('pages.dev') ||
@@ -283,20 +318,40 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             return NavigationDecision.prevent;
           },
           onWebResourceError: (WebResourceError error) {
-            _triggerAutoFallback();
+            if (!isVideoPlaying) {
+              _triggerAutoFallback();
+            }
           },
         ),
       );
 
-    // Load direct URL with Referer & Sec-Fetch-Dest headers to prevent iframe block error
-    _controller.loadRequest(
-      Uri.parse(targetUrl),
-      headers: {
-        'Referer': 'https://hannutv.app/',
-        'Origin': 'https://hannutv.app',
-        'Sec-Fetch-Dest': 'iframe',
-        'Sec-Fetch-Mode': 'navigate',
-      },
+    // 🚀 ULTRA FIX FOR "VIDBOLT BUILT TO RUN INSIDE AN IFRAME"
+    // Using full container HTML embedding with top-level parent origin
+    final embedHtml = '''
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
+            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
+          </style>
+        </head>
+        <body>
+          <iframe 
+            id="player-frame"
+            src="$targetUrl" 
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
+            allowfullscreen>
+          </iframe>
+        </body>
+      </html>
+    ''';
+
+    _controller.loadHtmlString(
+      embedHtml,
+      baseUrl: 'https://hannutv.app',
     );
 
     if (_controller.platform is AndroidWebViewController) {
@@ -316,7 +371,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _startHideTimer();
     final js = '''
       (function() {
-        var vids = document.getElementsByTagName('video');
+        var frame = document.getElementById('player-frame');
+        var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
+        var vids = doc ? doc.getElementsByTagName('video') : document.getElementsByTagName('video');
         if (vids.length > 0) {
           vids[0].currentTime += $seconds;
         }
@@ -352,7 +409,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   const Text(
-                    "AI Provider Switcher",
+                    "HANNUTV Server Switcher",
                     style: TextStyle(
                       color: Colors.white,
                       fontSize: 18,
@@ -445,7 +502,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   void toggleCrop() {
     setState(() => isCropped = !isCropped);
     _controller.runJavaScript('''
-      var vids = document.getElementsByTagName('video');
+      var frame = document.getElementById('player-frame');
+      var doc = frame ? (frame.contentDocument || frame.contentWindow.document) : document;
+      var vids = doc ? doc.getElementsByTagName('video') : document.getElementsByTagName('video');
       if (vids.length > 0) {
         vids[0].style.objectFit = '${isCropped ? "cover" : "contain"}';
       }
@@ -467,7 +526,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final list = currentServers;
     final currentSrvName = (activeServerIndex < list.length)
         ? list[activeServerIndex]['name']
-        : 'VIP Server';
+        : 'HANNUTV VIP';
 
     return PopScope(
       canPop: false,
@@ -479,7 +538,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            // 1. PURE BLACK WEBVIEW (NO WHITE/GREY FLASH)
+            // 1. PURE BLACK WEBVIEW EMBED
             Positioned.fill(
               child: Container(
                 color: Colors.black,
@@ -512,7 +571,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
               ),
             ),
 
-            // 3. AI SCANNER & CONNECTING OVERLAY
+            // 3. AI SCANNER & CONNECTING BADGE
             if (isAiScanning || !isVideoPlaying)
               Positioned(
                 bottom: 40,
@@ -536,8 +595,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         const SizedBox(width: 10),
                         Text(
                           isAiScanning
-                              ? "AI Scanner: Matching Hindi Dub Node..."
-                              : "Connecting: $currentSrvName...",
+                              ? "Connecting HANNUTV AI Engine..."
+                              : "Buffering: $currentSrvName...",
                           style: const TextStyle(color: Colors.white, fontSize: 12),
                         ),
                       ],

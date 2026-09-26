@@ -1,5 +1,5 @@
 name: onyxtube
-description: HANNUTV Flutter Movie & Series Application
+description: HANNUTV Flutter Movie and Series Application
 publish_to: 'none'
 version: 1.0.0+1
 
@@ -11,8 +11,8 @@ dependencies:
     sdk: flutter
   url_launcher: ^6.3.0
   http: ^1.2.2
-  webview_flutter: ^4.7.0
-  webview_flutter_android: ^3.16.2  # <--- YEH NAYA ADD KIYA HAI AUDIO FIX KE LIYE
+  webview_flutter: ^4.10.0
+  webview_flutter_android: ^4.7.0
 
 dev_dependencies:
   flutter_test:

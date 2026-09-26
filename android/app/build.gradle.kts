@@ -17,7 +17,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.onyxtube"
-        minSdk = 21 // Video player ke liye mandatory
+        minSdk = flutter.minSdkVersion // Video player ke liye mandatory
         targetSdk = 34 // Android 12+ crash bypass ke liye isko 34 hi rakhna hai
         versionCode = flutter.versionCode
         versionName = flutter.versionName
