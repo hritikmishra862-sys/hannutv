@@ -11,7 +11,10 @@ class VideoPlayerPage extends StatefulWidget {
   final int episode;
   final String movieTitle;
   final String? customUrl;
-  final String preferredServer;
+  final String overview;
+  final String rating;
+  final String year;
+  final List seasons;
 
   const VideoPlayerPage({
     Key? key,
@@ -21,7 +24,10 @@ class VideoPlayerPage extends StatefulWidget {
     required this.episode,
     required this.movieTitle,
     this.customUrl,
-    this.preferredServer = 'netmirror_vip',
+    this.overview = '',
+    this.rating = '9.0',
+    this.year = '2024',
+    this.seasons = const [],
   }) : super(key: key);
 
   @override
@@ -32,139 +38,46 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late WebViewController _controller;
 
   bool isVideoPlaying = false;
-  bool isCropped = false;
-  bool showControls = true;
-  Timer? _hideTimer;
+  bool isFullScreen = false;
   bool isPageLoading = true;
-  late String currentServerKey;
+  String activeServer = 'vidrift'; // Default to Rift
+  late int currentSeason;
+  late int currentEpisode;
 
-  // 👑 VIP HARDCODED SERVERS (100% BUG FREE)
-  final List<Map<String, dynamic>> allServers = [
-    {
-      'key': 'netmirror_vip',
-      'name': 'HANNUTV VIP (NetMirror)',
-      'sub': 'Official Direct URL (No White Screen / 404)',
-      'color': Colors.redAccent,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'vidbolt',
-      'name': 'VidBolt VIP Ultra HD',
-      'sub': '1080p Hindi Dub + High Bitrate',
-      'color': Colors.orangeAccent,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'olly',
-      'name': 'Olly Embed VIP',
-      'sub': 'Fast HLS Hindi Stream',
-      'color': Colors.purpleAccent,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'vega',
-      'name': 'Vega Multi-Audio 4K',
-      'sub': 'Dual Audio Hindi/Eng Cloud',
-      'color': Colors.teal,
-      'lang': 'hindi',
-    },
-    {
-      'key': 'flixorent',
-      'name': 'Flixorent HD',
-      'sub': 'English Subtitles 1080p',
-      'color': Colors.blueAccent,
-      'lang': 'english',
-    }
+  // 🤖 PANTYFLIX VERIFIED SERVERS
+  final List<Map<String, String>> pantyflixServers = [
+    {'key': 'vidrift', 'name': 'Rift'},
+    {'key': 'spiral', 'name': 'Spiral'},
+    {'key': 'hydra', 'name': 'Hydra'},
+    {'key': 'vidbolt', 'name': 'VidBolt VIP'},
   ];
-
-  String selectedLanguage = 'hindi';
-
-  List<Map<String, dynamic>> get currentServers =>
-      allServers.where((s) => s['lang'] == selectedLanguage).toList();
 
   @override
   void initState() {
     super.initState();
-    currentServerKey = widget.preferredServer;
+    currentSeason = widget.season;
+    currentEpisode = widget.episode;
 
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Portrait Mode by Default (Like YouTube UI)
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-    _initSecurePlayer();
-    _startHideTimer();
+    _initPantyFlixStream();
   }
 
-  void _switchServer(String newServerKey) {
+  void _initPantyFlixStream() {
     setState(() {
-      currentServerKey = newServerKey;
       isPageLoading = true;
       isVideoPlaying = false;
     });
-    _initSecurePlayer();
-    _startHideTimer();
-  }
 
-  // 🚀 10000000000% ACCURATE URL GENERATOR (Deep Hardcoding)
-  String _generateServerUrl() {
-    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
-      return widget.customUrl!;
-    }
-
-    final id = widget.tmdbId;
-    final s = widget.season;
-    final e = widget.episode;
-    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
-
-    // ⚡ NETMIRROR DIRECT HASH URL (Exactly as you requested: https://net27.cc/#w=...)
-    if (currentServerKey == 'netmirror_vip' || currentServerKey.contains('netmirror')) {
-      return isTv
-          ? 'https://net27.cc/#w=$id-tv-$s-$e'
-          : 'https://net27.cc/#w=$id-movie';
-    }
-
-    // ⚡ VIDBOLT (Forced Hindi 1080p)
-    if (currentServerKey == 'vidbolt') {
-      return isTv
-          ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
-          : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
-    }
-
-    // ⚡ OLLY
-    if (currentServerKey == 'olly') {
-      return isTv
-          ? 'https://ollyembed.pages.dev/tv/$id/$s/$e?server=1'
-          : 'https://ollyembed.pages.dev/movie/$id?server=1';
-    }
-
-    // ⚡ VEGA
-    if (currentServerKey == 'vega') {
-      return isTv
-          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.to/embed/movie/$id';
-    }
-
-    // ⚡ FLIXORENT
-    return isTv
-        ? 'https://vidsrc.pro/embed/tv/$id/$s/$e'
-        : 'https://vidsrc.pro/embed/movie/$id';
-  }
-
-  // 🛡️ THE ULTIMATE AI BYPASS ENGINE
-  void _initSecurePlayer() {
-    final targetUrl = _generateServerUrl();
-    
-    // NetMirror SPA needs direct loading to avoid White Screen/404.
-    // VidBolt & Olly strict security needs Iframe wrapper.
-    bool loadAsIframe = currentServerKey == 'vidbolt' || currentServerKey == 'olly' || currentServerKey == 'vega';
+    final targetUrl = _buildPantyflixUrl();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
       )
       ..addJavaScriptChannel(
         'VideoState',
@@ -179,336 +92,516 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       )
       ..setNavigationDelegate(
         NavigationDelegate(
-          onPageStarted: (String url) {
-            if (mounted) setState(() => isPageLoading = true);
-          },
           onPageFinished: (String url) {
-            if (mounted) setState(() => isPageLoading = false);
-
-            // 🔥 AI AUTO-CLICKER & AD-NUKER (Protects Dual Audio Controls)
+            // 🛡️ WORLD'S BEST PANTYFLIX AD-KILLER & BRANDING NUKER
             String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
-              // Hide annoying UI elements globally (Telegram, Banner Ads)
-              var style = document.createElement('style');
-              style.innerHTML = `
-                header, footer, nav, aside, .sidebar, .logo, .ad-container, iframe[src*="ads"], 
-                [class*="telegram"], [id*="telegram"], a[href*="t.me"], .connecto-ad, .popup-container { display: none !important; }
-                body, html { overflow: hidden !important; background: black !important; }
-              `;
-              document.head.appendChild(style);
+              window.open = function() { return null; };
+              window.alert = function() { return null; };
+              window.confirm = function() { return null; };
 
-              // 🤖 AI Background Engine (Runs every 1.5 seconds)
               setInterval(function() {
-                // 1. Auto click "Server 1" for NetMirror automatically
-                let buttons = document.querySelectorAll('button, div.server, .btn, .server-item, li');
-                buttons.forEach(btn => {
-                   let text = btn.innerText.toLowerCase();
-                   if ((text.includes('server 1') || text.includes('play')) && !window._autoClickedS1) {
-                      btn.click();
-                      window._autoClickedS1 = true;
-                   }
-                });
-
-                // 2. Kill Popups but IGNORE Player Controls (Allows Dual Audio ⚙️)
-                document.querySelectorAll('div, a, span, img, iframe').forEach(el => {
-                  let style = window.getComputedStyle(el);
-                  let cls = el.className ? el.className.toString().toLowerCase() : '';
-                  let txt = el.innerText ? el.innerText.toLowerCase() : '';
-
-                  // Kill Telegram overlays
-                  if(txt.includes('telegram') || txt.includes('join our') || txt.includes('bet365')) {
-                      el.style.display = 'none';
-                      return;
-                  }
-
-                  // Destroy absolute overlays that block clicks
-                  if ((style.position === 'fixed' || style.position === 'absolute') && 
-                      style.zIndex > 500 && 
-                      el.tagName !== 'IFRAME' && 
-                      el.tagName !== 'VIDEO') {
-                    
-                    // 🛡️ DUAL AUDIO PROTECTOR: DO NOT Remove JWPlayer / VideoJS menus
-                    if (cls.includes('jw-') || cls.includes('vjs') || cls.includes('plyr') || 
-                        cls.includes('control') || cls.includes('setting') || cls.includes('menu') ||
-                        cls.includes('audio') || cls.includes('quality')) {
-                        return; // Save player's own UI
-                    }
-                    el.style.display = 'none';
-                  }
-                });
-
-                // 3. Auto Play Video
+                // A. Video Auto Play & Unmute
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
                   v.style.backgroundColor = '#000000';
-                  if (v.paused) {
+                  v.muted = false;
+                  v.volume = 1.0;
+                  if (v.paused && !v.ended) {
                     v.play().catch(function(){});
                   }
-                  if (v.currentTime > 0 && !v.paused) {
+                  if (v.currentTime > 0.5 && !v.paused) {
                     VideoState.postMessage('playing');
                   }
                 }
-              }, 1500);
+
+                // B. Auto click play triggers
+                var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .jw-display-icon-container, [aria-label="Play"], button[title*="Play"], .play-icon');
+                playBtns.forEach(function(b) { b.click(); });
+
+                // C. Kill Pantyflix Telegram, Footer, DMCA, support emails & Ads
+                document.querySelectorAll('div, a, span, img, section, modal, aside, p, h2, header, footer, nav').forEach(el => {
+                  let text = el.innerText ? el.innerText.toLowerCase() : '';
+                  let href = el.href ? el.href.toLowerCase() : '';
+                  let className = el.className ? el.className.toString().toLowerCase() : '';
+                  let style = window.getComputedStyle(el);
+
+                  // Remove Telegram & DMCA / Contact
+                  if (text.includes('telegram') || text.includes('dmca') || text.includes('support@pantyflix') || href.includes('t.me') || text.includes('contact us')) {
+                    el.remove();
+                  }
+
+                  // Remove Navbar/Header
+                  if (el.tagName === 'HEADER' || el.tagName === 'NAV' || className.includes('header') || className.includes('navbar')) {
+                    el.style.display = 'none';
+                  }
+
+                  // Remove Floating Ad Overlays
+                  if ((style.position === 'fixed' || style.position === 'absolute') && 
+                      style.zIndex > 1000 && 
+                      el.tagName !== 'IFRAME' && 
+                      el.tagName !== 'VIDEO' &&
+                      !el.contains(document.querySelector('video'))) {
+                    el.remove();
+                  }
+
+                  // Banners
+                  if (className.includes('banner') || className.includes('ad-') || className.includes('popup')) {
+                    el.remove();
+                  }
+                });
+              }, 200);
             ''';
             _controller.runJavaScript(jsCode);
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
-            
-            // 🚫 FIXED RECONNECT BUG: DO NOT BLOCK VIDEO STREAMS OR CAPTCHAS
-            if (url.contains('.m3u8') || url.contains('.mp4') || url.contains('hakunaymatata') || 
-                url.contains('videodelivery') || url.contains('recaptcha')) {
-                return NavigationDecision.navigate;
-            }
 
-            // 🚫 HARD BLOCK AD NETWORKS & TELEGRAM REDIRECTS
-            if (url.contains('doubleclick') || url.contains('popads') || 
-                url.contains('onclick') || url.contains('adsterra') || 
-                url.contains('bet365') || url.contains('monetag') ||
-                url.contains('market://') || url.contains('intent://') || 
-                url.contains('t.me') || url.contains('telegram') ||
-                url.contains('opera') || url.contains('connecto') || url.contains('play.google')) {
+            // 🚫 Block Ads & Telegram links
+            if (url.contains('doubleclick') ||
+                url.contains('popads') ||
+                url.contains('1xbet') ||
+                url.contains('bet365') ||
+                url.contains('onclick') ||
+                url.contains('monetag') ||
+                url.contains('exoclick') ||
+                url.contains('redirect') ||
+                url.contains('adsterra') ||
+                url.contains('t.me') ||
+                url.contains('telegram')) {
               return NavigationDecision.prevent;
             }
 
-            return NavigationDecision.navigate;
+            // ✅ Allow safe streaming embed links
+            if (url.contains('pantyflix.com') ||
+                url.contains('vidbolt') ||
+                url.contains('vidsrc') ||
+                url.contains('vidlink') ||
+                url.contains('pages.dev') ||
+                url.startsWith('about:blank') ||
+                url.startsWith('data:')) {
+              return NavigationDecision.navigate;
+            }
+
+            return NavigationDecision.prevent;
           },
         ),
       );
 
-    if (loadAsIframe) {
-      // ⚡ IFRAME METHOD (For VidBolt & Olly - Old working logic)
-      String spoofedBaseUrl = currentServerKey == 'vidbolt' ? 'https://vidbolt.pro/' : 'https://hannutv.app/';
-      final embedHtml = '''
-        <!DOCTYPE html>
-        <html>
-          <head>
-            <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-            <style>
-              * { margin: 0; padding: 0; box-sizing: border-box; }
-              html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
-              iframe { width: 100vw; height: 100vh; border: none; background-color: #000000; }
-            </style>
-          </head>
-          <body>
-            <iframe src="$targetUrl" allow="autoplay; fullscreen; encrypted-media" allowfullscreen></iframe>
-          </body>
-        </html>
-      ''';
-      _controller.loadHtmlString(embedHtml, baseUrl: spoofedBaseUrl);
-    } else {
-      // ⚡ DIRECT METHOD (For NetMirror - Fixes White Screen & 404)
-      _controller.loadRequest(Uri.parse(targetUrl));
-    }
+    _controller.loadRequest(
+      Uri.parse(targetUrl),
+      headers: {
+        'Referer': 'https://pantyflix.com/',
+        'Origin': 'https://pantyflix.com',
+      },
+    );
 
     if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
     }
   }
 
-  void _seekRelative(int seconds) {
-    _startHideTimer();
-    final js = '''
-      (function() {
-        var v = null;
-        var iframes = document.getElementsByTagName('iframe');
-        if(iframes.length > 0) {
-           var doc = iframes[0].contentDocument || iframes[0].contentWindow.document;
-           if(doc) v = doc.querySelector('video');
-        }
-        if(!v) v = document.querySelector('video');
-        if (v) v.currentTime += $seconds;
-      })();
-    ''';
-    _controller.runJavaScript(js);
+  String _buildPantyflixUrl() {
+    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
+      return widget.customUrl!;
+    }
+
+    final id = widget.tmdbId;
+    final s = currentSeason;
+    final e = currentEpisode;
+    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+
+    // 🚀 PANTYFLIX DIRECT ROUTED URL PATTERN
+    if (isTv) {
+      return 'https://pantyflix.com/watch/play/tv/$id/$s/$e?server=$activeServer';
+    } else {
+      return 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
+    }
   }
 
-  void _startHideTimer() {
-    _hideTimer?.cancel();
-    if (mounted) setState(() => showControls = true);
-    _hideTimer = Timer(const Duration(seconds: 4), () {
-      if (mounted) setState(() => showControls = false);
+  void _toggleFullScreen() {
+    setState(() {
+      isFullScreen = !isFullScreen;
     });
+
+    if (isFullScreen) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
   }
 
-  void _showServerSelector() {
-    _hideTimer?.cancel();
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setModalState) {
-            final list = currentServers;
-            return Container(
-              padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      const Text("Switch Server", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                      Row(
-                        children: [
-                          ChoiceChip(
-                            label: const Text("Hindi"),
-                            selected: selectedLanguage == 'hindi',
-                            selectedColor: Colors.redAccent,
-                            onSelected: (val) {
-                              setModalState(() => selectedLanguage = 'hindi');
-                              setState(() => selectedLanguage = 'hindi');
-                            },
-                          ),
-                          const SizedBox(width: 8),
-                          ChoiceChip(
-                            label: const Text("English"),
-                            selected: selectedLanguage == 'english',
-                            selectedColor: Colors.blueAccent,
-                            onSelected: (val) {
-                              setModalState(() => selectedLanguage = 'english');
-                              setState(() => selectedLanguage = 'english');
-                            },
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                  ...List.generate(list.length, (index) {
-                    final srv = list[index];
-                    final isSelected = currentServerKey == srv['key'];
-                    return ListTile(
-                      leading: Icon(
-                        isSelected ? Icons.check_circle : Icons.radio_button_unchecked,
-                        color: isSelected ? Colors.greenAccent : Colors.grey,
-                      ),
-                      title: Text(srv['name'], style: TextStyle(color: isSelected ? Colors.redAccent : Colors.white, fontWeight: FontWeight.bold)),
-                      subtitle: Text(srv['sub'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                      onTap: () {
-                        Navigator.pop(context);
-                        if (currentServerKey != srv['key']) {
-                          _switchServer(srv['key']);
-                        } else {
-                          _startHideTimer();
-                        }
-                      },
-                    );
-                  }),
-                ],
-              ),
-            );
-          }
-        );
-      },
-    ).then((_) => _startHideTimer());
-  }
-
-  void toggleCrop() {
-    setState(() => isCropped = !isCropped);
-    _controller.runJavaScript('''
-      var v = null;
-      var iframes = document.getElementsByTagName('iframe');
-      if(iframes.length > 0) {
-         var doc = iframes[0].contentDocument || iframes[0].contentWindow.document;
-         if(doc) v = doc.querySelector('video');
-      }
-      if(!v) v = document.querySelector('video');
-      if (v) v.style.objectFit = '${isCropped ? "cover" : "contain"}';
-    ''');
-    _startHideTimer();
+  void _switchEpisode(int s, int ep) {
+    setState(() {
+      currentSeason = s;
+      currentEpisode = ep;
+    });
+    _initPantyFlixStream();
   }
 
   @override
   void dispose() {
-    _hideTimer?.cancel();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual,
+        overlays: SystemUiOverlay.values);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    final currentSrv = allServers.firstWhere((s) => s['key'] == currentServerKey, orElse: () => allServers[0]);
-
-    return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) async {
-        if (didPop) return;
-        Navigator.of(context).pop();
-      },
-      child: Scaffold(
+    if (isFullScreen) {
+      // 📺 FULLSCREEN LANDSCAPE VIEW
+      return Scaffold(
         backgroundColor: Colors.black,
-        body: GestureDetector(
-          onTap: _startHideTimer,
-          behavior: HitTestBehavior.opaque,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: Container(color: Colors.black, child: WebViewWidget(controller: _controller)),
+        body: Stack(
+          children: [
+            Positioned.fill(
+              child: WebViewWidget(controller: _controller),
+            ),
+            Positioned(
+              top: 16,
+              right: 16,
+              child: SafeArea(
+                child: IconButton(
+                  icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 28),
+                  onPressed: _toggleFullScreen,
+                ),
               ),
-              Positioned(
-                top: 16, right: 16,
-                child: SafeArea(child: IgnorePointer(child: Opacity(opacity: 0.5, child: Image.asset('assets/logo.png', height: 30)))),
-              ),
-              if (isPageLoading && !isVideoPlaying)
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 📱 YOUTUBE-STYLE PORTRAIT UI (EXACT SCREENSHOT LAYOUT)
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. TOP VIDEO PLAYER WINDOW
+            Stack(
+              children: [
+                Container(
+                  width: double.infinity,
+                  height: 230,
+                  color: Colors.black,
+                  child: WebViewWidget(controller: _controller),
+                ),
+
+                // Top Back Button
                 Positioned(
-                  bottom: 40, left: 20,
-                  child: SafeArea(
+                  top: 8,
+                  left: 8,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    radius: 18,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                      onPressed: () => Navigator.pop(context),
+                    ),
+                  ),
+                ),
+
+                // Top Watermark Logo
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Opacity(
+                    opacity: 0.6,
+                    child: Image.asset('assets/logo.png', height: 24, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
+                  ),
+                ),
+
+                // FullScreen Rotate Button
+                Positioned(
+                  bottom: 8,
+                  right: 8,
+                  child: CircleAvatar(
+                    backgroundColor: Colors.black54,
+                    radius: 16,
+                    child: IconButton(
+                      padding: EdgeInsets.zero,
+                      icon: const Icon(Icons.fullscreen, color: Colors.white, size: 22),
+                      onPressed: _toggleFullScreen,
+                    ),
+                  ),
+                ),
+
+                // Loading Indicator
+                if (isPageLoading && !isVideoPlaying)
+                  Positioned.fill(
                     child: Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.redAccent, width: 1)),
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          const SizedBox(width: 14, height: 14, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2)),
-                          const SizedBox(width: 10),
-                          Text("Connecting: ${currentSrv['name']}...", style: const TextStyle(color: Colors.white, fontSize: 12)),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              if (showControls)
-                Positioned(
-                  top: 16, left: 16, right: 80,
-                  child: SafeArea(
-                    child: Row(
-                      children: [
-                        Container(decoration: BoxDecoration(color: Colors.black.withOpacity(0.6), shape: BoxShape.circle), child: IconButton(icon: const Icon(Icons.arrow_back, color: Colors.white, size: 22), onPressed: () => Navigator.pop(context))),
-                        const SizedBox(width: 12),
-                        Expanded(child: Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 6)]), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                      ],
-                    ),
-                  ),
-                ),
-              if (showControls)
-                Positioned(
-                  bottom: 16, right: 16,
-                  child: SafeArea(
-                    child: GestureDetector(
-                      onTap: _showServerSelector,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                        decoration: BoxDecoration(color: Colors.black.withOpacity(0.8), borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.redAccent, width: 1.2)),
-                        child: Row(
+                      color: Colors.black87,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.swap_horiz, color: Colors.redAccent, size: 16),
-                            const SizedBox(width: 6),
-                            Text("Server: ${currentSrv['name']}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
+                            const SizedBox(
+                              width: 35,
+                              height: 35,
+                              child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                            ),
+                            const SizedBox(height: 12),
+                            const Text(
+                              "Loading selected server",
+                              style: TextStyle(color: Colors.white, fontSize: 15, fontWeight: FontWeight.bold),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              "Requesting a playable link from $activeServer...",
+                              style: const TextStyle(color: Colors.grey, fontSize: 12),
+                            ),
                           ],
                         ),
                       ),
                     ),
                   ),
+              ],
+            ),
+
+            // 2. SCROLLABLE DETAILS & EPISODES SECTION
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Movie / Series Title
+                    Text(
+                      widget.movieTitle,
+                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Rating & Year
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 18),
+                        const SizedBox(width: 4),
+                        Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 12),
+                        Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Action Buttons (Add to List, Play on TV, Share, Report)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          _buildActionButton(Icons.bookmark_border, "Add to List"),
+                          const SizedBox(width: 8),
+                          _buildActionButton(Icons.tv, "Play on TV"),
+                          const SizedBox(width: 8),
+                          _buildActionButton(Icons.share, "Share"),
+                          const SizedBox(width: 8),
+                          _buildActionButton(Icons.flag_outlined, "Report"),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Server Section Title
+                    const Text(
+                      "If current server is not working, try a different one:",
+                      style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Servers Switcher Tabs (Rift, Spiral, Hydra, etc.)
+                    Row(
+                      children: [
+                        const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 8),
+                        ...pantyflixServers.map((srv) {
+                          final isSelected = activeServer == srv['key'];
+                          return GestureDetector(
+                            onTap: () {
+                              if (activeServer != srv['key']) {
+                                setState(() {
+                                  activeServer = srv['key']!;
+                                });
+                                _initPantyFlixStream();
+                              }
+                            },
+                            child: Container(
+                              margin: const EdgeInsets.only(right: 8),
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                              decoration: BoxDecoration(
+                                color: isSelected ? Colors.white : Colors.grey[900],
+                                borderRadius: BorderRadius.circular(20),
+                              ),
+                              child: Text(
+                                srv['name']!,
+                                style: TextStyle(
+                                  color: isSelected ? Colors.black : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                  fontSize: 13,
+                                ),
+                              ),
+                            ),
+                          );
+                        }).toList(),
+                      ],
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Comments Preview
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          const Text("Comments  1", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 8),
+                          Row(
+                            children: [
+                              const CircleAvatar(
+                                radius: 14,
+                                backgroundColor: Colors.redAccent,
+                                child: Icon(Icons.person, color: Colors.white, size: 16),
+                              ),
+                              const SizedBox(width: 10),
+                              Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: const [
+                                  Text("HANNUTV User", style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  Text("Awesome HD Quality 🔥", style: TextStyle(color: Colors.grey, fontSize: 11)),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Episodes Section (If TV Show)
+                    if (widget.mediaType == 'tv' || widget.mediaType == 'series') ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              "Season $currentSeason",
+                              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                          const Icon(Icons.grid_view, color: Colors.grey, size: 20),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+
+                      // Episode Cards List (Horizontal Grid like Pantyflix)
+                      SizedBox(
+                        height: 140,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: 15, // Multi episode generator
+                          itemBuilder: (context, index) {
+                            final epNum = index + 1;
+                            final isCurrent = currentEpisode == epNum;
+                            return GestureDetector(
+                              onTap: () => _switchEpisode(currentSeason, epNum),
+                              child: Container(
+                                width: 170,
+                                margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: isCurrent ? Border.all(color: Colors.white, width: 2) : null,
+                                  color: Colors.grey[900],
+                                ),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                          image: DecorationImage(
+                                            image: NetworkImage(
+                                              'https://image.tmdb.org/t/p/w500/image.jpg',
+                                            ),
+                                            fit: BoxFit.cover,
+                                            onError: (_, __) => null,
+                                          ),
+                                          color: Colors.grey[850],
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            isCurrent ? Icons.play_arrow : Icons.play_circle_outline,
+                                            color: Colors.white,
+                                            size: 32,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text("Episode : $epNum", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                          const Text("Playing next on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
                 ),
-            ],
-          ),
+              ),
+            ),
+          ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildActionButton(IconData icon, String title) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: Colors.white, size: 16),
+          const SizedBox(width: 6),
+          Text(title, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w600)),
+        ],
       ),
     );
   }
