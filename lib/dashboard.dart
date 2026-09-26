@@ -32,7 +32,7 @@ class DashboardPageState extends State<DashboardPage> {
 
   bool isLoading = true;
   bool isSearching = false;
-  bool isNetMirrorSearchActive = false; // ⚡ DUAL SEARCH ENGINE
+  bool isNetMirrorSearchActive = false;
   final TextEditingController searchController = TextEditingController();
 
   Timer? _debounce;
@@ -107,7 +107,6 @@ class DashboardPageState extends State<DashboardPage> {
         .toList();
   }
 
-  // 🚀 LIVE STREAM SYNC LOADER
   Future<void> loadAllDashboards({String? providerId}) async {
     setState(() => isLoading = true);
     try {
@@ -390,7 +389,6 @@ class DashboardPageState extends State<DashboardPage> {
                                 ),
                               ),
                         if (!isSearching) ...[
-                          // 🔍 1. HANNUTV NETMIRROR LIVE SEARCH BUTTON
                           IconButton(
                             icon: const Icon(Icons.flash_on, color: Colors.redAccent, size: 28),
                             tooltip: "HANNUTV Direct Search",
@@ -401,7 +399,6 @@ class DashboardPageState extends State<DashboardPage> {
                               });
                             },
                           ),
-                          // 🔍 2. GLOBAL SEARCH BUTTON
                           IconButton(
                             icon: const Icon(Icons.search, color: Colors.white, size: 28),
                             onPressed: () {
@@ -574,7 +571,7 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// ── DETAILS SCREEN WITH NETMIRROR PRIORITY 1-CLICK HD PLAY ───────────
+// ── DETAILS SCREEN WITH NATIVE NETMIRROR 1-CLICK HD PLAY ───────────
 class MediaDetailScreen extends StatefulWidget {
   final Map mediaItem;
   const MediaDetailScreen({Key? key, required this.mediaItem}) : super(key: key);
@@ -672,7 +669,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
     }
   }
 
-  // 🚀 DIRECT 1-CLICK HD PLAY (NETMIRROR LIVE INJECTED)
+  // 🚀 DIRECT 1-CLICK HD PLAY (NETMIRROR NATIVE KOTLIN BRIDGE)
   void launchPlayer(String title, {int? season, int? episode}) {
     continueWatchingList.removeWhere((m) => m['id'] == widget.mediaItem['id']);
     Map currentMedia = Map.from(widget.mediaItem);
@@ -694,7 +691,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
           season: season ?? 1,
           episode: episode ?? 1,
           movieTitle: title,
-          preferredServer: 'netmirror_portal', // NetMirror First Priority
+          preferredServer: 'netmirror_native', // Native Bridge Priority #1
         ),
       ),
     );
@@ -813,7 +810,7 @@ class _MediaDetailScreenState extends State<MediaDetailScreen> {
                                   icon: const Icon(Icons.play_arrow,
                                       color: Colors.white),
                                   label: const Text(
-                                    'Play Movie (NetMirror HD)',
+                                    'Play Movie (HD)',
                                     style: TextStyle(
                                         color: Colors.white,
                                         fontSize: 16,

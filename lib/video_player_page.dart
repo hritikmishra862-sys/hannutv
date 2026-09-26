@@ -4,7 +4,7 @@ import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
-/// 🌉 NATIVE METHODCHANNEL SERVICE FOR NETMIRROR CNCVERSE
+/// ⚡ NATIVE METHODCHANNEL SERVICE FOR NETMIRROR CNCVERSE
 class CNCVerseService {
   static const MethodChannel _channel =
       MethodChannel('com.horis.cncverse/stream');
@@ -70,7 +70,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   late String currentServerKey;
   String? resolvedDirectStreamUrl;
 
-  // 🤖 VIP SERVERS WITH NATIVE NETMIRROR FIRST
+  // 👑 VIP SERVERS WITH NATIVE NETMIRROR FIRST
   final List<Map<String, dynamic>> allServers = [
     {
       'key': 'netmirror_native',
@@ -171,7 +171,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _startHideTimer();
   }
 
-  // 🎬 NATIVE DIRECT STREAM HTML5 PLAYER (ZERO ADS, 100% CLEAN)
+  // ⚡ NATIVE DIRECT STREAM HTML5 PLAYER (ZERO ADS, 100% CLEAN)
   void _initNativeHtmlPlayer(String streamUrl) {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -232,7 +232,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
-  // 🌐 FALLBACK WEBVIEW ENGINE (VIDBOLT, OLLY, VEGA, FLIXORENT)
+  // 🛡️ FALLBACK WEBVIEW ENGINE (VIDBOLT, OLLY, VEGA, FLIXORENT)
   void _initFallbackWebView() {
     final targetUrl = _generateFallbackUrl();
 
