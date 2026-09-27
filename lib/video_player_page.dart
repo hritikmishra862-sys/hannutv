@@ -122,7 +122,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     _resetHideTimer(); 
   }
 
-  // 🕒 STRICT 3-SECOND AUTO-HIDE LOGIC (For Back Button Only)
+  // 🕒 STRICT 3-SECOND AUTO-HIDE LOGIC
   void _resetHideTimer() {
     _hideControlsTimer?.cancel();
     if (mounted) setState(() => showControls = true);
@@ -192,7 +192,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
-  // 🛡️ THE NUCLEAR AD-BLOCKER (REVERTED TO STRONGEST VERSION)
+  // 🛡️ THE NUCLEAR AD-BLOCKER (YOUR ORIGINAL TRUSTED LOGIC)
   void _initStream() {
     setState(() {
       isPageLoading = true;
@@ -256,20 +256,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               `;
               document.head.appendChild(style);
 
-              // 🚀 REAL-TIME XPATH KILLER & AD NUKER
+              // 🚀 REAL-TIME XPATH KILLER & NATIVE FULLSCREEN BLOCKER
               setInterval(function() {
-                // Find any element containing the word "(Ads)" and delete it
-                var xpath = "//*[contains(text(), '(Ads)')]";
-                var matchingElement = document.evaluate(xpath, document, null, XPathResult.UNORDERED_NODE_SNAPSHOT_TYPE, null);
-                for (var i = 0; i < matchingElement.snapshotLength; i++) {
-                   var el = matchingElement.snapshotItem(i);
-                   if (el) {
-                       el.style.display = 'none';
-                       if(el.parentElement) el.parentElement.style.display = 'none';
-                   }
-                }
-
-                // Delete any remaining ad overlays
+                // 1. Nuke Dropdowns
                 document.querySelectorAll('div, a, span, button, ul, li').forEach(el => {
                   let text = el.innerText ? el.innerText.toLowerCase().trim() : '';
                   if (text.includes('(ads)') || text.includes('rift(ads)') || text.includes('bolt(ads)') || text.includes('fast(ads)') || text.includes('cinezo(ads)') || text.includes('hindi new')) {
@@ -280,7 +269,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   }
                 });
 
-                // Force Auto-Play & Adjust Screen Ratio
+                // 2. 🔥 FIX BLACK SCREEN BUG: Hide Native Web Player's Fullscreen Button
+                var fsBtns = document.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"], .plyr__controls__item[data-plyr="fullscreen"]');
+                fsBtns.forEach(btn => {
+                   btn.style.display = 'none';
+                   btn.style.opacity = '0';
+                   btn.style.pointerEvents = 'none';
+                });
+
+                // 3. Force Auto-Play & Adjust Screen Ratio
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -292,24 +289,41 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     VideoState.postMessage('playing');
                   }
                 }
-              }, 200);
+              }, 100);
             ''';
             _controller.runJavaScript(jsCode);
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // 🚫 STRICT BLOCK: Stops Lucky Draw, Amazon, Bet365, Popads, Adsterra
+            // 🚫 YOUR TRUSTED OLD AD-BLOCKER: Strict Block EVERYTHING
             if (url.contains('doubleclick') || url.contains('popads') ||
                 url.contains('1xbet') || url.contains('bet365') ||
                 url.contains('onclick') || url.contains('adsterra') ||
                 url.contains('lucky') || url.contains('amazon') ||
                 url.contains('vast') || url.contains('vpaid') ||
                 url.contains('t.me') || url.contains('telegram') ||
+                url.contains('monetag') || url.contains('exoclick') ||
+                url.contains('redirect') ||
                 url.contains('market://') || url.contains('intent://')) {
               return NavigationDecision.prevent;
             }
-            return NavigationDecision.navigate;
+
+            // ✅ ALLOW ONLY THESE SAFE STREAMING SERVERS
+            if (url.contains('pantyflix.com') ||
+                url.contains('vidbolt') ||
+                url.contains('vidsrc') ||
+                url.contains('vidlink') ||
+                url.contains('multiembed') ||
+                url.contains('pages.dev') ||
+                url.contains('google.com/recaptcha') ||
+                url.startsWith('about:blank') ||
+                url.startsWith('data:')) {
+              return NavigationDecision.navigate;
+            }
+
+            // STRICT FALLBACK BLOCK FOR ANY OTHER AD DOMAIN
+            return NavigationDecision.prevent;
           },
         ),
       );
@@ -430,7 +444,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   child: WebViewWidget(controller: _controller),
                 ),
 
-                // 🌟 1. PERMANENT HANNUTV LOGO & ROTATE BUTTON (BOTTOM-LEFT)
+                // 🌟 PERMANENT HANNUTV LOGO & ROTATE BUTTON (BOTTOM-LEFT)
                 Positioned(
                   bottom: 16,
                   left: 16,
@@ -461,24 +475,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   ),
                 ),
 
-                // 🌟 2. PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (ABOVE ROTATE BUTTON, LOW OPACITY)
+                // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (VERTICALLY ABOVE ROTATE BUTTON, LOW OPACITY)
                 Positioned(
-                  bottom: 64, // Placed above the rotate button
+                  bottom: 70, // Placed exactly above the rotate button
                   left: 16,
                   child: SafeArea(
                     child: Opacity(
-                      opacity: 0.5, // Low opacity as requested
+                      opacity: 0.4, // Extremely low opacity so it's not over-highlighted
                       child: GestureDetector(
                         onTap: _cycleAspectRatio,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.aspect_ratio, color: Colors.white, size: 16),
-                              const SizedBox(width: 6),
-                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                              const Icon(Icons.aspect_ratio, color: Colors.white54, size: 14),
+                              const SizedBox(width: 4),
+                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
@@ -487,7 +501,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   ),
                 ),
 
-                // 🌟 3. HANNUTV CINEMATIC INTRO ANIMATION ON PLAY
+                // 🌟 HANNUTV CINEMATIC INTRO ANIMATION ON PLAY
                 if (showIntroAnimation)
                   Positioned.fill(
                     child: IgnorePointer(
@@ -515,7 +529,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     ),
                   ),
 
-                // 🕒 4. AUTO-HIDE BACK BUTTON (3 SECONDS)
+                // 🕒 AUTO-HIDE BACK BUTTON (3 SECONDS)
                 if (showControls) 
                   Positioned(
                     top: 16,
@@ -567,23 +581,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       child: WebViewWidget(controller: _controller),
                     ),
 
-                    // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (ABOVE ROTATE BUTTON, LOW OPACITY)
+                    // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (VERTICALLY ABOVE ROTATE BUTTON)
                     Positioned(
-                      bottom: 48, // Placed above the rotate button
+                      bottom: 50, // Placed exactly above the rotate button
                       left: 8,
                       child: Opacity(
-                        opacity: 0.5,
+                        opacity: 0.4, // Low opacity to not over-highlight
                         child: GestureDetector(
                           onTap: _cycleAspectRatio,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                             decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white30)),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.aspect_ratio, color: Colors.white, size: 14),
+                                const Icon(Icons.aspect_ratio, color: Colors.white54, size: 12),
                                 const SizedBox(width: 4),
-                                Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                                Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                               ],
                             ),
                           ),
@@ -818,8 +832,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                               ],
                             ),
                             const SizedBox(height: 10),
-
-                            // Comment Input Box
                             Row(
                               children: [
                                 Expanded(
