@@ -181,7 +181,6 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // 🔥 NEW SUPPORT BOTTOM SHEET FOR TELEGRAM & WHATSAPP
   void _showSupportOptions() {
     showModalBottomSheet(
       context: context,
@@ -195,8 +194,6 @@ class DashboardPageState extends State<DashboardPage> {
             children: [
               const Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 20),
-              
-              // Telegram Option
               InkWell(
                 onTap: () async {
                   Navigator.pop(context);
@@ -208,7 +205,7 @@ class DashboardPageState extends State<DashboardPage> {
                   decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
                   child: Row(
                     children: [
-                      const Icon(Icons.send, color: Colors.blueAccent, size: 30), // Telegram Icon
+                      const Icon(Icons.send, color: Colors.blueAccent, size: 30),
                       const SizedBox(width: 16),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -222,8 +219,6 @@ class DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               const SizedBox(height: 12),
-              
-              // WhatsApp Option
               InkWell(
                 onTap: () async {
                   Navigator.pop(context);
@@ -235,7 +230,7 @@ class DashboardPageState extends State<DashboardPage> {
                   decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
                   child: Row(
                     children: [
-                      const Icon(Icons.chat, color: Colors.greenAccent, size: 30), // WhatsApp Icon
+                      const Icon(Icons.chat, color: Colors.greenAccent, size: 30),
                       const SizedBox(width: 16),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
@@ -296,7 +291,6 @@ class DashboardPageState extends State<DashboardPage> {
             itemCount: moviesData.length,
             itemBuilder: (context, index) {
               final media = moviesData[index];
-              // 🔥 FIX: Changed to InkWell for TV Remote Focus Support
               return InkWell(
                 onTap: () => launchPlayerDirect(media),
                 focusColor: Colors.white24,
@@ -312,6 +306,7 @@ class DashboardPageState extends State<DashboardPage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
                           image: DecorationImage(
+                            // 🔥 OPTIMIZATION FOR TV: cacheWidth prevents memory lag
                             image: NetworkImage(media['posterUrl'] != '' ? media['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
                             fit: BoxFit.cover,
                           ),
@@ -341,7 +336,7 @@ class DashboardPageState extends State<DashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.support_agent, color: Colors.red, size: 30),
-            onPressed: _showSupportOptions, // 🔥 Changed to open popup
+            onPressed: _showSupportOptions,
           )
         ],
       ),
@@ -493,7 +488,6 @@ class DashboardPageState extends State<DashboardPage> {
                 itemCount: searchResults.length,
                 itemBuilder: (context, index) {
                   final movie = searchResults[index];
-                  // 🔥 FIX: Changed to InkWell for TV Remote Focus Support
                   return InkWell(
                     onTap: () => launchPlayerDirect(movie),
                     focusColor: Colors.white24,

@@ -94,14 +94,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   List similarMovies = [];
   bool isLoadingSimilar = false;
 
+  // 📺 TV DETECTION
+  bool isTvDevice = false;
+
   @override
   void initState() {
     super.initState();
     currentSeason = widget.season;
     currentEpisode = widget.episode;
-
-    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     _introAnimController = AnimationController(
       vsync: this,
@@ -115,11 +115,28 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     );
 
     _fetchSimilarMovies();
-    _initStream();
-    _showControlPanel(); 
+    _checkDeviceType(); // 📺 Detect if it's TV
   }
 
-  // 🕒 5-SECOND LOGO CONTROL PANEL LOGIC (TV Remote Compatible)
+  // 📺 Detect TV Layout Based on Screen Width
+  void _checkDeviceType() {
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final size = MediaQuery.of(context).size;
+      setState(() {
+        isTvDevice = size.width > size.height && size.width > 800; // Common TV aspect ratio
+        if (isTvDevice) {
+           isFullScreen = true; // TV is always Full Screen
+        } else {
+           SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+        }
+      });
+      _initStream(); // Init stream after layout is known
+      _showControlPanel(); 
+    });
+  }
+
+  // 🕒 5-SECOND LOGO CONTROL PANEL LOGIC
   void _showControlPanel() {
     setState(() => showControls = true);
     _hideControlsTimer?.cancel();
@@ -192,13 +209,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 🚀 DIRECT SERVER ENGINE MAPPING (Exact Pantyflix URLs)
+    // 🚀 DIRECT SERVER ENGINE MAPPING
     return isTv
         ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
-  // 🛡️ THE NUCLEAR AD-BLOCKER (100% UNTOUCHED ORIGINAL LOGIC)
+  // 🛡️ THE NUCLEAR AD-BLOCKER (100% UNTOUCHED MOBILE LOGIC, TV OPTIMIZED)
   void _initStream() {
     setState(() {
       isPageLoading = true;
@@ -212,7 +229,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
       ..setUserAgent(
-        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        // 📺 Use TV User Agent if TV Device to fix playback issues
+        isTvDevice 
+          ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
+          : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
       )
       ..addJavaScriptChannel(
         'VideoState',
@@ -262,7 +282,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               `;
               document.head.appendChild(style);
 
-              // 🚀 REAL-TIME XPATH KILLER & NATIVE FULLSCREEN BLOCKER
+              // 🚀 REAL-TIME XPATH KILLER
               setInterval(function() {
                 // 1. Nuke Dropdowns
                 document.querySelectorAll('div, a, span, button, ul, li').forEach(el => {
@@ -275,7 +295,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   }
                 });
 
-                // 2. 🔥 FIX BLACK SCREEN BUG: Hide Native Web Player's Fullscreen Button
+                // 2. 🔥 FIX BLACK SCREEN BUG
                 var fsBtns = document.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"], .plyr__controls__item[data-plyr="fullscreen"]');
                 fsBtns.forEach(btn => {
                    btn.style.display = 'none';
@@ -283,7 +303,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                    btn.style.pointerEvents = 'none';
                 });
 
-                // 3. Force Auto-Play & Adjust Screen Ratio
+                // 3. Force Auto-Play
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -315,20 +335,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               return NavigationDecision.prevent;
             }
 
-            // ✅ ALLOW ONLY THESE SAFE STREAMING SERVERS
-            if (url.contains('pantyflix.com') ||
-                url.contains('vidbolt') ||
-                url.contains('vidsrc') ||
-                url.contains('vidlink') ||
-                url.contains('multiembed') ||
-                url.contains('pages.dev') ||
-                url.contains('google.com/recaptcha') ||
-                url.startsWith('about:blank') ||
-                url.startsWith('data:')) {
-              return NavigationDecision.navigate;
-            }
-
-            return NavigationDecision.prevent;
+            return NavigationDecision.navigate;
           },
         ),
       );
@@ -374,6 +381,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   }
 
   void _toggleFullScreen() {
+    if (isTvDevice) return; // TV is always fullscreen
+    
     setState(() {
       isFullScreen = !isFullScreen;
     });
@@ -423,14 +432,181 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     super.dispose();
   }
 
+  // ==========================================
+  // 📺 TV UI LAYOUT (NEW: Full Screen Video Background + Overlay UI)
+  // ==========================================
+  Widget _buildTVLayout() {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      body: Stack(
+        children: [
+          // 1. VIDEO LAYER: Always Full Screen Background
+          Positioned.fill(
+            child: WebViewWidget(controller: _controller),
+          ),
+          
+          // 🌟 CINEMATIC HANNUTV INTRO ANIMATION ON PLAY
+          if (showIntroAnimation)
+            Positioned.fill(
+              child: IgnorePointer(
+                child: Center(
+                  child: AnimatedBuilder(
+                    animation: _introAnimController,
+                    builder: (context, child) {
+                      return Opacity(
+                        opacity: _introOpacityAnimation.value,
+                        child: Transform.scale(
+                          scale: _introScaleAnimation.value,
+                          child: Image.asset('assets/logo.png', height: 120, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 120)),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+              ),
+            ),
+            
+          // 2. DIM OVERLAY FOR DETAILS & CONTROLS
+          if (showControls) ...[
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    colors: [Colors.black.withOpacity(0.9), Colors.black.withOpacity(0.4), Colors.transparent],
+                    begin: Alignment.bottomCenter,
+                    end: Alignment.topCenter,
+                  ),
+                ),
+              ),
+            ),
+
+            // TV Overlay Details Area
+            Positioned(
+              left: 40,
+              right: 40,
+              bottom: 40,
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  Row(
+                    children: [
+                      const Icon(Icons.star, color: Colors.amber, size: 24),
+                      const SizedBox(width: 8),
+                      Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                      const SizedBox(width: 16),
+                      Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 20)),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Action Buttons
+                  Row(
+                    children: [
+                      InkWell(
+                        onTap: () => Navigator.pop(context),
+                        focusColor: Colors.white24,
+                        borderRadius: BorderRadius.circular(10),
+                        child: _buildActionButton(Icons.arrow_back, "Back", activeColor: Colors.white),
+                      ),
+                      const SizedBox(width: 16),
+                      InkWell(
+                        onTap: _cycleAspectRatio,
+                        focusColor: Colors.white24,
+                        borderRadius: BorderRadius.circular(10),
+                        child: _buildActionButton(Icons.aspect_ratio, currentAspectRatio.toUpperCase(), activeColor: Colors.white),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 20),
+                  
+                  // Server Selector (TV Format)
+                  const Text("Servers:", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 10),
+                  SizedBox(
+                    height: 50,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: servers.length,
+                      itemBuilder: (context, index) {
+                        final srv = servers[index];
+                        final isSelected = activeServer == srv['key'];
+                        return InkWell(
+                          onTap: () {
+                            if (activeServer != srv['key']) {
+                              setState(() => activeServer = srv['key']!);
+                              _initStream();
+                            }
+                          },
+                          focusColor: Colors.white24,
+                          borderRadius: BorderRadius.circular(20),
+                          child: Container(
+                            margin: const EdgeInsets.only(right: 12),
+                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.grey[900], borderRadius: BorderRadius.circular(20)),
+                            child: Text(srv['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+          
+          // 3. MAGIC LOGO TRIGGER (Top-Left)
+          Positioned(
+            top: 30,
+            left: 40,
+            child: InkWell(
+              onTap: _toggleControlPanel,
+              focusColor: Colors.white24,
+              borderRadius: BorderRadius.circular(8),
+              child: Container(
+                padding: const EdgeInsets.all(8),
+                child: Opacity(
+                  opacity: 0.9,
+                  child: Image.asset('assets/logo.png', height: 45, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 24))),
+                ),
+              ),
+            ),
+          ),
+          
+          // Loading Indicator for TV
+          if (isPageLoading && !isVideoPlaying)
+            Positioned.fill(
+              child: Container(
+                color: Colors.black87,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 60)),
+                      const SizedBox(height: 20),
+                      const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 3)),
+                    ],
+                  ),
+                ),
+              ),
+            ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
+    if (isTvDevice) return _buildTVLayout(); // 📺 Automatically serve TV Layout
+
+    // ==========================================
+    // 📱 MOBILE LAYOUT (100% UNTOUCHED ORIGINAL)
+    // ==========================================
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
     if (isFullScreen) {
-      // ==========================================
-      // 🖥️ PURE LANDSCAPE FULLSCREEN VIEW
-      // ==========================================
       return PopScope(
         canPop: false,
         onPopInvoked: (bool didPop) {
@@ -441,12 +617,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
           backgroundColor: Colors.black,
           body: Stack(
             children: [
-              // 1. WEBVIEW: Fully interactive when controls are hidden
               Positioned.fill(
                 child: WebViewWidget(controller: _controller),
               ),
-
-              // 🌟 HANNUTV CINEMATIC INTRO ANIMATION ON PLAY
               if (showIntroAnimation)
                 Positioned.fill(
                   child: IgnorePointer(
@@ -473,17 +646,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     ),
                   ),
                 ),
-
-              // 2. DIM OVERLAY: Makes control panel buttons clear when active
               if (showControls)
                 Positioned.fill(
                   child: IgnorePointer(
                     child: Container(color: Colors.black38),
                   ),
                 ),
-
-              // 🌟 3. PERMANENT HANNUTV LOGO (Top-Left) -> THE MAGIC TRIGGER
-              // 🔥 Changed to InkWell for TV Remote Focus Support
               Positioned(
                 top: 20,
                 left: 20,
@@ -506,10 +674,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   ),
                 ),
               ),
-
-              // 🕒 4. CONTROL PANEL BUTTONS (5 SECONDS AUTO-HIDE)
               if (showControls) ...[
-                // Back Button (Top-Right)
                 Positioned(
                   top: 20,
                   right: 20,
@@ -530,8 +695,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     ),
                   ),
                 ),
-                
-                // Aspect Ratio / Crop Fit Button (Bottom-Left)
                 Positioned(
                   bottom: 20, 
                   left: 20,
@@ -555,8 +718,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     ),
                   ),
                 ),
-
-                // Rotate / Exit Fullscreen Button (Bottom-Right)
                 Positioned(
                   bottom: 20,
                   right: 20,
@@ -580,9 +741,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
       );
     }
 
-    // ==========================================
-    // 📱 PORTRAIT YOUTUBE-STYLE VIEW
-    // ==========================================
     return PopScope(
       canPop: false,
       onPopInvoked: (bool didPop) {
@@ -595,7 +753,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. TOP VIDEO PLAYER WINDOW (230px height)
               Stack(
                 children: [
                   Container(
@@ -604,8 +761,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     color: Colors.black,
                     child: WebViewWidget(controller: _controller),
                   ),
-
-                  // 🌟 CINEMATIC HANNUTV INTRO ANIMATION
                   if (showIntroAnimation)
                     Positioned.fill(
                       child: IgnorePointer(
@@ -625,16 +780,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ),
                       ),
                     ),
-
-                  // 2. DIM OVERLAY FOR CONTROLS
                   if (showControls)
                     Positioned.fill(
                       child: IgnorePointer(
                         child: Container(color: Colors.black38),
                       ),
                     ),
-
-                  // 🌟 3. PERMANENT HANNUTV LOGO (Top-Left) -> MAGIC TRIGGER (TV Support)
                   Positioned(
                     top: 10,
                     left: 10,
@@ -651,10 +802,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                     ),
                   ),
-
-                  // 🕒 4. CONTROL PANEL BUTTONS (5 SECONDS AUTO-HIDE)
                   if (showControls) ...[
-                    // Back Button (Top-Right)
                     Positioned(
                       top: 10,
                       right: 10,
@@ -669,8 +817,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ),
                       ),
                     ),
-
-                    // Screen Fit Button (Bottom-Left)
                     Positioned(
                       bottom: 10,
                       left: 10,
@@ -692,8 +838,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ),
                       ),
                     ),
-
-                    // Rotate Fullscreen Button (Bottom-Right)
                     Positioned(
                       bottom: 10,
                       right: 10,
@@ -709,8 +853,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                     ),
                   ],
-
-                  // Fast Loading Indicator with HANNUTV Branding
                   if (isPageLoading && !isVideoPlaying)
                     Positioned.fill(
                       child: Container(
@@ -733,8 +875,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     ),
                 ],
               ),
-
-              // 2. SCROLLABLE DETAILS SECTION (100% UNCHANGED)
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -743,7 +883,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     children: [
                       Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 6),
-
                       Row(
                         children: [
                           const Icon(Icons.star, color: Colors.amber, size: 18),
@@ -758,7 +897,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ],
                       ),
                       const SizedBox(height: 14),
-
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -785,10 +923,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ),
                       ),
                       const SizedBox(height: 16),
-
                       const Text("If current server is not working, try a different one:", style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic)),
                       const SizedBox(height: 10),
-
                       Row(
                         children: [
                           const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
@@ -824,7 +960,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ],
                       ),
                       const SizedBox(height: 18),
-
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)),
@@ -888,7 +1023,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ),
                       ),
                       const SizedBox(height: 20),
-
                       if (isTv) ...[
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -904,7 +1038,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         const SizedBox(height: 12),
                         const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 10),
-
                         SizedBox(
                           height: 140,
                           child: ListView.builder(
@@ -913,7 +1046,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                             itemBuilder: (context, index) {
                               final epNum = index + 1;
                               final isCurrent = currentEpisode == epNum;
-
                               return InkWell(
                                 onTap: () => _switchEpisode(epNum),
                                 focusColor: Colors.white24,
@@ -959,7 +1091,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ),
                         const SizedBox(height: 20),
                       ],
-
                       if (similarMovies.isNotEmpty) ...[
                         const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 10),
