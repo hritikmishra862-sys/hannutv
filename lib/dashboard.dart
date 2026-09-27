@@ -41,20 +41,20 @@ class DashboardPageState extends State<DashboardPage> {
   int _currentPage = 0;
   String selectedPlatform = 'all';
 
-  // 🔥 ALL PREMIUM OTT CHANNELS ADDED (MAPPED WITH EXACT TMDB IDs)
+  // 🌟 EXACT 11 PANTYFLIX PLATFORMS FROM QUERY
   final List<Map<String, dynamic>> ottPlatforms = [
     {"name": "🔥 HANNUTV VIP", "color": Colors.red, "providerId": "all"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
     {"name": "PRIME VIDEO", "color": Colors.blueAccent, "providerId": "9"},
     {"name": "APPLE TV+", "color": Colors.white70, "providerId": "350"},
     {"name": "CRUNCHYROLL", "color": Colors.orangeAccent, "providerId": "283"},
-    {"name": "DISNEY+", "color": Colors.blue, "providerId": "337"},
+    {"name": "DISNEY+", "color": Colors.lightBlueAccent, "providerId": "337"},
     {"name": "HULU", "color": Colors.greenAccent, "providerId": "15"},
-    {"name": "HBO MAX", "color": Colors.purpleAccent, "providerId": "1899"},
+    {"name": "HBO MAX", "color": Colors.deepPurpleAccent, "providerId": "1899"},
     {"name": "MGM+", "color": Colors.amber, "providerId": "34"},
-    {"name": "PARAMOUNT+", "color": Colors.blueGrey, "providerId": "2303"},
-    {"name": "PEACOCK", "color": Colors.yellow, "providerId": "387"},
-    {"name": "SHUDDER", "color": Colors.red[900], "providerId": "99"},
+    {"name": "PARAMOUNT+", "color": Colors.blue, "providerId": "2303"},
+    {"name": "PEACOCK", "color": Colors.tealAccent, "providerId": "387"},
+    {"name": "SHUDDER", "color": Colors.red, "providerId": "99"},
   ];
 
   @override
@@ -114,6 +114,7 @@ class DashboardPageState extends State<DashboardPage> {
         .toList();
   }
 
+  // 🚀 LIVE STREAM SYNC FOR ALL 11 PLATFORMS (NO WHITE SCREEN, REAL DATA)
   Future<void> loadAllDashboards({String? providerId}) async {
     setState(() {
       isLoading = true;
@@ -122,24 +123,23 @@ class DashboardPageState extends State<DashboardPage> {
     try {
       String base = 'https://api.themoviedb.org/3';
       
-      // Changed watch_region to US/IN to support international apps like Hulu/Peacock
-      String prov = (providerId != null && providerId != 'all' && providerId != 'anime')
+      String prov = (providerId != null && providerId != 'all')
           ? '&with_watch_providers=$providerId&watch_region=US'
           : '';
 
-      String animeGenre = (providerId == 'anime' || providerId == '283') ? '&with_genres=16' : '';
+      String animeFilter = (providerId == '283') ? '&with_genres=16' : '';
 
       String trendUrl = (providerId != null && providerId != 'all')
-          ? '$base/discover/movie?language=en-US&sort_by=popularity.desc$prov$animeGenre'
+          ? '$base/discover/movie?language=en-US&sort_by=popularity.desc$prov$animeFilter'
           : '$base/trending/all/day?language=en-US';
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
-        // Bollywood (Hindi Movies)
+        // Bollywood
         http.get(Uri.parse('$base/discover/movie?language=hi-IN&with_original_language=hi&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Hollywood (English Movies)
+        // Hollywood
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_original_language=en&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Anime Hub (Genre 16)
+        // Anime
         http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=16&sort_by=popularity.desc'), headers: kApiHeaders),
         // Action Movies
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders),
@@ -391,6 +391,7 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
+            // 🌟 11 OTT WATCH PLATFORMS (NETFLIX, PRIME, APPLE TV, CRUNCHYROLL, DISNEY+, HULU, HBO, MGM, PARAMOUNT, PEACOCK, SHUDDER)
             const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
             SizedBox(
               height: 50,
