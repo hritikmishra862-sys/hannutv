@@ -60,7 +60,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   int viewCount = 84920;
 
   // 🔥 5-SECOND CONTROL PANEL TIMER
-  bool showControls = false; // Start hidden, triggered by Logo Click
+  bool showControls = false; // Start hidden, triggered by Logo Click or TV OK Button
   Timer? _hideControlsTimer;
 
   // Cinematic Intro Animation
@@ -85,7 +85,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     {'key': 'hindi-new', 'name': 'Hindi New'},
   ];
 
-  // REAL WORKING PUBLIC COMMENTS
   final List<Map<String, String>> publicComments = [
     {'name': 'SHEEL', 'text': 'HARE KRISHNA 🦚', 'time': '9d', 'avatar': 'S'},
     {'name': 'Rohit Sharma', 'text': 'Best quality on HANNUTV, loving this series! 🔥', 'time': '2d', 'avatar': 'R'},
@@ -101,11 +100,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     currentSeason = widget.season;
     currentEpisode = widget.episode;
 
-    // Start in YouTube Style Portrait mode
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
-    // Setup Cinematic Animation
     _introAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -119,10 +116,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
 
     _fetchSimilarMovies();
     _initStream();
-    _showControlPanel(); // Show controls for the first 5 seconds on load
+    _showControlPanel(); 
   }
 
-  // 🕒 5-SECOND LOGO CONTROL PANEL LOGIC
+  // 🕒 5-SECOND LOGO CONTROL PANEL LOGIC (TV Remote Compatible)
   void _showControlPanel() {
     setState(() => showControls = true);
     _hideControlsTimer?.cancel();
@@ -376,7 +373,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     _showControlPanel(); // Restart the 5-second timer
   }
 
-  // 🖥️ ROTATE & FULLSCREEN LOGIC
   void _toggleFullScreen() {
     setState(() {
       isFullScreen = !isFullScreen;
@@ -487,14 +483,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                 ),
 
               // 🌟 3. PERMANENT HANNUTV LOGO (Top-Left) -> THE MAGIC TRIGGER
+              // 🔥 Changed to InkWell for TV Remote Focus Support
               Positioned(
                 top: 20,
                 left: 20,
                 child: SafeArea(
-                  child: GestureDetector(
+                  child: InkWell(
                     onTap: _toggleControlPanel,
+                    focusColor: Colors.white24,
+                    borderRadius: BorderRadius.circular(8),
                     child: Container(
-                      padding: const EdgeInsets.all(4), // Easier to tap
+                      padding: const EdgeInsets.all(4),
                       child: Opacity(
                         opacity: 0.9,
                         child: Image.asset(
@@ -515,17 +514,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   top: 20,
                   right: 20,
                   child: SafeArea(
-                    child: CircleAvatar(
-                      backgroundColor: Colors.black87,
-                      radius: 22,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                        onPressed: () {
-                          SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-                          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-                          Navigator.pop(context);
-                        },
+                    child: InkWell(
+                      onTap: () {
+                        SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+                        SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+                        Navigator.pop(context);
+                      },
+                      focusColor: Colors.white24,
+                      borderRadius: BorderRadius.circular(22),
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black87,
+                        radius: 22,
+                        child: const Icon(Icons.close, color: Colors.white, size: 28),
                       ),
                     ),
                   ),
@@ -536,8 +536,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   bottom: 20, 
                   left: 20,
                   child: SafeArea(
-                    child: GestureDetector(
+                    child: InkWell(
                       onTap: _cycleAspectRatio,
+                      focusColor: Colors.white24,
+                      borderRadius: BorderRadius.circular(20),
                       child: Container(
                         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
@@ -559,13 +561,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   bottom: 20,
                   right: 20,
                   child: SafeArea(
-                    child: CircleAvatar(
-                      backgroundColor: Colors.black87,
-                      radius: 22,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 28),
-                        onPressed: _toggleFullScreen,
+                    child: InkWell(
+                      onTap: _toggleFullScreen,
+                      focusColor: Colors.white24,
+                      borderRadius: BorderRadius.circular(22),
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black87,
+                        radius: 22,
+                        child: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 28),
                       ),
                     ),
                   ),
@@ -631,12 +634,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                     ),
 
-                  // 🌟 3. PERMANENT HANNUTV LOGO (Top-Left) -> MAGIC TRIGGER
+                  // 🌟 3. PERMANENT HANNUTV LOGO (Top-Left) -> MAGIC TRIGGER (TV Support)
                   Positioned(
                     top: 10,
                     left: 10,
-                    child: GestureDetector(
+                    child: InkWell(
                       onTap: _toggleControlPanel,
+                      focusColor: Colors.white24,
+                      borderRadius: BorderRadius.circular(8),
                       child: Container(
                         padding: const EdgeInsets.all(4),
                         child: Opacity(
@@ -653,13 +658,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     Positioned(
                       top: 10,
                       right: 10,
-                      child: CircleAvatar(
-                        backgroundColor: Colors.black87,
-                        radius: 18,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.close, color: Colors.white, size: 22),
-                          onPressed: () => Navigator.pop(context),
+                      child: InkWell(
+                        onTap: () => Navigator.pop(context),
+                        focusColor: Colors.white24,
+                        borderRadius: BorderRadius.circular(18),
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black87,
+                          radius: 18,
+                          child: const Icon(Icons.close, color: Colors.white, size: 22),
                         ),
                       ),
                     ),
@@ -668,8 +674,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     Positioned(
                       bottom: 10,
                       left: 10,
-                      child: GestureDetector(
+                      child: InkWell(
                         onTap: _cycleAspectRatio,
+                        focusColor: Colors.white24,
+                        borderRadius: BorderRadius.circular(15),
                         child: Container(
                           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white30)),
@@ -689,13 +697,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     Positioned(
                       bottom: 10,
                       right: 10,
-                      child: CircleAvatar(
-                        backgroundColor: Colors.black87,
-                        radius: 18,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.fullscreen, color: Colors.white, size: 22),
-                          onPressed: _toggleFullScreen,
+                      child: InkWell(
+                        onTap: _toggleFullScreen,
+                        focusColor: Colors.white24,
+                        borderRadius: BorderRadius.circular(18),
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black87,
+                          radius: 18,
+                          child: const Icon(Icons.fullscreen, color: Colors.white, size: 22),
                         ),
                       ),
                     ),
@@ -754,13 +763,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         scrollDirection: Axis.horizontal,
                         child: Row(
                           children: [
-                            GestureDetector(
+                            InkWell(
                               onTap: () {
                                 setState(() {
                                   isLiked = !isLiked;
                                   likeCount += isLiked ? 1 : -1;
                                 });
                               },
+                              borderRadius: BorderRadius.circular(20),
                               child: _buildActionButton(isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined, "$likeCount", activeColor: isLiked ? Colors.redAccent : Colors.white),
                             ),
                             const SizedBox(width: 8),
@@ -789,7 +799,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                               child: Row(
                                 children: servers.map((srv) {
                                   final isSelected = activeServer == srv['key'];
-                                  return GestureDetector(
+                                  return InkWell(
                                     onTap: () {
                                       if (activeServer != srv['key']) {
                                         setState(() {
@@ -798,6 +808,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                         _initStream();
                                       }
                                     },
+                                    focusColor: Colors.white24,
+                                    borderRadius: BorderRadius.circular(20),
                                     child: Container(
                                       margin: const EdgeInsets.only(right: 8),
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
@@ -902,8 +914,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                               final epNum = index + 1;
                               final isCurrent = currentEpisode == epNum;
 
-                              return GestureDetector(
+                              return InkWell(
                                 onTap: () => _switchEpisode(epNum),
+                                focusColor: Colors.white24,
+                                borderRadius: BorderRadius.circular(10),
                                 child: Container(
                                   width: 170,
                                   margin: const EdgeInsets.only(right: 12),
@@ -956,7 +970,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                             itemCount: similarMovies.length,
                             itemBuilder: (context, index) {
                               final m = similarMovies[index];
-                              return GestureDetector(
+                              return InkWell(
                                 onTap: () {
                                   Navigator.pushReplacement(
                                     context,
@@ -971,6 +985,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                     ),
                                   );
                                 },
+                                focusColor: Colors.white24,
+                                borderRadius: BorderRadius.circular(8),
                                 child: Container(
                                   width: 110,
                                   margin: const EdgeInsets.only(right: 10),

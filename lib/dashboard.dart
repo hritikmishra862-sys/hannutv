@@ -41,7 +41,6 @@ class DashboardPageState extends State<DashboardPage> {
   int _currentPage = 0;
   String selectedPlatform = 'all';
 
-  // 🌟 EXACT 11 PANTYFLIX PLATFORMS FROM QUERY
   final List<Map<String, dynamic>> ottPlatforms = [
     {"name": "🔥 HANNUTV VIP", "color": Colors.red, "providerId": "all"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
@@ -114,7 +113,6 @@ class DashboardPageState extends State<DashboardPage> {
         .toList();
   }
 
-  // 🚀 LIVE STREAM SYNC FOR ALL 11 PLATFORMS (NO WHITE SCREEN, REAL DATA)
   Future<void> loadAllDashboards({String? providerId}) async {
     setState(() {
       isLoading = true;
@@ -135,17 +133,11 @@ class DashboardPageState extends State<DashboardPage> {
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
-        // Bollywood
         http.get(Uri.parse('$base/discover/movie?language=hi-IN&with_original_language=hi&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Hollywood
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_original_language=en&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Anime
         http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=16&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Action Movies
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Comedy Shows
         http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=35$prov&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Horror Movies
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=27$prov&sort_by=popularity.desc'), headers: kApiHeaders),
       ]);
 
@@ -189,11 +181,78 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  Future<void> _openTelegram() async {
-    if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'),
-        mode: LaunchMode.externalApplication)) {
-      debugPrint('Telegram error');
-    }
+  // 🔥 NEW SUPPORT BOTTOM SHEET FOR TELEGRAM & WHATSAPP
+  void _showSupportOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              
+              // Telegram Option
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(context);
+                  if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication)) {}
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.send, color: Colors.blueAccent, size: 30), // Telegram Icon
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text("Request for New Movie", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text("Join Telegram", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              
+              // WhatsApp Option
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(context);
+                  if (!await launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication)) {}
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chat, color: Colors.greenAccent, size: 30), // WhatsApp Icon
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text("New Movie Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text("Join WhatsApp Channel", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
+    );
   }
 
   void launchPlayerDirect(Map media) {
@@ -237,8 +296,11 @@ class DashboardPageState extends State<DashboardPage> {
             itemCount: moviesData.length,
             itemBuilder: (context, index) {
               final media = moviesData[index];
-              return GestureDetector(
+              // 🔥 FIX: Changed to InkWell for TV Remote Focus Support
+              return InkWell(
                 onTap: () => launchPlayerDirect(media),
+                focusColor: Colors.white24,
+                borderRadius: BorderRadius.circular(8),
                 child: Container(
                   width: 110,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -279,7 +341,7 @@ class DashboardPageState extends State<DashboardPage> {
         actions: [
           IconButton(
             icon: const Icon(Icons.support_agent, color: Colors.red, size: 30),
-            onPressed: _openTelegram,
+            onPressed: _showSupportOptions, // 🔥 Changed to open popup
           )
         ],
       ),
@@ -391,7 +453,6 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            // 🌟 11 OTT WATCH PLATFORMS (NETFLIX, PRIME, APPLE TV, CRUNCHYROLL, DISNEY+, HULU, HBO, MGM, PARAMOUNT, PEACOCK, SHUDDER)
             const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
             SizedBox(
               height: 50,
@@ -432,8 +493,11 @@ class DashboardPageState extends State<DashboardPage> {
                 itemCount: searchResults.length,
                 itemBuilder: (context, index) {
                   final movie = searchResults[index];
-                  return GestureDetector(
+                  // 🔥 FIX: Changed to InkWell for TV Remote Focus Support
+                  return InkWell(
                     onTap: () => launchPlayerDirect(movie),
+                    focusColor: Colors.white24,
+                    borderRadius: BorderRadius.circular(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
