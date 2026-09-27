@@ -64,7 +64,7 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   void _startCarousel() {
-    _carouselTimer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
+    _carouselTimer = Timer.periodic(Duration(seconds: 4), (Timer timer) {
       if (_pageController.hasClients && trendingList.isNotEmpty) {
         _currentPage++;
         if (_currentPage >= (trendingList.length > 5 ? 5 : trendingList.length)) {
@@ -72,7 +72,7 @@ class DashboardPageState extends State<DashboardPage> {
         }
         _pageController.animateToPage(
           _currentPage,
-          duration: const Duration(milliseconds: 800),
+          duration: Duration(milliseconds: 800),
           curve: Curves.easeInOut,
         );
       }
@@ -166,7 +166,7 @@ class DashboardPageState extends State<DashboardPage> {
     }
     setState(() => isSearching = true);
     if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 300), () async {
+    _debounce = Timer(Duration(milliseconds: 300), () async {
       setState(() => isLoading = true);
       try {
         final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
@@ -185,15 +185,15 @@ class DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.grey[900],
-      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
         return Container(
-          padding: const EdgeInsets.all(20),
+          padding: EdgeInsets.all(20),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
+              Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              Container(height: 20),
               InkWell(
                 onTap: () async {
                   Navigator.pop(context);
@@ -201,15 +201,15 @@ class DashboardPageState extends State<DashboardPage> {
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
                   child: Row(
                     children: [
-                      const Icon(Icons.send, color: Colors.blueAccent, size: 30),
-                      const SizedBox(width: 16),
+                      Icon(Icons.send, color: Colors.blueAccent, size: 30),
+                      Container(width: 16),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text("Request for New Movie", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                           Text("Join Telegram", style: TextStyle(color: Colors.grey, fontSize: 12)),
                         ],
@@ -218,7 +218,7 @@ class DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
               ),
-              const SizedBox(height: 12),
+              Container(height: 12),
               InkWell(
                 onTap: () async {
                   Navigator.pop(context);
@@ -226,15 +226,15 @@ class DashboardPageState extends State<DashboardPage> {
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
-                  padding: const EdgeInsets.all(12),
+                  padding: EdgeInsets.all(12),
                   decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
                   child: Row(
                     children: [
-                      const Icon(Icons.chat, color: Colors.greenAccent, size: 30),
-                      const SizedBox(width: 16),
+                      Icon(Icons.chat, color: Colors.greenAccent, size: 30),
+                      Container(width: 16),
                       Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
+                        children: [
                           Text("New Movie Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                           Text("Join WhatsApp Channel", style: TextStyle(color: Colors.grey, fontSize: 12)),
                         ],
@@ -274,44 +274,25 @@ class DashboardPageState extends State<DashboardPage> {
     ).then((_) => setState(() {}));
   }
 
-  // 🎯 UNIVERSAL FOCUS HIGHLIGHT HELPER FOR DASHBOARD
+  // 🎯 REPLACED WITH THE FIXED STATEFUL TV FOCUS BUTTON
   Widget _buildFocusableItem({required Widget child, required VoidCallback onTap}) {
-    return Focus(
-      builder: (context, hasFocus) {
-        return InkWell(
-          onTap: onTap,
-          borderRadius: BorderRadius.circular(8),
-          child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(8),
-              border: Border.all(
-                color: hasFocus ? Colors.redAccent : Colors.transparent, 
-                width: hasFocus ? 3 : 0
-              ),
-              boxShadow: hasFocus ? [BoxShadow(color: Colors.redAccent.withOpacity(0.6), blurRadius: 10)] : [],
-            ),
-            child: child,
-          ),
-        );
-      },
-    );
+    return _TvFocusItem(onTap: onTap, child: child);
   }
 
   Widget _buildHorizontalList(String title, List moviesData) {
-    if (moviesData.isEmpty) return const SizedBox();
+    if (moviesData.isEmpty) return Container();
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-          child: Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+          padding: EdgeInsets.fromLTRB(16, 20, 16, 10),
+          child: Text(title, style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
         ),
-        SizedBox(
+        Container(
           height: 160,
           child: ListView.builder(
             scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
+            padding: EdgeInsets.symmetric(horizontal: 12),
             itemCount: moviesData.length,
             itemBuilder: (context, index) {
               final media = moviesData[index];
@@ -319,7 +300,7 @@ class DashboardPageState extends State<DashboardPage> {
                 onTap: () => launchPlayerDirect(media),
                 child: Container(
                   width: 110,
-                  margin: const EdgeInsets.symmetric(horizontal: 4),
+                  margin: EdgeInsets.symmetric(horizontal: 4),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
@@ -332,10 +313,10 @@ class DashboardPageState extends State<DashboardPage> {
                             fit: BoxFit.cover,
                           ),
                         ),
-                        child: const Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 40)),
+                        child: Center(child: Icon(Icons.play_circle_fill, color: Colors.white70, size: 40)),
                       ),
-                      const SizedBox(height: 4),
-                      Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                      Container(height: 4),
+                      Text(media['title'] ?? '', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                     ],
                   ),
                 ),
@@ -355,19 +336,12 @@ class DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          Focus(
-            builder: (context, hasFocus) {
-              return Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: hasFocus ? Colors.redAccent : Colors.transparent, width: 2),
-                  borderRadius: BorderRadius.circular(30),
-                ),
-                child: IconButton(
-                  icon: const Icon(Icons.support_agent, color: Colors.red, size: 30),
-                  onPressed: _showSupportOptions,
-                ),
-              );
-            }
+          _TvFocusItem(
+            onTap: _showSupportOptions,
+            child: Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Icon(Icons.support_agent, color: Colors.red, size: 30),
+            ),
           )
         ],
       ),
@@ -377,7 +351,7 @@ class DashboardPageState extends State<DashboardPage> {
           children: [
             Stack(
               children: [
-                SizedBox(
+                Container(
                   height: 400,
                   child: trendingList.isEmpty
                       ? Container(color: Colors.black)
@@ -403,19 +377,19 @@ class DashboardPageState extends State<DashboardPage> {
                     gradient: LinearGradient(
                       begin: Alignment.bottomCenter,
                       end: Alignment.topCenter,
-                      colors: [const Color(0xFF0F0F0F), Colors.transparent, Colors.black.withOpacity(0.9)],
+                      colors: [Color(0xFF0F0F0F), Colors.transparent, Colors.black.withOpacity(0.9)],
                     ),
                   ),
                 ),
                 SafeArea(
                   child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
+                    padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 8.0),
                     child: Row(
                       children: [
                         isSearching
                             ? Expanded(
                                 child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 12),
+                                  padding: EdgeInsets.symmetric(horizontal: 12),
                                   decoration: BoxDecoration(
                                     color: Colors.black87,
                                     borderRadius: BorderRadius.circular(25),
@@ -423,14 +397,14 @@ class DashboardPageState extends State<DashboardPage> {
                                   ),
                                   child: TextField(
                                     controller: searchController,
-                                    style: const TextStyle(color: Colors.white),
+                                    style: TextStyle(color: Colors.white),
                                     autofocus: true,
                                     decoration: InputDecoration(
                                       hintText: 'Search Movies & Shows on HANNUTV...',
                                       border: InputBorder.none,
-                                      prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
+                                      prefixIcon: Icon(Icons.search, color: Colors.redAccent),
                                       suffixIcon: IconButton(
-                                        icon: const Icon(Icons.close, color: Colors.white),
+                                        icon: Icon(Icons.close, color: Colors.white),
                                         onPressed: () {
                                           setState(() {
                                             isSearching = false;
@@ -447,12 +421,12 @@ class DashboardPageState extends State<DashboardPage> {
                             : Expanded(
                                 child: Align(
                                   alignment: Alignment.centerLeft,
-                                  child: Image.asset('assets/logo.png', height: 35, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontSize: 24, fontWeight: FontWeight.bold))),
+                                  child: Image.asset('assets/logo.png', height: 35, errorBuilder: (_, __, ___) => Text('HANNUTV', style: TextStyle(color: Colors.red, fontSize: 24, fontWeight: FontWeight.bold))),
                                 ),
                               ),
                         if (!isSearching)
                           IconButton(
-                            icon: const Icon(Icons.search, color: Colors.white, size: 28),
+                            icon: Icon(Icons.search, color: Colors.white, size: 28),
                             onPressed: () => setState(() => isSearching = true),
                           ),
                       ],
@@ -465,15 +439,15 @@ class DashboardPageState extends State<DashboardPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(trendingList[_currentPage]['title'] ?? 'Title', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
-                        const SizedBox(height: 8),
+                        Text(trendingList[_currentPage]['title'] ?? 'Title', style: TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
+                        Container(height: 8),
                         _buildFocusableItem(
                           onTap: () => launchPlayerDirect(trendingList[_currentPage]),
                           child: ElevatedButton.icon(
-                            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24)),
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: EdgeInsets.symmetric(vertical: 12, horizontal: 24)),
                             onPressed: () => launchPlayerDirect(trendingList[_currentPage]),
-                            icon: const Icon(Icons.play_arrow, size: 24),
-                            label: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                            icon: Icon(Icons.play_arrow, size: 24),
+                            label: Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
                           ),
                         ),
                       ],
@@ -482,17 +456,17 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
-            SizedBox(
+            Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
+            Container(
               height: 50,
               child: ListView.builder(
-                scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
+                scrollDirection: Axis.horizontal, padding: EdgeInsets.symmetric(horizontal: 12),
                 itemCount: ottPlatforms.length,
                 itemBuilder: (context, index) {
                   final srv = ottPlatforms[index];
                   final isSelected = selectedPlatform == srv['providerId'];
                   return Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 4),
+                    margin: EdgeInsets.symmetric(horizontal: 4),
                     child: _buildFocusableItem(
                       onTap: () {
                         searchController.clear();
@@ -519,13 +493,13 @@ class DashboardPageState extends State<DashboardPage> {
             ),
 
             if (isLoading)
-              const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
+              Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
             else if (isSearching)
               GridView.builder(
                 shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 20),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 0.65, crossAxisSpacing: 12, mainAxisSpacing: 12),
+                physics: NeverScrollableScrollPhysics(),
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 20),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 0.65, crossAxisSpacing: 12, mainAxisSpacing: 12),
                 itemCount: searchResults.length,
                 itemBuilder: (context, index) {
                   final movie = searchResults[index];
@@ -535,8 +509,8 @@ class DashboardPageState extends State<DashboardPage> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Expanded(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), image: DecorationImage(image: NetworkImage(movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover)))),
-                        const SizedBox(height: 6),
-                        Text(movie['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                        Container(height: 6),
+                        Text(movie['title'] ?? '', style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                       ],
                     ),
                   );
@@ -552,8 +526,50 @@ class DashboardPageState extends State<DashboardPage> {
               _buildHorizontalList('Comedy Shows', comedyList),
               _buildHorizontalList('Horror Movies', horrorList),
             ],
-            const SizedBox(height: 40),
+            Container(height: 40),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+// 🎯 NEW STATEFUL WIDGET TO FIX DASHBOARD FOCUS ERROR COMPLETELY
+class _TvFocusItem extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _TvFocusItem({Key? key, required this.child, required this.onTap}) : super(key: key);
+
+  @override
+  State<_TvFocusItem> createState() => _TvFocusItemState();
+}
+
+class _TvFocusItemState extends State<_TvFocusItem> {
+  bool _hasFocus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (hasFocus) {
+        if (mounted) {
+          setState(() => _hasFocus = hasFocus);
+        }
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _hasFocus ? Colors.redAccent : Colors.transparent, 
+              width: _hasFocus ? 4 : 0
+            ),
+            boxShadow: _hasFocus ? [BoxShadow(color: Colors.redAccent.withOpacity(0.6), blurRadius: 10)] : [],
+          ),
+          child: widget.child,
         ),
       ),
     );
