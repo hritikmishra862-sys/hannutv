@@ -16,7 +16,7 @@ const Map<String, String> kApiHeaders = {
 
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
-  final String mediaType; // 'movie' or 'tv'
+  final String mediaType; 
   final int season;
   final int episode;
   final String movieTitle;
@@ -48,7 +48,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   bool isVideoPlaying = false;
   bool isFullScreen = false;
   bool isPageLoading = true;
-  String activeServer = 'vidrift'; // Default to Rift
+  String activeServer = 'vidrift'; 
   String currentAspectRatio = 'contain'; 
 
   late int currentSeason;
@@ -437,7 +437,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   }
 
   // ==========================================
-  // 📺 TV UI LAYOUT (Full Screen Video Background)
+  // 📺 TV UI LAYOUT
   // ==========================================
   Widget _buildTVLayout() {
     return Scaffold(
@@ -588,7 +588,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     if (isTvDevice) return _buildTVLayout(); 
 
     // ==========================================
-    // 📱 MOBILE LAYOUT (Untouched Mobile Code)
+    // 📱 MOBILE LAYOUT 
     // ==========================================
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
@@ -1022,7 +1022,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       if (similarMovies.isNotEmpty) ...[
                         const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 10),
-                        SizedBox(
+                        Container(
                           height: 160,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
