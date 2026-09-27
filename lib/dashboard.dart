@@ -220,7 +220,6 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // 🔥 TV Support Sheet Fixed: Restored WhatsApp and Telegram Both + App Version
   void _showSupportOptions() {
     showModalBottomSheet(
       context: context,
@@ -284,7 +283,7 @@ class DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              // 🔥 Added App Version Information here
+              // 🔥 Added App Version here
               const Center(
                 child: Text("App Version: v1.0.0", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
               ),
@@ -411,7 +410,7 @@ class DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // 🔥 NEW: Notification Bell Icon 
+          // 🔥 Notification Bell Added
           _TvFocusItem(
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -423,7 +422,6 @@ class DashboardPageState extends State<DashboardPage> {
               child: Icon(Icons.notifications_active, color: Colors.white, size: 28),
             ),
           ),
-          // 🔥 FIXED: Calls Support Sheet correctly now
           _TvFocusButton(
             onTap: _showSupportOptions,
             borderRadius: BorderRadius.circular(20),
