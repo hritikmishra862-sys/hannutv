@@ -89,7 +89,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   List similarMovies = [];
   bool isLoadingSimilar = false;
 
-  // 🤖 AI DEVICE DETECTION (TV vs MOBILE)
   bool isTvDevice = false;
 
   @override
@@ -117,7 +116,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final size = MediaQuery.of(context).size;
       setState(() {
-        // TV SCREEN DETECTION LOGIC
         isTvDevice = size.width > size.height && size.width > 600; 
         if (isTvDevice) {
            isFullScreen = true; 
@@ -208,7 +206,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
-  // 🛡️ THE ULTIMATE HARDCODED AD-BLOCKER (AI Mutation + Z-Index Video Fix)
   void _initStream() {
     setState(() {
       isPageLoading = true;
@@ -248,7 +245,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               window.open = function() { return null; };
               window.alert = function() { return null; };
 
-              // 1. Aggressive CSS Nuke (Destroys all Captchas & Ads structurally)
               var style = document.createElement('style');
               style.innerHTML = `
                 header, nav, .navbar, footer, .footer,
@@ -267,7 +263,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               `;
               document.head.appendChild(style);
 
-              // 2. Real-time AI Ad-Killer (Watches for anything trying to spawn)
               const adKeywords = ['(ads)', 'rift(ads)', 'bolt(ads)', 'fast(ads)', 'cinezo(ads)', 'hindi new', 'mutual funds', 'business news', 'robot', 'captcha', 'telegram', 'dmca'];
               const observer = new MutationObserver((mutations) => {
                   mutations.forEach((mutation) => {
@@ -283,7 +278,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               });
               observer.observe(document.body, { childList: true, subtree: true });
 
-              // 3. THE Z-INDEX VIDEO HACK: Forces Video on top of EVERYTHING
               setInterval(function() {
                 var fsBtns = document.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"], .plyr__controls__item[data-plyr="fullscreen"]');
                 fsBtns.forEach(btn => { btn.style.display = 'none'; btn.style.opacity = '0'; btn.style.pointerEvents = 'none'; });
@@ -291,7 +285,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
-                  // THIS MAKES THE VIDEO COVER ANY HIDDEN ROBOT CAPTCHA
                   v.style.position = 'fixed';
                   v.style.top = '0';
                   v.style.left = '0';
@@ -311,7 +304,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // 🚫 MASSIVE URL AD-BLOCKER LIST (Untouched)
             if (url.contains('doubleclick') || url.contains('popads') ||
                 url.contains('1xbet') || url.contains('bet365') ||
                 url.contains('onclick') || url.contains('adsterra') ||
@@ -420,28 +412,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     super.dispose();
   }
 
-  // 🎯 UNIVERSAL GLOWING HIGHLIGHT HELPER FOR TV REMOTE
+  // 🎯 REPLACED WITH THE FIXED STATEFUL TV FOCUS BUTTON
   Widget _buildFocusableButton({required Widget child, required VoidCallback onTap, BorderRadius? radius}) {
-    return Focus(
-      builder: (context, hasFocus) {
-        return InkWell(
-          onTap: onTap,
-          borderRadius: radius ?? BorderRadius.circular(20),
-          child: AnimatedContainer(
-            duration: Duration(milliseconds: 150),
-            decoration: BoxDecoration(
-              borderRadius: radius ?? BorderRadius.circular(20),
-              border: Border.all(
-                color: hasFocus ? Colors.redAccent : Colors.transparent, 
-                width: hasFocus ? 4 : 0 // 🔥 Thicker Red Border for TV
-              ),
-              boxShadow: hasFocus ? [BoxShadow(color: Colors.redAccent.withOpacity(0.8), blurRadius: 15, spreadRadius: 2)] : [],
-            ),
-            child: child,
-          ),
-        );
-      },
-    );
+    return _TvFocusButton(onTap: onTap, radius: radius, child: child);
   }
 
   // ==========================================
@@ -1103,6 +1076,56 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
           Container(width: 6),
           Text(title, style: TextStyle(color: activeColor, fontSize: 12, fontWeight: FontWeight.w600)),
         ],
+      ),
+    );
+  }
+}
+
+// 🎯 NEW STATEFUL WIDGET TO FIX TV FOCUS ERROR COMPLETELY
+class _TvFocusButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final BorderRadius? radius;
+
+  const _TvFocusButton({
+    Key? key,
+    required this.child,
+    required this.onTap,
+    this.radius,
+  }) : super(key: key);
+
+  @override
+  State<_TvFocusButton> createState() => _TvFocusButtonState();
+}
+
+class _TvFocusButtonState extends State<_TvFocusButton> {
+  bool _hasFocus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (hasFocus) {
+        if (mounted) {
+          setState(() {
+            _hasFocus = hasFocus;
+          });
+        }
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: widget.radius ?? BorderRadius.circular(20),
+        child: AnimatedContainer(
+          duration: Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: widget.radius ?? BorderRadius.circular(20),
+            border: Border.all(
+              color: _hasFocus ? Colors.redAccent : Colors.transparent, 
+              width: _hasFocus ? 4 : 0
+            ),
+            boxShadow: _hasFocus ? [BoxShadow(color: Colors.redAccent.withOpacity(0.8), blurRadius: 15, spreadRadius: 2)] : [],
+          ),
+          child: widget.child,
+        ),
       ),
     );
   }
