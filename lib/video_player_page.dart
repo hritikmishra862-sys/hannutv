@@ -413,120 +413,127 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
       // ==========================================
       // 🖥️ PURE LANDSCAPE FULLSCREEN VIEW
       // ==========================================
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: GestureDetector(
-          onTap: _resetHideTimer, // Tap anywhere to show/reset 3s timer
-          behavior: HitTestBehavior.opaque,
-          child: Stack(
-            children: [
-              Positioned.fill(
-                child: WebViewWidget(controller: _controller),
-              ),
+      return PopScope(
+        canPop: false,
+        onPopInvoked: (bool didPop) {
+          if (didPop) return;
+          _toggleFullScreen();
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: GestureDetector(
+            onTap: _resetHideTimer, // Tap anywhere to show/reset 3s timer
+            behavior: HitTestBehavior.opaque,
+            child: Stack(
+              children: [
+                Positioned.fill(
+                  child: WebViewWidget(controller: _controller),
+                ),
 
-              // 🌟 1. PERMANENT HANNUTV LOGO & ROTATE BUTTON (BOTTOM-LEFT)
-              Positioned(
-                bottom: 16,
-                left: 16,
-                child: SafeArea(
-                  child: Row(
-                    crossAxisAlignment: CrossAxisAlignment.center,
-                    children: [
-                      CircleAvatar(
+                // 🌟 1. PERMANENT HANNUTV LOGO & ROTATE BUTTON (BOTTOM-LEFT)
+                Positioned(
+                  bottom: 16,
+                  left: 16,
+                  child: SafeArea(
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.center,
+                      children: [
+                        CircleAvatar(
+                          backgroundColor: Colors.black54,
+                          radius: 20,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.screen_rotation, color: Colors.white, size: 24),
+                            onPressed: _toggleFullScreen,
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Opacity(
+                          opacity: 0.9,
+                          child: Image.asset(
+                            'assets/logo.png',
+                            height: 32,
+                            errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+
+                // 🌟 2. PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (ABOVE ROTATE BUTTON, LOW OPACITY)
+                Positioned(
+                  bottom: 64, // Placed above the rotate button
+                  left: 16,
+                  child: SafeArea(
+                    child: Opacity(
+                      opacity: 0.5, // Low opacity as requested
+                      child: GestureDetector(
+                        onTap: _cycleAspectRatio,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                          decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.aspect_ratio, color: Colors.white, size: 16),
+                              const SizedBox(width: 6),
+                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 🌟 3. HANNUTV CINEMATIC INTRO ANIMATION ON PLAY
+                if (showIntroAnimation)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(
+                        child: AnimatedBuilder(
+                          animation: _introAnimController,
+                          builder: (context, child) {
+                            return Opacity(
+                              opacity: _introOpacityAnimation.value,
+                              child: Transform.scale(
+                                scale: _introScaleAnimation.value,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
+                                    const SizedBox(height: 10),
+                                    const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // 🕒 4. AUTO-HIDE BACK BUTTON (3 SECONDS)
+                if (showControls) 
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    child: SafeArea(
+                      child: CircleAvatar(
                         backgroundColor: Colors.black54,
                         radius: 20,
                         child: IconButton(
                           padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.screen_rotation, color: Colors.white, size: 24),
+                          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
                           onPressed: _toggleFullScreen,
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      Opacity(
-                        opacity: 0.9,
-                        child: Image.asset(
-                          'assets/logo.png',
-                          height: 32,
-                          errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-              // 🌟 2. PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (TOP-RIGHT, LOW OPACITY)
-              Positioned(
-                top: 16,
-                right: 16,
-                child: SafeArea(
-                  child: Opacity(
-                    opacity: 0.5, // Not highly highlighted
-                    child: GestureDetector(
-                      onTap: _cycleAspectRatio,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                        decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(Icons.aspect_ratio, color: Colors.white, size: 16),
-                            const SizedBox(width: 6),
-                            Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                          ],
-                        ),
-                      ),
                     ),
                   ),
-                ),
-              ),
-
-              // 🌟 3. HANNUTV CINEMATIC INTRO ANIMATION ON PLAY
-              if (showIntroAnimation)
-                Positioned.fill(
-                  child: IgnorePointer(
-                    child: Center(
-                      child: AnimatedBuilder(
-                        animation: _introAnimController,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _introOpacityAnimation.value,
-                            child: Transform.scale(
-                              scale: _introScaleAnimation.value,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
-                                  const SizedBox(height: 10),
-                                  const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
-                ),
-
-              // 🕒 4. AUTO-HIDE BACK BUTTON (3 SECONDS)
-              if (showControls) 
-                Positioned(
-                  top: 16,
-                  left: 16,
-                  child: SafeArea(
-                    child: CircleAvatar(
-                      backgroundColor: Colors.black54,
-                      radius: 20,
-                      child: IconButton(
-                        padding: EdgeInsets.zero,
-                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-                        onPressed: _toggleFullScreen,
-                      ),
-                    ),
-                  ),
-                ),
-            ],
+              ],
+            ),
           ),
         ),
       );
@@ -560,10 +567,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       child: WebViewWidget(controller: _controller),
                     ),
 
-                    // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (TOP-RIGHT, LOW OPACITY)
+                    // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (ABOVE ROTATE BUTTON, LOW OPACITY)
                     Positioned(
-                      top: 10,
-                      right: 10,
+                      bottom: 48, // Placed above the rotate button
+                      left: 8,
                       child: Opacity(
                         opacity: 0.5,
                         child: GestureDetector(
@@ -811,6 +818,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                               ],
                             ),
                             const SizedBox(height: 10),
+
+                            // Comment Input Box
                             Row(
                               children: [
                                 Expanded(
@@ -869,7 +878,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       const SizedBox(height: 20),
 
                       // Episodes Section (If TV Show)
-                      if (isTv) ...[
+                      if (widget.mediaType == 'tv' || widget.mediaType == 'series') ...[
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [

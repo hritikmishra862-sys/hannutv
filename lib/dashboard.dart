@@ -41,7 +41,7 @@ class DashboardPageState extends State<DashboardPage> {
   int _currentPage = 0;
   String selectedPlatform = 'all';
 
-  // 🌟 PURE HANNUTV OTT WATCH CHANNELS (NETFLIX, HOTSTAR, PRIME, JIO, ANIME, APPLE TV)
+  // 🌟 PURE HANNUTV BRANDED OTT & CHANNELS
   final List<Map<String, dynamic>> ottPlatforms = [
     {"name": "🔥 HANNUTV VIP", "color": Colors.red, "providerId": "all"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
@@ -129,17 +129,11 @@ class DashboardPageState extends State<DashboardPage> {
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
-        // Bollywood (Hindi Movies)
         http.get(Uri.parse('$base/discover/movie?language=hi-IN&with_original_language=hi&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Hollywood (English Movies)
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_original_language=en&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Anime Hub (Genre 16)
         http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=16&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Action Movies
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Comedy Shows
         http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=35$prov&sort_by=popularity.desc'), headers: kApiHeaders),
-        // Horror Movies
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=27$prov&sort_by=popularity.desc'), headers: kApiHeaders),
       ]);
 
@@ -385,7 +379,6 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            // 🌟 OTT WATCH CHANNELS (PURE HANNUTV BRANDED)
             const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
             SizedBox(
               height: 50,
