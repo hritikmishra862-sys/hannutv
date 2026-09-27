@@ -38,7 +38,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   bool isVideoPlaying = false;
   bool isFullScreen = false;
   bool isPageLoading = true;
-  String activeServer = 'vidrift'; // Default Rift Server
+  String activeServer = 'vidrift'; // Default to Rift
 
   late int currentSeason;
   late int currentEpisode;
@@ -46,7 +46,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   int likeCount = 1248;
   int viewCount = 84920;
 
-  // 🤖 PANTYFLIX WORKING SERVERS (RIFT, SPIRAL, HYDRA, VIDBOLT)
+  final TextEditingController commentInputController = TextEditingController();
+
+  // 🤖 VERIFIED SERVERS
   final List<Map<String, String>> servers = [
     {'key': 'vidrift', 'name': 'Rift'},
     {'key': 'spiral', 'name': 'Spiral'},
@@ -54,7 +56,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     {'key': 'vidbolt', 'name': 'VidBolt VIP'},
   ];
 
-  // REALISTIC PUBLIC COMMENTS FOR OTT APP
+  // REAL WORKING INTERACTIVE COMMENTS
   final List<Map<String, String>> publicComments = [
     {'name': 'SHEEL', 'text': 'HARE KRISHNA 🦚', 'time': '9d', 'avatar': 'S'},
     {'name': 'Rohit Sharma', 'text': 'Best quality on HANNUTV, loving this series! 🔥', 'time': '2d', 'avatar': 'R'},
@@ -67,14 +69,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     currentSeason = widget.season;
     currentEpisode = widget.episode;
 
-    // Start in Portrait mode (YouTube Style UI)
+    // Start in YouTube Style Portrait mode
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     _initStream();
   }
 
-  String _buildPantyflixStreamUrl() {
+  String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
     }
@@ -84,7 +86,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 🚀 DIRECT PANTYFLIX STREAM URL ENGINE
+    // 🚀 CLEAN STREAM ROUTING
     if (activeServer == 'vidrift') {
       return isTv
           ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=vidrift'
@@ -101,7 +103,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           : 'https://vidsrc.to/embed/movie/$id';
     }
 
-    // VidBolt VIP
     return isTv
         ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
         : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
@@ -113,7 +114,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       isVideoPlaying = false;
     });
 
-    final targetUrl = _buildPantyflixStreamUrl();
+    final targetUrl = _buildStreamUrl();
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -140,17 +141,37 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🛡️ WORLD'S BEST AD-KILLER, AUTO-PLAY & BRANDING NUKER
+            // 🛡️ HARDCORE CSS & JS: HIDE IN-PLAYER SERVER SELECTOR, ADS, DMCA & BRANDING
             String jsCode = '''
-              // Force Black Screen
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
-              // Prevent all redirects and popups
               window.open = function() { return null; };
               window.alert = function() { return null; };
               window.confirm = function() { return null; };
 
+              // 1. Permanent CSS Inject to Nuke In-Player Dropdown, Headers & Ads
+              var style = document.createElement('style');
+              style.innerHTML = `
+                header, nav, .navbar, footer, .footer,
+                .server-select, .server-dropdown, select[name*="server"], 
+                div[class*="server-dropdown"], div[class*="server-btn"],
+                a[href*="t.me"], a[href*="telegram"], [class*="telegram"], 
+                iframe[src*="ads"], .ad-container, .ads, .ad-banner, .popup-overlay,
+                .dmca-notice, .copyright, [href*="mailto:"] { 
+                  display: none !important; 
+                  opacity: 0 !important;
+                  pointer-events: none !important;
+                  visibility: hidden !important;
+                }
+                body { 
+                  background-color: #000000 !important; 
+                  color: #ffffff !important;
+                }
+              `;
+              document.head.appendChild(style);
+
+              // 2. Real-time Cleanup Loop (Every 200ms)
               setInterval(function() {
                 // A. Video Auto Play & Unmute
                 var vids = document.getElementsByTagName('video');
@@ -171,34 +192,26 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .jw-display-icon-container, [aria-label="Play"], button[title*="Play"], .play-icon, #play-button');
                 playBtns.forEach(function(b) { b.click(); });
 
-                // C. Kill Pantyflix Telegram, Header, Footer, DMCA, support emails & Ads
-                document.querySelectorAll('div, a, span, img, section, modal, aside, p, h2, header, footer, nav').forEach(el => {
+                // C. Nuke In-Player Server pill and ads
+                document.querySelectorAll('div, a, span, img, section, modal, aside, p, select, button').forEach(el => {
                   let text = el.innerText ? el.innerText.toLowerCase() : '';
-                  let href = el.href ? el.href.toLowerCase() : '';
                   let className = el.className ? el.className.toString().toLowerCase() : '';
-                  let style = window.getComputedStyle(el);
 
-                  // Remove Telegram & DMCA / Contact
-                  if (text.includes('telegram') || text.includes('dmca') || text.includes('support@') || href.includes('t.me') || text.includes('contact us')) {
+                  if (text.includes('rift(ads)') || text.includes('rift (ads)') || className.includes('server-select') || className.includes('server-drop')) {
+                    el.style.display = 'none';
                     el.remove();
                   }
 
-                  // Remove Navbar/Header
-                  if (el.tagName === 'HEADER' || el.tagName === 'NAV' || className.includes('header') || className.includes('navbar')) {
-                    el.style.display = 'none';
+                  if (text.includes('telegram') || text.includes('dmca') || text.includes('support@') || text.includes('contact us')) {
+                    el.remove();
                   }
 
-                  // Remove Floating Ad Overlays
+                  let style = window.getComputedStyle(el);
                   if ((style.position === 'fixed' || style.position === 'absolute') && 
                       style.zIndex > 1000 && 
                       el.tagName !== 'IFRAME' && 
                       el.tagName !== 'VIDEO' &&
                       !el.contains(document.querySelector('video'))) {
-                    el.remove();
-                  }
-
-                  // Banners
-                  if (className.includes('banner') || className.includes('ad-') || className.includes('popup')) {
                     el.remove();
                   }
                 });
@@ -209,7 +222,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // 🚫 HARD BLOCK ADS & BETTING POPUPS
+            // 🚫 HARD BLOCK AD NETWORKS & BETTING POPUPS
             if (url.contains('doubleclick') ||
                 url.contains('popads') ||
                 url.contains('1xbet') ||
@@ -276,12 +289,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
 
     if (isFullScreen) {
+      // 🖥️ PURE DESKTOP-STYLE FULLSCREEN LANDSCAPE VIEW
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
       ]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     } else {
+      // 📱 PORTRAIT YOUTUBE VIEW
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
@@ -294,8 +309,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _initStream();
   }
 
+  void _addComment() {
+    final text = commentInputController.text.trim();
+    if (text.isNotEmpty) {
+      setState(() {
+        publicComments.insert(0, {
+          'name': 'You',
+          'text': text,
+          'time': 'Just now',
+          'avatar': 'Y',
+        });
+        commentInputController.clear();
+      });
+    }
+  }
+
   @override
   void dispose() {
+    commentInputController.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
@@ -304,6 +335,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   Widget build(BuildContext context) {
     if (isFullScreen) {
+      // 🖥️ PURE FULLSCREEN CINEMA ROTATION (NO DROPDOWNS, CLEAN VIDEO ONLY)
       return Scaffold(
         backgroundColor: Colors.black,
         body: Stack(
@@ -311,13 +343,30 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             Positioned.fill(
               child: WebViewWidget(controller: _controller),
             ),
+            // Right Side Watermark Logo
+            Positioned(
+              top: 16,
+              right: 60,
+              child: SafeArea(
+                child: Opacity(
+                  opacity: 0.7,
+                  child: Image.asset('assets/logo.png', height: 28, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold))),
+                ),
+              ),
+            ),
+            // Exit Fullscreen Button
             Positioned(
               top: 16,
               right: 16,
               child: SafeArea(
-                child: IconButton(
-                  icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 28),
-                  onPressed: _toggleFullScreen,
+                child: CircleAvatar(
+                  backgroundColor: Colors.black54,
+                  radius: 18,
+                  child: IconButton(
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 24),
+                    onPressed: _toggleFullScreen,
+                  ),
                 ),
               ),
             ),
@@ -326,7 +375,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       );
     }
 
-    // 📱 EXACT SCREENSHOT YOUTUBE PORTRAIT LAYOUT
+    // 📱 YOUTUBE-STYLE PORTRAIT UI (EXACT SCREENSHOT LAYOUT)
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       body: SafeArea(
@@ -343,7 +392,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   child: WebViewWidget(controller: _controller),
                 ),
 
-                // Top Back Arrow
+                // Top Back Button
                 Positioned(
                   top: 8,
                   left: 8,
@@ -355,6 +404,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
                       onPressed: () => Navigator.pop(context),
                     ),
+                  ),
+                ),
+
+                // 🌟 TOP RIGHT HANNUTV WATERMARK LOGO
+                Positioned(
+                  top: 12,
+                  right: 12,
+                  child: Opacity(
+                    opacity: 0.8,
+                    child: Image.asset('assets/logo.png', height: 26, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 13))),
                   ),
                 ),
 
@@ -373,7 +432,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   ),
                 ),
 
-                // Fast Loading Spinner
+                // Fast Loading Indicator
                 if (isPageLoading && !isVideoPlaying)
                   Positioned.fill(
                     child: Container(
@@ -511,7 +570,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                     ),
                     const SizedBox(height: 18),
 
-                    // Real Comments Section
+                    // Working Comments Section (Interactive Add & Read)
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -529,9 +588,37 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             ],
                           ),
                           const SizedBox(height: 10),
+
+                          // Comment Input Box
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: commentInputController,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  decoration: InputDecoration(
+                                    hintText: 'Add a comment...',
+                                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                                    filled: true,
+                                    fillColor: Colors.black45,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.send, color: Colors.redAccent, size: 20),
+                                onPressed: _addComment,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Comments List
                           ...publicComments.map((c) => Padding(
                             padding: const EdgeInsets.only(bottom: 8.0),
                             child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
                                 CircleAvatar(
                                   radius: 14,
@@ -585,7 +672,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
 
-                      // Real Episodes Grid Cards
+                      // Episodes Grid Cards
                       SizedBox(
                         height: 140,
                         child: ListView.builder(

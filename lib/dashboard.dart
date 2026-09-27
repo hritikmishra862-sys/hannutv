@@ -23,10 +23,12 @@ class DashboardPage extends StatefulWidget {
 
 class DashboardPageState extends State<DashboardPage> {
   List trendingList = [];
+  List bollywoodList = [];
+  List hollywoodList = [];
+  List animeList = [];
   List actionList = [];
   List comedyList = [];
   List horrorList = [];
-  List dramaList = [];
   List searchResults = [];
 
   bool isLoading = true;
@@ -37,15 +39,17 @@ class DashboardPageState extends State<DashboardPage> {
   final PageController _pageController = PageController();
   Timer? _carouselTimer;
   int _currentPage = 0;
+  String selectedPlatform = 'all';
 
-  // OTT Watch Provider Channels (Pantyflix VIP, Netflix, Prime, Hotstar, Jio, etc.)
+  // 🌟 PURE HANNUTV BRANDED OTT & CHANNELS (NETFLIX, HOTSTAR, PRIME, JIO, ANIME, APPLE TV)
   final List<Map<String, dynamic>> ottPlatforms = [
-    {"name": "🔥 PANTYFLIX VIP", "color": Colors.red, "providerId": "pantyflix"},
+    {"name": "🔥 HANNUTV VIP", "color": Colors.red, "providerId": "all"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
     {"name": "PRIME", "color": Colors.blueAccent, "providerId": "119"},
     {"name": "HOTSTAR", "color": Colors.green, "providerId": "122"},
-    {"name": "SONYLIV", "color": Colors.orange, "providerId": "237"},
-    {"name": "ZEE5", "color": Colors.purple, "providerId": "232"},
+    {"name": "JIO CINEMA", "color": Colors.pinkAccent, "providerId": "220"},
+    {"name": "APPLE TV+", "color": Colors.white70, "providerId": "350"},
+    {"name": "ANIME HUB", "color": Colors.orangeAccent, "providerId": "anime"},
   ];
 
   @override
@@ -106,31 +110,48 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> loadAllDashboards({String? providerId}) async {
-    setState(() => isLoading = true);
+    setState(() {
+      isLoading = true;
+      selectedPlatform = providerId ?? 'all';
+    });
     try {
       String base = 'https://api.themoviedb.org/3';
-      String prov = (providerId != null && providerId != 'pantyflix')
+      
+      // Smart filter: Hotstar/Jio/AppleTV/Netflix/Anime
+      String prov = (providerId != null && providerId != 'all' && providerId != 'anime')
           ? '&with_watch_providers=$providerId&watch_region=IN'
           : '';
 
-      String trendUrl = (providerId != null && providerId != 'pantyflix')
-          ? '$base/discover/tv?language=en-US&sort_by=popularity.desc$prov'
+      String animeGenre = (providerId == 'anime') ? '&with_genres=16' : '';
+
+      String trendUrl = (providerId != null && providerId != 'all')
+          ? '$base/discover/movie?language=en-US&sort_by=popularity.desc$prov$animeGenre'
           : '$base/trending/all/day?language=en-US';
 
       var responses = await Future.wait([
         http.get(Uri.parse(trendUrl), headers: kApiHeaders),
+        // Bollywood (Hindi Movies)
+        http.get(Uri.parse('$base/discover/movie?language=hi-IN&with_original_language=hi&sort_by=popularity.desc'), headers: kApiHeaders),
+        // Hollywood (English Movies)
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_original_language=en&sort_by=popularity.desc'), headers: kApiHeaders),
+        // Anime Hub (Genre 16)
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=16&sort_by=popularity.desc'), headers: kApiHeaders),
+        // Action Movies
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders),
+        // Comedy Shows
         http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=35$prov&sort_by=popularity.desc'), headers: kApiHeaders),
+        // Horror Movies
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=27$prov&sort_by=popularity.desc'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=18$prov&sort_by=popularity.desc'), headers: kApiHeaders),
       ]);
 
       setState(() {
-        trendingList = parseData(responses[0], forceMediaType: (providerId != null && providerId != 'pantyflix') ? 'tv' : null);
-        actionList = parseData(responses[1], forceMediaType: 'movie');
-        comedyList = parseData(responses[2], forceMediaType: 'tv');
-        horrorList = parseData(responses[3], forceMediaType: 'movie');
-        dramaList = parseData(responses[4], forceMediaType: 'tv');
+        trendingList = parseData(responses[0]);
+        bollywoodList = parseData(responses[1], forceMediaType: 'movie');
+        hollywoodList = parseData(responses[2], forceMediaType: 'movie');
+        animeList = parseData(responses[3], forceMediaType: 'tv');
+        actionList = parseData(responses[4], forceMediaType: 'movie');
+        comedyList = parseData(responses[5], forceMediaType: 'tv');
+        horrorList = parseData(responses[6], forceMediaType: 'movie');
         isLoading = false;
       });
     } catch (e) {
@@ -138,7 +159,6 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // 🔍 DIRECT MULTI-SEARCH (ALL PANTYFLIX TITLES SUPPORTED)
   void onSearchChanged(String value) {
     if (value.isEmpty) {
       setState(() {
@@ -171,7 +191,6 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // 🚀 DIRECT LAUNCH PLAYER WITH FULL SCREENSHOT UI & DETAILS
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
@@ -314,7 +333,7 @@ class DashboardPageState extends State<DashboardPage> {
                                     style: const TextStyle(color: Colors.white),
                                     autofocus: true,
                                     decoration: InputDecoration(
-                                      hintText: 'Search Movies & TV Series...',
+                                      hintText: 'Search Movies & Shows on HANNUTV...',
                                       border: InputBorder.none,
                                       prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
                                       suffixIcon: IconButton(
@@ -338,12 +357,11 @@ class DashboardPageState extends State<DashboardPage> {
                                   child: Image.asset('assets/logo.png', height: 35, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontSize: 24, fontWeight: FontWeight.bold))),
                                 ),
                               ),
-                        if (!isSearching) ...[
+                        if (!isSearching)
                           IconButton(
                             icon: const Icon(Icons.search, color: Colors.white, size: 28),
                             onPressed: () => setState(() => isSearching = true),
                           ),
-                        ],
                       ],
                     ),
                   ),
@@ -368,7 +386,7 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            // OTT FILTERS
+            // 🌟 PURE HANNUTV OTT WATCH PROVIDERS (NO PANTYFLIX BRANDING)
             const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
             SizedBox(
               height: 50,
@@ -376,20 +394,22 @@ class DashboardPageState extends State<DashboardPage> {
                 scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12),
                 itemCount: ottPlatforms.length,
                 itemBuilder: (context, index) {
+                  final srv = ottPlatforms[index];
+                  final isSelected = selectedPlatform == srv['providerId'];
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 4),
                     child: ElevatedButton(
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.grey[900],
+                        backgroundColor: isSelected ? Colors.redAccent : Colors.grey[900],
                         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        side: BorderSide(color: ottPlatforms[index]['color'], width: 1.5),
+                        side: BorderSide(color: srv['color'], width: 1.5),
                       ),
                       onPressed: () {
                         searchController.clear();
                         setState(() => isSearching = false);
-                        loadAllDashboards(providerId: ottPlatforms[index]['providerId']); 
+                        loadAllDashboards(providerId: srv['providerId']); 
                       },
-                      child: Text(ottPlatforms[index]['name'], style: TextStyle(color: ottPlatforms[index]['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      child: Text(srv['name'], style: TextStyle(color: isSelected ? Colors.white : srv['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
                     ),
                   );
                 },
@@ -421,12 +441,14 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              _buildHorizontalList('🔥 Trending Now', trendingList),
+              _buildHorizontalList('🔥 HANNUTV Trending', trendingList),
               if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
+              _buildHorizontalList('Bollywood Hindi Movies', bollywoodList),
+              _buildHorizontalList('Hollywood English Movies', hollywoodList),
+              _buildHorizontalList('Anime Hub ⛩️', animeList),
               _buildHorizontalList('Action Movies', actionList),
               _buildHorizontalList('Comedy Shows', comedyList),
               _buildHorizontalList('Horror Movies', horrorList),
-              _buildHorizontalList('Drama & Romance Shows', dramaList),
             ],
             const SizedBox(height: 40),
           ],
