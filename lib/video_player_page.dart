@@ -37,7 +37,7 @@ class VideoPlayerPage extends StatefulWidget {
   State<VideoPlayerPage> createState() => _VideoPlayerPageState();
 }
 
-class _VideoPlayerPageState extends State<VideoPlayerPage> {
+class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderStateMixin {
   late WebViewController _controller;
 
   bool isVideoPlaying = false;
@@ -47,6 +47,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   Timer? _hideTimer;
   String activeServer = 'vidrift'; // Default to Rift
 
+  // Scale / Aspect Ratio Mode (Fill, Fit, Cover / 4:3)
+  String currentAspectRatio = 'contain'; // 'contain', 'cover', 'fill'
+
   late int currentSeason;
   late int currentEpisode;
   bool isLiked = false;
@@ -55,12 +58,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
 
   final TextEditingController commentInputController = TextEditingController();
 
-  // 🤖 VERIFIED SERVERS
+  // 🤖 VERIFIED SERVERS (Mapped directly to Pantyflix server URLs)
   final List<Map<String, String>> servers = [
     {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'spiral', 'name': 'Spiral'},
-    {'key': 'hydra', 'name': 'Hydra'},
-    {'key': 'vidbolt', 'name': 'VidBolt VIP'},
+    {'key': 'fast', 'name': 'Fast'},
+    {'key': 'vidbolt', 'name': 'Bolt'},
+    {'key': 'vidspiral', 'name': 'Spiral'},
+    {'key': 'cinezo', 'name': 'Cinezo'},
+    {'key': 'orion', 'name': 'Orion'},
+    {'key': 'alpha', 'name': 'Alpha'},
+    {'key': 'mega', 'name': 'Mega'},
+    {'key': 'peach', 'name': 'Peach'},
+    {'key': 'hindi-new', 'name': 'Hindi New'},
   ];
 
   // REAL WORKING INTERACTIVE COMMENTS
@@ -69,6 +78,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     {'name': 'Rohit Sharma', 'text': 'Best quality on HANNUTV, loving this series! 🔥', 'time': '2d', 'avatar': 'R'},
     {'name': 'Ananya Verma', 'text': 'Full HD stream with no buffering ❤️', 'time': '5h', 'avatar': 'A'},
   ];
+
+  List similarMovies = [];
+  bool isLoadingSimilar = false;
+
+  // Netflix / HANNUTV Cinematic Intro Animation
+  bool showIntroAnimation = false;
+  late AnimationController _introAnimController;
+  late Animation<double> _introScaleAnimation;
+  late Animation<double> _introOpacityAnimation;
 
   @override
   void initState() {
@@ -80,6 +98,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
+    // Setup Cinematic HANNUTV Netflix-Style Intro Animation
+    _introAnimController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 1400),
+    );
+    _introScaleAnimation = Tween<double>(begin: 0.7, end: 1.3).animate(
+      CurvedAnimation(parent: _introAnimController, curve: Curves.easeOutBack),
+    );
+    _introOpacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
+      CurvedAnimation(parent: _introAnimController, curve: const Interval(0.65, 1.0, curve: Curves.easeIn)),
+    );
+
+    _fetchSimilarMovies();
     _initStream();
     _startHideTimer();
   }
@@ -97,6 +128,51 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     _startHideTimer();
   }
 
+  void _triggerCinematicPlayAnimation() {
+    if (showIntroAnimation || isVideoPlaying) return;
+    setState(() {
+      showIntroAnimation = true;
+      isVideoPlaying = true;
+      isPageLoading = false;
+    });
+
+    _introAnimController.forward().then((_) {
+      if (mounted) setState(() => showIntroAnimation = false);
+    });
+  }
+
+  Future<void> _fetchSimilarMovies() async {
+    setState(() => isLoadingSimilar = true);
+    try {
+      final type = widget.mediaType == 'tv' || widget.mediaType == 'series' ? 'tv' : 'movie';
+      final res = await http.get(
+        Uri.parse('https://api.themoviedb.org/3/$type/${widget.tmdbId}/recommendations?language=en-US'),
+        headers: kApiHeaders,
+      );
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final List results = data['results'] ?? [];
+        if(mounted) {
+          setState(() {
+            similarMovies = results.map((m) => {
+              'id': m['id'],
+              'title': m['title'] ?? m['name'] ?? 'Unknown',
+              'posterUrl': m['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}' : '',
+              'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
+              'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
+              'mediaType': type,
+            }).toList();
+            isLoadingSimilar = false;
+          });
+        }
+      } else {
+        if(mounted) setState(() => isLoadingSimilar = false);
+      }
+    } catch (_) {
+      if(mounted) setState(() => isLoadingSimilar = false);
+    }
+  }
+
   String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -107,32 +183,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 🚀 CLEAN STREAM ROUTING
-    if (activeServer == 'vidrift') {
-      return isTv
-          ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=vidrift'
-          : 'https://pantyflix.com/watch/play/movie/$id?server=vidrift';
-    }
-    if (activeServer == 'spiral') {
-      return isTv
-          ? 'https://vidsrc.icu/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.icu/embed/movie/$id';
-    }
-    if (activeServer == 'hydra') {
-      return isTv
-          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.to/embed/movie/$id';
-    }
-
+    // 🚀 DIRECT PANTYFLIX SERVER ROUTING (Matches your screenshots exactly)
     return isTv
-        ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
-        : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
+        ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
+        : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
   void _initStream() {
     setState(() {
       isPageLoading = true;
       isVideoPlaying = false;
+      showIntroAnimation = false;
     });
 
     final targetUrl = _buildStreamUrl();
@@ -147,10 +208,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
         'VideoState',
         onMessageReceived: (JavaScriptMessage message) {
           if (message.message == 'playing' && mounted) {
-            setState(() {
-              isVideoPlaying = true;
-              isPageLoading = false;
-            });
+            _triggerCinematicPlayAnimation();
           }
         },
       )
@@ -188,6 +246,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 body { 
                   background-color: #000000 !important; 
                   color: #ffffff !important;
+                  overflow: hidden !important;
+                }
+                video {
+                  object-fit: $currentAspectRatio !important;
+                  width: 100% !important;
+                  height: 100% !important;
                 }
               `;
               document.head.appendChild(style);
@@ -199,7 +263,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   let text = el.innerText ? el.innerText.toLowerCase().trim() : '';
                   
                   // If the element contains the word "(ads)" like "Rift(Ads)", "Bolt(Ads)", kill it!
-                  if (text.includes('(ads)') || text.includes('rift(ads)') || text.includes('bolt(ads)')) {
+                  if (text.includes('(ads)') || text.includes('rift(ads)') || text.includes('bolt(ads)') || text.includes('fast(ads)') || text.includes('cinezo(ads)') || text.includes('hindi new')) {
                     el.remove();
                   }
 
@@ -213,6 +277,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 if (vids.length > 0) {
                   var v = vids[0];
                   v.style.backgroundColor = '#000000';
+                  v.style.objectFit = '$currentAspectRatio';
                   v.muted = false;
                   v.volume = 1.0;
                   if (v.paused && !v.ended) {
@@ -253,6 +318,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 url.contains('vidbolt') ||
                 url.contains('vidsrc') ||
                 url.contains('vidlink') ||
+                url.contains('multiembed') ||
                 url.contains('pages.dev') ||
                 url.startsWith('about:blank') ||
                 url.startsWith('data:')) {
@@ -294,13 +360,33 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
+  void _cycleAspectRatio() {
+    setState(() {
+      if (currentAspectRatio == 'contain') {
+        currentAspectRatio = 'cover';
+      } else if (currentAspectRatio == 'cover') {
+        currentAspectRatio = 'fill';
+      } else {
+        currentAspectRatio = 'contain';
+      }
+    });
+
+    _controller.runJavaScript('''
+      var vids = document.getElementsByTagName('video');
+      if (vids.length > 0) {
+        vids[0].style.objectFit = '$currentAspectRatio';
+      }
+    ''');
+    _startControlsTimer();
+  }
+
   void _toggleFullScreen() {
     setState(() {
       isFullScreen = !isFullScreen;
     });
 
     if (isFullScreen) {
-      // 🖥️ PURE DESKTOP-STYLE FULLSCREEN LANDSCAPE VIEW
+      // 🖥️ PURE FULLSCREEN CINEMA LANDSCAPE ROTATION (DESKTOP STYLE)
       SystemChrome.setPreferredOrientations([
         DeviceOrientation.landscapeLeft,
         DeviceOrientation.landscapeRight,
@@ -311,7 +397,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
-    _startHideTimer();
+    _startControlsTimer();
   }
 
   void _switchEpisode(int ep) {
@@ -339,6 +425,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   void dispose() {
     _hideTimer?.cancel();
+    _introAnimController.dispose();
     commentInputController.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
@@ -348,7 +435,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   @override
   Widget build(BuildContext context) {
     if (isFullScreen) {
-      // 🖥️ PURE FULLSCREEN CINEMA ROTATION
+      // 🖥️ PURE ROTATED COMPUTER-STYLE FULLSCREEN (CLEAN VIDEO WITH AUTO-HIDE 3s CONTROLS)
       return PopScope(
         canPop: false,
         onPopInvoked: (bool didPop) {
@@ -365,38 +452,112 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 Positioned.fill(
                   child: WebViewWidget(controller: _controller),
                 ),
-                // Right Side Watermark Logo
+
+                // 🌟 BIGGER CORNER WATERMARK HANNUTV LOGO
                 Positioned(
-                  top: 16,
-                  right: 60,
+                  top: 14,
+                  right: 20,
                   child: SafeArea(
-                    child: Opacity(
-                      opacity: 0.7,
-                      child: Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18))),
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.85,
+                        child: Image.asset(
+                          'assets/logo.png',
+                          height: 38,
+                          errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                        ),
+                      ),
                     ),
                   ),
                 ),
-                // Animated Exit Fullscreen Button
-                if (showControls)
+
+                // 🌟 HANNUTV NETFLIX-STYLE CINEMATIC INTRO ANIMATION ON PLAY
+                if (showIntroAnimation)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(
+                        child: AnimatedBuilder(
+                          animation: _introAnimController,
+                          builder: (context, child) {
+                            return Opacity(
+                              opacity: _introOpacityAnimation.value,
+                              child: Transform.scale(
+                                scale: _introScaleAnimation.value,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
+                                    const SizedBox(height: 10),
+                                    const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // Auto-Hide Controls (3 Seconds)
+                if (showControls) ...[
+                  // Aspect Ratio / Screen Fit Button (4:3 / Fit / Fill) - Moved next to back button
                   Positioned(
-                    top: 16,
-                    left: 16, // Moved to left to avoid clashing with logo
+                    top: 14,
+                    left: 64, // Placed next to back button
                     child: SafeArea(
-                      child: AnimatedOpacity(
-                        opacity: showControls ? 1.0 : 0.0,
-                        duration: const Duration(milliseconds: 300),
-                        child: CircleAvatar(
-                          backgroundColor: Colors.black54,
-                          radius: 20,
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 28),
-                            onPressed: _toggleFullScreen,
+                      child: GestureDetector(
+                        onTap: _cycleAspectRatio,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                          decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.aspect_ratio, color: Colors.white, size: 18),
+                              const SizedBox(width: 6),
+                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            ],
                           ),
                         ),
                       ),
                     ),
                   ),
+
+                  // Back Button (Left Top)
+                  Positioned(
+                    top: 14,
+                    left: 14,
+                    child: SafeArea(
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 20,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                          onPressed: _toggleFullScreen,
+                        ),
+                      ),
+                    ),
+                  ),
+
+                  // Exit Fullscreen Button (Right Bottom)
+                  Positioned(
+                    bottom: 16,
+                    right: 16,
+                    child: SafeArea(
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 20,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 24),
+                          onPressed: _toggleFullScreen,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -404,7 +565,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       );
     }
 
-    // 📱 YOUTUBE-STYLE PORTRAIT UI
+    // 📱 YOUTUBE-STYLE PORTRAIT UI (EXACT SCREENSHOT LAYOUT)
     return PopScope(
       canPop: false,
       onPopInvoked: (bool didPop) {
@@ -419,8 +580,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
             children: [
               // 1. TOP VIDEO PLAYER WINDOW (230px height, fixed ratio)
               GestureDetector(
-                onTap: _onPlayerTapped,
-                behavior: HitTestBehavior.opaque,
+                onTap: _startControlsTimer,
                 child: Stack(
                   children: [
                     Container(
@@ -430,57 +590,73 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       child: WebViewWidget(controller: _controller),
                     ),
 
-                    // Top Back Button
+                    // 🌟 BIGGER TOP RIGHT HANNUTV WATERMARK LOGO
+                    Positioned(
+                      top: 10,
+                      right: 14,
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: 0.85,
+                          child: Image.asset('assets/logo.png', height: 34, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15))),
+                        ),
+                      ),
+                    ),
+
+                    // 🌟 CINEMATIC HANNUTV INTRO ANIMATION
+                    if (showIntroAnimation)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Center(
+                            child: AnimatedBuilder(
+                              animation: _introAnimController,
+                              builder: (context, child) {
+                                return Opacity(
+                                  opacity: _introOpacityAnimation.value,
+                                  child: Transform.scale(
+                                    scale: _introScaleAnimation.value,
+                                    child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // Top Back Button (3-Second Auto-Hide)
                     if (showControls)
                       Positioned(
                         top: 8,
                         left: 8,
-                        child: AnimatedOpacity(
-                          opacity: showControls ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 300),
-                          child: CircleAvatar(
-                            backgroundColor: Colors.black54,
-                            radius: 18,
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
-                              onPressed: () => Navigator.pop(context),
-                            ),
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black54,
+                          radius: 18,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                            onPressed: () => Navigator.pop(context),
                           ),
                         ),
                       ),
 
-                    // 🌟 TOP RIGHT HANNUTV WATERMARK LOGO
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: Opacity(
-                        opacity: 0.8,
-                        child: Image.asset('assets/logo.png', height: 32, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))),
-                      ),
-                    ),
-
                     // Fullscreen Button
-                    if (showControls)
+                    if (showControls) ...[
                       Positioned(
                         bottom: 8,
                         right: 8,
-                        child: AnimatedOpacity(
-                          opacity: showControls ? 1.0 : 0.0,
-                          duration: const Duration(milliseconds: 300),
-                          child: CircleAvatar(
-                            backgroundColor: Colors.black54,
-                            radius: 18,
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.fullscreen, color: Colors.white, size: 24),
-                              onPressed: _toggleFullScreen,
-                            ),
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black54,
+                          radius: 16,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.fullscreen, color: Colors.white, size: 22),
+                            onPressed: _toggleFullScreen,
                           ),
                         ),
                       ),
+                    ],
 
-                    // ⚡ HANNUTV ANIMATED LOADING INDICATOR
+                    // Fast Loading Indicator with HANNUTV Branding
                     if (isPageLoading && !isVideoPlaying)
                       Positioned.fill(
                         child: Container(
@@ -489,36 +665,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             child: Column(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                // HannuTV Animated Text
-                                TweenAnimationBuilder(
-                                  tween: Tween<double>(begin: 0.8, end: 1.2),
-                                  duration: const Duration(milliseconds: 800),
-                                  builder: (context, double scale, child) {
-                                    return Transform.scale(
-                                      scale: scale,
-                                      child: child,
-                                    );
-                                  },
-                                  child: const Text(
-                                    "HANNUTV",
-                                    style: TextStyle(
-                                      color: Colors.redAccent,
-                                      fontSize: 28,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 2,
-                                    ),
-                                  ),
-                                ),
-                                const SizedBox(height: 16),
+                                Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 40)),
+                                const SizedBox(height: 12),
                                 const SizedBox(
                                   width: 30,
                                   height: 30,
-                                  child: CircularProgressIndicator(color: Colors.white, strokeWidth: 2.5),
+                                  child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5),
                                 ),
-                                const SizedBox(height: 12),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  "Loading HANNUTV Server",
+                                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
                                 Text(
-                                  "Loading $activeServer...",
-                                  style: const TextStyle(color: Colors.grey, fontSize: 12),
+                                  "Requesting stream from $activeServer node...",
+                                  style: const TextStyle(color: Colors.grey, fontSize: 11),
                                 ),
                               ],
                             ),
@@ -529,7 +691,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                 ),
               ),
 
-              // 2. SCROLLABLE DETAILS SECTION
+              // 2. SCROLLABLE DETAILS SECTION (EXACT SCREENSHOT BUTTONS & SERVERS)
               Expanded(
                 child: SingleChildScrollView(
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
@@ -559,7 +721,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       ),
                       const SizedBox(height: 14),
 
-                      // Action Buttons Row
+                      // Action Buttons Row (Like, Add to List, Play on TV, Share, Report)
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -597,52 +759,48 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                       ),
                       const SizedBox(height: 10),
 
-                      // Server Switcher Buttons
-                      Row(
-                        children: [
-                          const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: SingleChildScrollView(
-                              scrollDirection: Axis.horizontal,
-                              child: Row(
-                                children: servers.map((srv) {
-                                  final isSelected = activeServer == srv['key'];
-                                  return GestureDetector(
-                                    onTap: () {
-                                      if (activeServer != srv['key']) {
-                                        setState(() {
-                                          activeServer = srv['key']!;
-                                        });
-                                        _initStream();
-                                      }
-                                    },
-                                    child: Container(
-                                      margin: const EdgeInsets.only(right: 8),
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      decoration: BoxDecoration(
-                                        color: isSelected ? Colors.white : Colors.grey[900],
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Text(
-                                        srv['name']!,
-                                        style: TextStyle(
-                                          color: isSelected ? Colors.black : Colors.white,
-                                          fontWeight: FontWeight.bold,
-                                          fontSize: 13,
-                                        ),
-                                      ),
+                      // Server Switcher Buttons (Rift, Spiral, Hydra, VidBolt, Zenith, Nova)
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                            const SizedBox(width: 8),
+                            ...servers.map((srv) {
+                              final isSelected = activeServer == srv['key'];
+                              return GestureDetector(
+                                onTap: () {
+                                  if (activeServer != srv['key']) {
+                                    setState(() {
+                                      activeServer = srv['key']!;
+                                    });
+                                    _initStream();
+                                  }
+                                },
+                                child: Container(
+                                  margin: const EdgeInsets.only(right: 8),
+                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                  decoration: BoxDecoration(
+                                    color: isSelected ? Colors.white : Colors.grey[900],
+                                    borderRadius: BorderRadius.circular(20),
+                                  ),
+                                  child: Text(
+                                    srv['name']!,
+                                    style: TextStyle(
+                                      color: isSelected ? Colors.black : Colors.white,
+                                      fontWeight: FontWeight.bold,
+                                      fontSize: 13,
                                     ),
-                                  );
-                                }).toList(),
-                              ),
-                            ),
-                          ),
-                        ],
+                                  ),
+                                ),
+                              );
+                            }).toList(),
+                          ],
+                        ),
                       ),
                       const SizedBox(height: 18),
 
-                      // Working Comments Section
+                      // Working Comments Section (Interactive Add & Read)
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
@@ -791,6 +949,66 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                                             const Text("Stream on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1),
                                           ],
                                         ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                        const SizedBox(height: 20),
+                      ],
+
+                      // 🎬 SUGGESTED / SIMILAR MOVIES SECTION
+                      if (similarMovies.isNotEmpty) ...[
+                        const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 160,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: similarMovies.length,
+                            itemBuilder: (context, index) {
+                              final m = similarMovies[index];
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => VideoPlayerPage(
+                                        tmdbId: m['id'],
+                                        mediaType: m['mediaType'],
+                                        movieTitle: m['title'],
+                                        rating: m['rating'],
+                                        year: m['year'],
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 110,
+                                  margin: const EdgeInsets.only(right: 10),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(8),
+                                            image: DecorationImage(
+                                              image: NetworkImage(m['posterUrl'] != '' ? m['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
+                                              fit: BoxFit.cover,
+                                            ),
+                                          ),
+                                        ),
+                                      ),
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        m['title'],
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
                                   ),
