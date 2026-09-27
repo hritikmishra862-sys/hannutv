@@ -100,13 +100,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
 
     _introAnimController = AnimationController(
       vsync: this,
-      duration: const Duration(milliseconds: 1400),
+      duration: Duration(milliseconds: 1400),
     );
     _introScaleAnimation = Tween<double>(begin: 0.7, end: 1.3).animate(
       CurvedAnimation(parent: _introAnimController, curve: Curves.easeOutBack),
     );
     _introOpacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(parent: _introAnimController, curve: const Interval(0.65, 1.0, curve: Curves.easeIn)),
+      CurvedAnimation(parent: _introAnimController, curve: Interval(0.65, 1.0, curve: Curves.easeIn)),
     );
 
     _fetchSimilarMovies();
@@ -134,7 +134,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   void _showControlPanel() {
     setState(() => showControls = true);
     _hideControlsTimer?.cancel();
-    _hideControlsTimer = Timer(const Duration(seconds: 5), () {
+    _hideControlsTimer = Timer(Duration(seconds: 5), () {
       if (mounted) setState(() => showControls = false);
     });
   }
@@ -428,7 +428,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
           onTap: onTap,
           borderRadius: radius ?? BorderRadius.circular(20),
           child: AnimatedContainer(
-            duration: const Duration(milliseconds: 150),
+            duration: Duration(milliseconds: 150),
             decoration: BoxDecoration(
               borderRadius: radius ?? BorderRadius.circular(20),
               border: Border.all(
@@ -466,7 +466,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         opacity: _introOpacityAnimation.value,
                         child: Transform.scale(
                           scale: _introScaleAnimation.value,
-                          child: Image.asset('assets/logo.png', height: 120, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 120)),
+                          child: Image.asset('assets/logo.png', height: 120, errorBuilder: (_, __, ___) => Icon(Icons.play_circle_fill, color: Colors.red, size: 120)),
                         ),
                       );
                     },
@@ -494,18 +494,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                 crossAxisAlignment: CrossAxisAlignment.start,
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
+                  Text(widget.movieTitle, style: TextStyle(color: Colors.white, fontSize: 32, fontWeight: FontWeight.bold)),
+                  Container(height: 10),
                   Row(
                     children: [
-                      const Icon(Icons.star, color: Colors.amber, size: 24),
-                      const SizedBox(width: 8),
-                      Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                      const SizedBox(width: 16),
-                      Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 20)),
+                      Icon(Icons.star, color: Colors.amber, size: 24),
+                      Container(width: 8),
+                      Text(widget.rating, style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                      Container(width: 16),
+                      Text(widget.year, style: TextStyle(color: Colors.grey, fontSize: 20)),
                     ],
                   ),
-                  const SizedBox(height: 20),
+                  Container(height: 20),
                   Row(
                     children: [
                       _buildFocusableButton(
@@ -513,7 +513,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         radius: BorderRadius.circular(10),
                         child: _buildActionButton(Icons.arrow_back, "Back", activeColor: Colors.white),
                       ),
-                      const SizedBox(width: 16),
+                      Container(width: 16),
                       _buildFocusableButton(
                         onTap: _cycleAspectRatio,
                         radius: BorderRadius.circular(10),
@@ -521,10 +521,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                  const Text("Servers:", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 10),
-                  SizedBox(
+                  Container(height: 20),
+                  Text("Servers:", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Container(height: 10),
+                  Container(
                     height: 50,
                     child: ListView.builder(
                       scrollDirection: Axis.horizontal,
@@ -541,8 +541,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                           },
                           radius: BorderRadius.circular(20),
                           child: Container(
-                            margin: const EdgeInsets.only(right: 12),
-                            padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                            margin: EdgeInsets.only(right: 12),
+                            padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                             decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.grey[900], borderRadius: BorderRadius.circular(20)),
                             child: Text(srv['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
                           ),
@@ -561,10 +561,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               onTap: _toggleControlPanel,
               radius: BorderRadius.circular(8),
               child: Container(
-                padding: const EdgeInsets.all(8),
+                padding: EdgeInsets.all(8),
                 child: Opacity(
                   opacity: 0.9,
-                  child: Image.asset('assets/logo.png', height: 45, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 24))),
+                  child: Image.asset('assets/logo.png', height: 45, errorBuilder: (_, __, ___) => Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 24))),
                 ),
               ),
             ),
@@ -577,9 +577,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 60)),
-                      const SizedBox(height: 20),
-                      const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 3)),
+                      Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => Icon(Icons.movie, color: Colors.red, size: 60)),
+                      Container(height: 20),
+                      Container(width: 40, height: 40, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 3)),
                     ],
                   ),
                 ),
@@ -625,9 +625,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                               child: Column(
                                 mainAxisSize: MainAxisSize.min,
                                 children: [
-                                  Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
-                                  const SizedBox(height: 10),
-                                  const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
+                                  Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
+                                  Container(height: 10),
+                                  Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
                                 ],
                               ),
                             ),
@@ -645,10 +645,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     onTap: _toggleControlPanel,
                     radius: BorderRadius.circular(8),
                     child: Container(
-                      padding: const EdgeInsets.all(4),
+                      padding: EdgeInsets.all(4),
                       child: Opacity(
                         opacity: 0.9,
-                        child: Image.asset('assets/logo.png', height: 38, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18))),
+                        child: Image.asset('assets/logo.png', height: 38, errorBuilder: (_, __, ___) => Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18))),
                       ),
                     ),
                   ),
@@ -665,7 +665,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         Navigator.pop(context);
                       },
                       radius: BorderRadius.circular(22),
-                      child: CircleAvatar(backgroundColor: Colors.black87, radius: 22, child: const Icon(Icons.close, color: Colors.white, size: 28)),
+                      child: CircleAvatar(backgroundColor: Colors.black87, radius: 22, child: Icon(Icons.close, color: Colors.white, size: 28)),
                     ),
                   ),
                 ),
@@ -676,14 +676,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       onTap: _cycleAspectRatio,
                       radius: BorderRadius.circular(20),
                       child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
                         decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
-                            const Icon(Icons.aspect_ratio, color: Colors.white, size: 16),
-                            const SizedBox(width: 8),
-                            Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                            Icon(Icons.aspect_ratio, color: Colors.white, size: 16),
+                            Container(width: 8),
+                            Text(currentAspectRatio.toUpperCase(), style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                           ],
                         ),
                       ),
@@ -696,7 +696,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     child: _buildFocusableButton(
                       onTap: _toggleFullScreen,
                       radius: BorderRadius.circular(22),
-                      child: CircleAvatar(backgroundColor: Colors.black87, radius: 22, child: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 28)),
+                      child: CircleAvatar(backgroundColor: Colors.black87, radius: 22, child: Icon(Icons.fullscreen_exit, color: Colors.white, size: 28)),
                     ),
                   ),
                 ),
@@ -733,7 +733,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                 opacity: _introOpacityAnimation.value,
                                 child: Transform.scale(
                                   scale: _introScaleAnimation.value,
-                                  child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)),
+                                  child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => Icon(Icons.play_circle_fill, color: Colors.red, size: 60)),
                                 ),
                               );
                             },
@@ -748,8 +748,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       onTap: _toggleControlPanel,
                       radius: BorderRadius.circular(8),
                       child: Container(
-                        padding: const EdgeInsets.all(4),
-                        child: Opacity(opacity: 0.9, child: Image.asset('assets/logo.png', height: 28, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)))),
+                        padding: EdgeInsets.all(4),
+                        child: Opacity(opacity: 0.9, child: Image.asset('assets/logo.png', height: 28, errorBuilder: (_, __, ___) => Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)))),
                       ),
                     ),
                   ),
@@ -759,7 +759,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       child: _buildFocusableButton(
                         onTap: () => Navigator.pop(context),
                         radius: BorderRadius.circular(18),
-                        child: CircleAvatar(backgroundColor: Colors.black87, radius: 18, child: const Icon(Icons.close, color: Colors.white, size: 22)),
+                        child: CircleAvatar(backgroundColor: Colors.black87, radius: 18, child: Icon(Icons.close, color: Colors.white, size: 22)),
                       ),
                     ),
                     Positioned(
@@ -768,14 +768,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         onTap: _cycleAspectRatio,
                         radius: BorderRadius.circular(15),
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          padding: EdgeInsets.symmetric(horizontal: 10, vertical: 6),
                           decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white30)),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.aspect_ratio, color: Colors.white, size: 14),
-                              const SizedBox(width: 6),
-                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                              Icon(Icons.aspect_ratio, color: Colors.white, size: 14),
+                              Container(width: 6),
+                              Text(currentAspectRatio.toUpperCase(), style: TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
@@ -786,7 +786,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       child: _buildFocusableButton(
                         onTap: _toggleFullScreen,
                         radius: BorderRadius.circular(18),
-                        child: CircleAvatar(backgroundColor: Colors.black87, radius: 18, child: const Icon(Icons.fullscreen, color: Colors.white, size: 22)),
+                        child: CircleAvatar(backgroundColor: Colors.black87, radius: 18, child: Icon(Icons.fullscreen, color: Colors.white, size: 22)),
                       ),
                     ),
                   ],
@@ -798,13 +798,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 40)),
-                              const SizedBox(height: 12),
-                              const SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)),
-                              const SizedBox(height: 10),
-                              const Text("Loading HANNUTV Server", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                              const SizedBox(height: 4),
-                              Text("Requesting stream from $activeServer node...", style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                              Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => Icon(Icons.movie, color: Colors.red, size: 40)),
+                              Container(height: 12),
+                              Container(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)),
+                              Container(height: 10),
+                              Text("Loading HANNUTV Server", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                              Container(height: 4),
+                              Text("Requesting stream from $activeServer node...", style: TextStyle(color: Colors.grey, fontSize: 11)),
                             ],
                           ),
                         ),
@@ -814,26 +814,26 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               ),
               Expanded(
                 child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  padding: EdgeInsets.symmetric(horizontal: 16, vertical: 12),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 6),
+                      Text(widget.movieTitle, style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                      Container(height: 6),
                       Row(
                         children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 18),
-                          const SizedBox(width: 4),
-                          Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 12),
-                          Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                          const SizedBox(width: 16),
-                          const Icon(Icons.visibility, color: Colors.grey, size: 16),
-                          const SizedBox(width: 4),
-                          Text("$viewCount Views", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          Icon(Icons.star, color: Colors.amber, size: 18),
+                          Container(width: 4),
+                          Text(widget.rating, style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          Container(width: 12),
+                          Text(widget.year, style: TextStyle(color: Colors.grey, fontSize: 14)),
+                          Container(width: 16),
+                          Icon(Icons.visibility, color: Colors.grey, size: 16),
+                          Container(width: 4),
+                          Text("$viewCount Views", style: TextStyle(color: Colors.grey, fontSize: 12)),
                         ],
                       ),
-                      const SizedBox(height: 14),
+                      Container(height: 14),
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -848,24 +848,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                               radius: BorderRadius.circular(20),
                               child: _buildActionButton(isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined, "$likeCount", activeColor: isLiked ? Colors.redAccent : Colors.white),
                             ),
-                            const SizedBox(width: 8),
+                            Container(width: 8),
                             _buildFocusableButton(onTap: (){}, child: _buildActionButton(Icons.bookmark_border, "Add to List")),
-                            const SizedBox(width: 8),
+                            Container(width: 8),
                             _buildFocusableButton(onTap: (){}, child: _buildActionButton(Icons.tv, "Play on TV")),
-                            const SizedBox(width: 8),
+                            Container(width: 8),
                             _buildFocusableButton(onTap: (){}, child: _buildActionButton(Icons.share, "Share")),
-                            const SizedBox(width: 8),
+                            Container(width: 8),
                             _buildFocusableButton(onTap: (){}, child: _buildActionButton(Icons.flag_outlined, "Report")),
                           ],
                         ),
                       ),
-                      const SizedBox(height: 16),
-                      const Text("If current server is not working, try a different one:", style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic)),
-                      const SizedBox(height: 10),
+                      Container(height: 16),
+                      Text("If current server is not working, try a different one:", style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic)),
+                      Container(height: 10),
                       Row(
                         children: [
-                          const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 8),
+                          Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          Container(width: 8),
                           Expanded(
                             child: SingleChildScrollView(
                               scrollDirection: Axis.horizontal,
@@ -883,8 +883,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                     },
                                     radius: BorderRadius.circular(20),
                                     child: Container(
-                                      margin: const EdgeInsets.only(right: 8),
-                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      margin: EdgeInsets.only(right: 8),
+                                      padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                                       decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.grey[900], borderRadius: BorderRadius.circular(20)),
                                       child: Text(srv['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
                                     ),
@@ -895,9 +895,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                           ),
                         ],
                       ),
-                      const SizedBox(height: 18),
+                      Container(height: 18),
                       Container(
-                        padding: const EdgeInsets.all(12),
+                        padding: EdgeInsets.all(12),
                         decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
@@ -905,50 +905,50 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                             Row(
                               mainAxisAlignment: MainAxisAlignment.spaceBetween,
                               children: [
-                                Text("Comments ${publicComments.length}", style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                const Icon(Icons.comment, color: Colors.grey, size: 16),
+                                Text("Comments ${publicComments.length}", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                Icon(Icons.comment, color: Colors.grey, size: 16),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            Container(height: 10),
                             Row(
                               children: [
                                 Expanded(
                                   child: TextField(
                                     controller: commentInputController,
-                                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                                    style: TextStyle(color: Colors.white, fontSize: 12),
                                     decoration: InputDecoration(
                                       hintText: 'Add a comment...',
-                                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                                      hintStyle: TextStyle(color: Colors.grey, fontSize: 12),
                                       filled: true,
                                       fillColor: Colors.black45,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                                       border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
                                     ),
                                   ),
                                 ),
-                                IconButton(icon: const Icon(Icons.send, color: Colors.redAccent, size: 20), onPressed: _addComment),
+                                IconButton(icon: Icon(Icons.send, color: Colors.redAccent, size: 20), onPressed: _addComment),
                               ],
                             ),
-                            const SizedBox(height: 10),
+                            Container(height: 10),
                             ...publicComments.map((c) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
+                              padding: EdgeInsets.only(bottom: 8.0),
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
-                                  const SizedBox(width: 10),
+                                  CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(c['avatar']!, style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                                  Container(width: 10),
                                   Expanded(
                                     child: Column(
                                       crossAxisAlignment: CrossAxisAlignment.start,
                                       children: [
                                         Row(
                                           children: [
-                                            Text(c['name']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                                            const SizedBox(width: 6),
-                                            Text(c['time']!, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                                            Text(c['name']!, style: TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                            Container(width: 6),
+                                            Text(c['time']!, style: TextStyle(color: Colors.grey, fontSize: 10)),
                                           ],
                                         ),
-                                        Text(c['text']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                        Text(c['text']!, style: TextStyle(color: Colors.white, fontSize: 12)),
                                       ],
                                     ),
                                   ),
@@ -958,25 +958,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                           ],
                         ),
                       ),
-                      const SizedBox(height: 20),
+                      Container(height: 20),
                       if (isTv) ...[
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
                               decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                              child: Text("Season $currentSeason", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
+                              child: Text("Season $currentSeason", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
                             ),
-                            const Icon(Icons.grid_view, color: Colors.grey, size: 20),
+                            Icon(Icons.grid_view, color: Colors.grey, size: 20),
                           ],
                         ),
-                        const SizedBox(height: 12),
-                        const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        // 🔥 100% FIXED SIZED BOX SYNTAX 🔥
-                        SizedBox(
-                          height: 140.0,
+                        Container(height: 12),
+                        Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Container(height: 10),
+                        Container(
+                          height: 140,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
                             itemCount: 15,
@@ -988,7 +987,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                 radius: BorderRadius.circular(10),
                                 child: Container(
                                   width: 170,
-                                  margin: const EdgeInsets.only(right: 12),
+                                  margin: EdgeInsets.only(right: 12),
                                   decoration: BoxDecoration(
                                     borderRadius: BorderRadius.circular(10),
                                     border: isCurrent ? Border.all(color: Colors.white, width: 2) : null,
@@ -1000,7 +999,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                       Expanded(
                                         child: Container(
                                           decoration: BoxDecoration(
-                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                            borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
                                             color: Colors.grey[850],
                                           ),
                                           child: Center(
@@ -1009,12 +1008,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                         ),
                                       ),
                                       Padding(
-                                        padding: const EdgeInsets.all(8.0),
+                                        padding: EdgeInsets.all(8.0),
                                         child: Column(
                                           crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Text("Episode : $epNum", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                            const Text("Stream on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1),
+                                            Text("Episode : $epNum", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                            Text("Stream on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1),
                                           ],
                                         ),
                                       ),
@@ -1025,14 +1024,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                             },
                           ),
                         ),
-                        const SizedBox(height: 20),
+                        Container(height: 20),
                       ],
                       if (similarMovies.isNotEmpty) ...[
-                        const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        // 🔥 100% FIXED SIZED BOX SYNTAX 🔥
-                        SizedBox(
-                          height: 160.0,
+                        Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Container(height: 10),
+                        Container(
+                          height: 160,
                           child: ListView.builder(
                             scrollDirection: Axis.horizontal,
                             itemCount: similarMovies.length,
@@ -1056,7 +1054,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                 radius: BorderRadius.circular(8),
                                 child: Container(
                                   width: 110,
-                                  margin: const EdgeInsets.only(right: 10),
+                                  margin: EdgeInsets.only(right: 10),
                                   child: Column(
                                     crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
@@ -1071,8 +1069,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(height: 4),
-                                      Text(m['title'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                      Container(height: 4),
+                                      Text(m['title'], style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                                     ],
                                   ),
                                 ),
@@ -1096,13 +1094,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
 
   Widget _buildActionButton(IconData icon, String title, {Color activeColor = Colors.white}) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      padding: EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: activeColor, size: 16),
-          const SizedBox(width: 6),
+          Container(width: 6),
           Text(title, style: TextStyle(color: activeColor, fontSize: 12, fontWeight: FontWeight.w600)),
         ],
       ),
