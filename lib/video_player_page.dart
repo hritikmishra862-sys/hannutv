@@ -46,14 +46,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   late WebViewController _controller;
 
   bool isVideoPlaying = false;
-  
-  // 🔥 FIX: Default is true so it opens DIRECTLY in FULLSCREEN
-  bool isFullScreen = true; 
-  
+  bool isFullScreen = false;
   bool isPageLoading = true;
   String activeServer = 'vidrift'; // Default to Rift
 
-  // Scale / Aspect Ratio Mode (Fill, Fit, Cover)
+  // Scale / Aspect Ratio Mode (Fill, Fit, Cover / 4:3)
   String currentAspectRatio = 'contain'; 
 
   late int currentSeason;
@@ -62,7 +59,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   int likeCount = 1248;
   int viewCount = 84920;
 
-  // Auto-Hide Controls Timer (Strict 3 Seconds)
+  // Auto-Hide Controls Timer (Strict 3 Seconds for Back Button)
   bool showControls = true;
   Timer? _hideControlsTimer;
 
@@ -74,7 +71,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
 
   final TextEditingController commentInputController = TextEditingController();
 
-  // 🤖 SERVER NODES
+  // 🤖 10 COMPLETE PANTYFLIX SERVER NODES MAPPED DIRECTLY TO HANNUTV BUTTONS
   final List<Map<String, String>> servers = [
     {'key': 'vidrift', 'name': 'Rift'},
     {'key': 'fast', 'name': 'Fast'},
@@ -104,12 +101,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     currentSeason = widget.season;
     currentEpisode = widget.episode;
 
-    // 🔥 FIX: Force Landscape (Fullscreen) Immediately on Load
-    SystemChrome.setPreferredOrientations([
-      DeviceOrientation.landscapeLeft,
-      DeviceOrientation.landscapeRight,
-    ]);
-    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    // Start in YouTube Style Portrait mode
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
     // Setup Cinematic Animation
     _introAnimController = AnimationController(
@@ -192,13 +186,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 🚀 DIRECT SERVER ENGINE MAPPING
+    // 🚀 DIRECT SERVER ENGINE MAPPING (Exact Pantyflix URLs)
     return isTv
         ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
-  // 🛡️ THE NUCLEAR AD-BLOCKER & BUG FIXER
+  // 🛡️ THE NUCLEAR AD-BLOCKER WITH DEEP "IFRAME ASPECT RATIO" HACK
   void _initStream() {
     setState(() {
       isPageLoading = true;
@@ -207,6 +201,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     });
 
     final targetUrl = _buildStreamUrl();
+    
+    // 🔥 THE DEEP HACK: Create a dynamic Base URL so the IFrame matches the parent!
+    // This removes CORS errors and allows us to force Crop/Fit dynamically.
+    final targetUri = Uri.parse(targetUrl);
+    final dynamicBaseUrl = '${targetUri.scheme}://${targetUri.host}';
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -254,6 +253,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   background-color: #000000 !important; 
                   overflow: hidden !important;
                 }
+                /* Important fallback for main document */
                 video {
                   object-fit: $currentAspectRatio !important;
                   width: 100% !important;
@@ -262,46 +262,55 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               `;
               document.head.appendChild(style);
 
-              // 🚀 THE ULTIMATE REAL-TIME KILLER
+              // 🚀 REAL-TIME DEEP KILLER AND "ASPECT RATIO" FORCER
               setInterval(function() {
-                // 1. 🔥 KILL NATIVE FULLSCREEN BUTTON: Prevents the black screen bug
-                document.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"]').forEach(btn => {
-                   btn.style.display = 'none';
-                   btn.style.opacity = '0';
-                   btn.style.pointerEvents = 'none';
-                });
+                try {
+                  // Access the deep Iframe safely since we spoofed the BaseURL
+                  var iframe = document.getElementById('player-frame');
+                  var doc = iframe ? (iframe.contentDocument || iframe.contentWindow.document) : document;
 
-                // 2. 🔥 KILL ADS DROPDOWN: Finds "(Ads)" and nukes it instantly
-                document.querySelectorAll('div, a, span, button, ul, li').forEach(el => {
-                  let text = el.innerText ? el.innerText.toLowerCase().trim() : '';
-                  if (text.includes('(ads)') || text.includes('rift(ads)') || text.includes('bolt(ads)') || text.includes('fast(ads)') || text.includes('cinezo(ads)') || text.includes('hindi new')) {
-                    el.remove();
-                  }
-                  if (text.includes('telegram') || text.includes('dmca') || text.includes('support@') || text.includes('contact us')) {
-                    el.remove();
-                  }
-                });
+                  // 1. Nuke Dropdowns inside the player
+                  doc.querySelectorAll('div, a, span, button, ul, li').forEach(el => {
+                    let text = el.innerText ? el.innerText.toLowerCase().trim() : '';
+                    if (text.includes('(ads)') || text.includes('rift(ads)') || text.includes('bolt(ads)') || text.includes('fast(ads)') || text.includes('cinezo(ads)') || text.includes('hindi new')) {
+                      el.remove();
+                    }
+                    if (text.includes('telegram') || text.includes('dmca') || text.includes('support@') || text.includes('contact us')) {
+                      el.remove();
+                    }
+                  });
 
-                // 3. Force Auto-Play & Adjust Screen Ratio dynamically
-                var vids = document.getElementsByTagName('video');
-                if (vids.length > 0) {
-                  var v = vids[0];
-                  v.style.objectFit = '$currentAspectRatio';
-                  if (v.paused && !v.ended) {
-                    v.play().catch(function(){});
+                  // 2. Hide inner native fullscreen buttons to stop black screen bugs
+                  doc.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"], .plyr__controls__item[data-plyr="fullscreen"]').forEach(btn => {
+                     btn.style.display = 'none';
+                     btn.style.opacity = '0';
+                     btn.style.pointerEvents = 'none';
+                  });
+
+                  // 3. 🔥 DEEP ASPECT RATIO FORCER: Adjusts video inside the Iframe!
+                  var vids = doc.getElementsByTagName('video');
+                  if (vids.length > 0) {
+                    var v = vids[0];
+                    v.style.setProperty('object-fit', '$currentAspectRatio', 'important');
+                    v.style.setProperty('width', '100%', 'important');
+                    v.style.setProperty('height', '100%', 'important');
+                    
+                    if (v.paused && !v.ended) {
+                      v.play().catch(function(){});
+                    }
+                    if (v.currentTime > 0.5 && !v.paused) {
+                      VideoState.postMessage('playing');
+                    }
                   }
-                  if (v.currentTime > 0.5 && !v.paused) {
-                    VideoState.postMessage('playing');
-                  }
-                }
-              }, 100);
+                } catch(e) {}
+              }, 150);
             ''';
             _controller.runJavaScript(jsCode);
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // 🚫 STRICT BLOCK: Stops ALL popups and external ads
+            // 🚫 YOUR TRUSTED ORIGINAL AD-BLOCKER: Strict Block EVERYTHING
             if (url.contains('doubleclick') || url.contains('popads') ||
                 url.contains('1xbet') || url.contains('bet365') ||
                 url.contains('onclick') || url.contains('adsterra') ||
@@ -313,15 +322,47 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                 url.contains('market://') || url.contains('intent://')) {
               return NavigationDecision.prevent;
             }
-            return NavigationDecision.navigate;
+
+            // ✅ ALLOW ONLY THESE SAFE STREAMING SERVERS
+            if (url.contains('pantyflix.com') ||
+                url.contains('vidbolt') ||
+                url.contains('vidsrc') ||
+                url.contains('vidlink') ||
+                url.contains('multiembed') ||
+                url.contains('pages.dev') ||
+                url.contains('google.com/recaptcha') ||
+                url.startsWith('about:blank') ||
+                url.startsWith('data:')) {
+              return NavigationDecision.navigate;
+            }
+
+            return NavigationDecision.prevent;
           },
         ),
       );
 
-    _controller.loadRequest(Uri.parse(targetUrl));
+    final embedHtml = '''
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
+            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
+          </style>
+        </head>
+        <body>
+          <iframe id="player-frame" src="$targetUrl" allow="autoplay; fullscreen; encrypted-media; picture-in-picture" allowfullscreen></iframe>
+        </body>
+      </html>
+    ''';
+
+    // 🔥 DEEP HACK APPLIED: dynamicBaseUrl allows JS to enter the iFrame!
+    _controller.loadHtmlString(embedHtml, baseUrl: dynamicBaseUrl);
   }
 
-  // 🔄 DYNAMIC ASPECT RATIO (FIT / COVER)
+  // 🔄 DYNAMIC ASPECT RATIO WITH DEEP I-FRAME INJECTION
   void _cycleAspectRatio() {
     setState(() {
       if (currentAspectRatio == 'contain') {
@@ -334,10 +375,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     });
 
     _controller.runJavaScript('''
-      var vids = document.getElementsByTagName('video');
-      if (vids.length > 0) {
-        vids[0].style.objectFit = '$currentAspectRatio';
-      }
+      try {
+        var iframe = document.getElementById('player-frame');
+        var doc = iframe ? (iframe.contentDocument || iframe.contentWindow.document) : document;
+        var vids = doc.getElementsByTagName('video');
+        if (vids.length > 0) {
+          vids[0].style.setProperty('object-fit', '$currentAspectRatio', 'important');
+          vids[0].style.setProperty('width', '100%', 'important');
+          vids[0].style.setProperty('height', '100%', 'important');
+        }
+      } catch(e) {}
     ''');
     _resetHideTimer(); 
   }
@@ -399,13 +446,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
 
     if (isFullScreen) {
       // ==========================================
-      // 🖥️ PURE LANDSCAPE FULLSCREEN VIEW (DEFAULT NOW)
+      // 🖥️ PURE LANDSCAPE FULLSCREEN VIEW
       // ==========================================
       return PopScope(
         canPop: false,
         onPopInvoked: (bool didPop) {
           if (didPop) return;
-          _toggleFullScreen(); // Go to portrait on back press
+          _toggleFullScreen();
         },
         child: Scaffold(
           backgroundColor: Colors.black,
@@ -418,55 +465,59 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   child: WebViewWidget(controller: _controller),
                 ),
 
-                // 🌟 PERMANENT HANNUTV LOGO & ROTATE BUTTON (BOTTOM-LEFT)
+                // 🌟 PERMANENT HANNUTV LOGO (TOP-LEFT) - NO OVERLAP WITH CONTROLS
                 Positioned(
-                  bottom: 20,
-                  left: 20,
+                  top: 14,
+                  left: 64, // Shifted right so it doesn't overlap the Back Button
                   child: SafeArea(
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.center,
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: Colors.black54,
-                          radius: 22,
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.screen_rotation, color: Colors.white, size: 26),
-                            onPressed: _toggleFullScreen,
-                          ),
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.85,
+                        child: Image.asset(
+                          'assets/logo.png',
+                          height: 32,
+                          errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
                         ),
-                        const SizedBox(width: 16),
-                        Opacity(
-                          opacity: 0.9,
-                          child: Image.asset(
-                            'assets/logo.png',
-                            height: 38,
-                            errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 20)),
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 ),
 
-                // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (TOP-LEFT)
+                // 🌟 PERMANENT ROTATE BUTTON (BOTTOM-LEFT)
                 Positioned(
-                  top: 20,
-                  left: 20,
+                  bottom: 16,
+                  left: 16,
+                  child: SafeArea(
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black54,
+                      radius: 20,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.screen_rotation, color: Colors.white, size: 24),
+                        onPressed: _toggleFullScreen,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (ABOVE ROTATE BUTTON, LOW OPACITY)
+                Positioned(
+                  bottom: 70, // Placed exactly above the rotate button
+                  left: 16,
                   child: SafeArea(
                     child: Opacity(
-                      opacity: 0.6,
+                      opacity: 0.4, // Extremely low opacity so it's not over-highlighted
                       child: GestureDetector(
                         onTap: _cycleAspectRatio,
                         child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
                           child: Row(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              const Icon(Icons.aspect_ratio, color: Colors.white, size: 18),
-                              const SizedBox(width: 8),
-                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                              const Icon(Icons.aspect_ratio, color: Colors.white54, size: 14),
+                              const SizedBox(width: 4),
+                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white54, fontSize: 10, fontWeight: FontWeight.bold)),
                             ],
                           ),
                         ),
@@ -490,9 +541,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                 child: Column(
                                   mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    Image.asset('assets/logo.png', height: 100, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 100)),
-                                    const SizedBox(height: 12),
-                                    const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 26, fontWeight: FontWeight.bold, letterSpacing: 3)),
+                                    Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
+                                    const SizedBox(height: 10),
+                                    const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
                                   ],
                                 ),
                               ),
@@ -503,23 +554,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                     ),
                   ),
 
-                // 🕒 AUTO-HIDE BACK BUTTON (3 SECONDS) - TOP RIGHT
+                // 🕒 AUTO-HIDE BACK BUTTON (3 SECONDS) - TOP LEFT
                 if (showControls) 
                   Positioned(
-                    top: 20,
-                    right: 20,
+                    top: 16,
+                    left: 16,
                     child: SafeArea(
                       child: CircleAvatar(
                         backgroundColor: Colors.black54,
-                        radius: 22,
+                        radius: 20,
                         child: IconButton(
                           padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.close, color: Colors.white, size: 28),
-                          onPressed: () {
-                            SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-                            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-                            Navigator.pop(context); // Close entirely
-                          },
+                          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                          onPressed: _toggleFullScreen,
                         ),
                       ),
                     ),
@@ -546,7 +593,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 1. TOP VIDEO PLAYER WINDOW (230px height)
+              // 1. TOP VIDEO PLAYER WINDOW (230px height, fixed ratio)
               GestureDetector(
                 onTap: _resetHideTimer,
                 behavior: HitTestBehavior.opaque,
@@ -559,23 +606,35 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       child: WebViewWidget(controller: _controller),
                     ),
 
-                    // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (TOP-LEFT)
+                    // 🌟 PERMANENT HANNUTV LOGO (TOP-LEFT) - Shifted slightly to not block back button
                     Positioned(
                       top: 10,
-                      left: 10,
+                      left: 60,
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: 0.85,
+                          child: Image.asset('assets/logo.png', height: 28, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15))),
+                        ),
+                      ),
+                    ),
+
+                    // 🌟 PERMANENT SCREEN FIT/ASPECT RATIO BUTTON (VERTICALLY ABOVE ROTATE BUTTON)
+                    Positioned(
+                      bottom: 50, // Placed exactly above the rotate button
+                      left: 8,
                       child: Opacity(
-                        opacity: 0.6,
+                        opacity: 0.4, // Low opacity to not over-highlight
                         child: GestureDetector(
                           onTap: _cycleAspectRatio,
                           child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white30)),
+                            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                            decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white30)),
                             child: Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                const Icon(Icons.aspect_ratio, color: Colors.white, size: 14),
-                                const SizedBox(width: 6),
-                                Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                                const Icon(Icons.aspect_ratio, color: Colors.white54, size: 12),
+                                const SizedBox(width: 4),
+                                Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white54, fontSize: 9, fontWeight: FontWeight.bold)),
                               ],
                             ),
                           ),
@@ -583,27 +642,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                     ),
 
-                    // 🌟 PERMANENT HANNUTV LOGO & ROTATE BUTTON (BOTTOM-LEFT)
+                    // 🌟 PERMANENT ROTATE BUTTON (BOTTOM-LEFT)
                     Positioned(
-                      bottom: 10,
-                      left: 10,
-                      child: Row(
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: Colors.black54,
-                            radius: 18,
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.screen_rotation, color: Colors.white, size: 20),
-                              onPressed: _toggleFullScreen,
-                            ),
-                          ),
-                          const SizedBox(width: 10),
-                          Opacity(
-                            opacity: 0.9,
-                            child: Image.asset('assets/logo.png', height: 28, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))),
-                          ),
-                        ],
+                      bottom: 8,
+                      left: 8,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 16,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.screen_rotation, color: Colors.white, size: 18),
+                          onPressed: _toggleFullScreen,
+                        ),
                       ),
                     ),
 
@@ -628,17 +678,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         ),
                       ),
 
-                    // 🕒 AUTO-HIDE BACK BUTTON (3 SECONDS) - TOP RIGHT
+                    // 🕒 AUTO-HIDE BACK BUTTON (3 SECONDS) - TOP LEFT
                     if (showControls)
                       Positioned(
-                        top: 10,
-                        right: 10,
+                        top: 8,
+                        left: 8,
                         child: CircleAvatar(
                           backgroundColor: Colors.black54,
                           radius: 18,
                           child: IconButton(
                             padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.close, color: Colors.white, size: 22),
+                            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
                             onPressed: () => Navigator.pop(context),
                           ),
                         ),
@@ -655,11 +705,21 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                               children: [
                                 Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 40)),
                                 const SizedBox(height: 12),
-                                const SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)),
+                                const SizedBox(
+                                  width: 30,
+                                  height: 30,
+                                  child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5),
+                                ),
                                 const SizedBox(height: 10),
-                                const Text("Loading HANNUTV Server", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                const Text(
+                                  "Loading HANNUTV Server",
+                                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
                                 const SizedBox(height: 4),
-                                Text("Requesting stream from $activeServer node...", style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                                Text(
+                                  "Requesting stream from $activeServer node...",
+                                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                ),
                               ],
                             ),
                           ),
@@ -676,9 +736,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                      // Title
+                      Text(
+                        widget.movieTitle,
+                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 6),
 
+                      // Star Rating, Year & Views Count
                       Row(
                         children: [
                           const Icon(Icons.star, color: Colors.amber, size: 18),
@@ -694,6 +759,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                       const SizedBox(height: 14),
 
+                      // Action Buttons Row
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         child: Row(
@@ -705,7 +771,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                   likeCount += isLiked ? 1 : -1;
                                 });
                               },
-                              child: _buildActionButton(isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined, "$likeCount", activeColor: isLiked ? Colors.redAccent : Colors.white),
+                              child: _buildActionButton(
+                                isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined,
+                                "$likeCount",
+                                activeColor: isLiked ? Colors.redAccent : Colors.white,
+                              ),
                             ),
                             const SizedBox(width: 8),
                             _buildActionButton(Icons.bookmark_border, "Add to List"),
@@ -720,9 +790,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                       const SizedBox(height: 16),
 
-                      const Text("If current server is not working, try a different one:", style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic)),
+                      // Server Section Title
+                      const Text(
+                        "If current server is not working, try a different one:",
+                        style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic),
+                      ),
                       const SizedBox(height: 10),
 
+                      // Server Switcher Buttons
                       Row(
                         children: [
                           const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
@@ -745,8 +820,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                     child: Container(
                                       margin: const EdgeInsets.only(right: 8),
                                       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                      decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.grey[900], borderRadius: BorderRadius.circular(20)),
-                                      child: Text(srv['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? Colors.white : Colors.grey[900],
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Text(
+                                        srv['name']!,
+                                        style: TextStyle(
+                                          color: isSelected ? Colors.black : Colors.white,
+                                          fontWeight: FontWeight.bold,
+                                          fontSize: 13,
+                                        ),
+                                      ),
                                     ),
                                   );
                                 }).toList(),
@@ -757,9 +842,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                       const SizedBox(height: 18),
 
+                      // Working Comments Section
                       Container(
                         padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[900],
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
@@ -787,7 +876,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                                     ),
                                   ),
                                 ),
-                                IconButton(icon: const Icon(Icons.send, color: Colors.redAccent, size: 20), onPressed: _addComment),
+                                IconButton(
+                                  icon: const Icon(Icons.send, color: Colors.redAccent, size: 20),
+                                  onPressed: _addComment,
+                                ),
                               ],
                             ),
                             const SizedBox(height: 10),
@@ -796,7 +888,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                               child: Row(
                                 crossAxisAlignment: CrossAxisAlignment.start,
                                 children: [
-                                  CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                                  CircleAvatar(
+                                    radius: 14,
+                                    backgroundColor: Colors.redAccent,
+                                    child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                  ),
                                   const SizedBox(width: 10),
                                   Expanded(
                                     child: Column(
@@ -821,6 +917,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                       ),
                       const SizedBox(height: 20),
 
+                      // Episodes Section (If TV Show)
                       if (widget.mediaType == 'tv' || widget.mediaType == 'series') ...[
                         Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -890,6 +987,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                         const SizedBox(height: 20),
                       ],
 
+                      // 🎬 SUGGESTED / SIMILAR MOVIES SECTION
                       if (similarMovies.isNotEmpty) ...[
                         const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                         const SizedBox(height: 10),
@@ -956,7 +1054,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   Widget _buildActionButton(IconData icon, String title, {Color activeColor = Colors.white}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20)),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(20),
+      ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
