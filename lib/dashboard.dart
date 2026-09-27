@@ -274,6 +274,30 @@ class DashboardPageState extends State<DashboardPage> {
     ).then((_) => setState(() {}));
   }
 
+  // 🎯 UNIVERSAL FOCUS HIGHLIGHT HELPER FOR DASHBOARD
+  Widget _buildFocusableItem({required Widget child, required VoidCallback onTap}) {
+    return Focus(
+      builder: (context, hasFocus) {
+        return InkWell(
+          onTap: onTap,
+          borderRadius: BorderRadius.circular(8),
+          child: AnimatedContainer(
+            duration: const Duration(milliseconds: 150),
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: hasFocus ? Colors.redAccent : Colors.transparent, 
+                width: hasFocus ? 3 : 0
+              ),
+              boxShadow: hasFocus ? [BoxShadow(color: Colors.redAccent.withOpacity(0.6), blurRadius: 10)] : [],
+            ),
+            child: child,
+          ),
+        );
+      },
+    );
+  }
+
   Widget _buildHorizontalList(String title, List moviesData) {
     if (moviesData.isEmpty) return const SizedBox();
     return Column(
@@ -291,10 +315,8 @@ class DashboardPageState extends State<DashboardPage> {
             itemCount: moviesData.length,
             itemBuilder: (context, index) {
               final media = moviesData[index];
-              return InkWell(
+              return _buildFocusableItem(
                 onTap: () => launchPlayerDirect(media),
-                focusColor: Colors.white24,
-                borderRadius: BorderRadius.circular(8),
                 child: Container(
                   width: 110,
                   margin: const EdgeInsets.symmetric(horizontal: 4),
@@ -306,7 +328,6 @@ class DashboardPageState extends State<DashboardPage> {
                         decoration: BoxDecoration(
                           borderRadius: BorderRadius.circular(8),
                           image: DecorationImage(
-                            // 🔥 OPTIMIZATION FOR TV: cacheWidth prevents memory lag
                             image: NetworkImage(media['posterUrl'] != '' ? media['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
                             fit: BoxFit.cover,
                           ),
@@ -334,9 +355,19 @@ class DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          IconButton(
-            icon: const Icon(Icons.support_agent, color: Colors.red, size: 30),
-            onPressed: _showSupportOptions,
+          Focus(
+            builder: (context, hasFocus) {
+              return Container(
+                decoration: BoxDecoration(
+                  border: Border.all(color: hasFocus ? Colors.redAccent : Colors.transparent, width: 2),
+                  borderRadius: BorderRadius.circular(30),
+                ),
+                child: IconButton(
+                  icon: const Icon(Icons.support_agent, color: Colors.red, size: 30),
+                  onPressed: _showSupportOptions,
+                ),
+              );
+            }
           )
         ],
       ),
@@ -436,11 +467,14 @@ class DashboardPageState extends State<DashboardPage> {
                       children: [
                         Text(trendingList[_currentPage]['title'] ?? 'Title', style: const TextStyle(color: Colors.white, fontSize: 28, fontWeight: FontWeight.bold), maxLines: 2, overflow: TextOverflow.ellipsis),
                         const SizedBox(height: 8),
-                        ElevatedButton.icon(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24)),
-                          onPressed: () => launchPlayerDirect(trendingList[_currentPage]),
-                          icon: const Icon(Icons.play_arrow, size: 24),
-                          label: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                        _buildFocusableItem(
+                          onTap: () => launchPlayerDirect(trendingList[_currentPage]),
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(backgroundColor: Colors.white, foregroundColor: Colors.black, padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24)),
+                            onPressed: () => launchPlayerDirect(trendingList[_currentPage]),
+                            icon: const Icon(Icons.play_arrow, size: 24),
+                            label: const Text('Play Now', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+                          ),
                         ),
                       ],
                     ),
@@ -459,18 +493,25 @@ class DashboardPageState extends State<DashboardPage> {
                   final isSelected = selectedPlatform == srv['providerId'];
                   return Container(
                     margin: const EdgeInsets.symmetric(horizontal: 4),
-                    child: ElevatedButton(
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: isSelected ? Colors.redAccent : Colors.grey[900],
-                        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
-                        side: BorderSide(color: srv['color'], width: 1.5),
-                      ),
-                      onPressed: () {
+                    child: _buildFocusableItem(
+                      onTap: () {
                         searchController.clear();
                         setState(() => isSearching = false);
                         loadAllDashboards(providerId: srv['providerId']); 
                       },
-                      child: Text(srv['name'], style: TextStyle(color: isSelected ? Colors.white : srv['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      child: ElevatedButton(
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: isSelected ? Colors.redAccent : Colors.grey[900],
+                          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8)),
+                          side: BorderSide(color: srv['color'], width: 1.5),
+                        ),
+                        onPressed: () {
+                          searchController.clear();
+                          setState(() => isSearching = false);
+                          loadAllDashboards(providerId: srv['providerId']); 
+                        },
+                        child: Text(srv['name'], style: TextStyle(color: isSelected ? Colors.white : srv['color'], fontWeight: FontWeight.bold, letterSpacing: 1)),
+                      ),
                     ),
                   );
                 },
@@ -488,10 +529,8 @@ class DashboardPageState extends State<DashboardPage> {
                 itemCount: searchResults.length,
                 itemBuilder: (context, index) {
                   final movie = searchResults[index];
-                  return InkWell(
+                  return _buildFocusableItem(
                     onTap: () => launchPlayerDirect(movie),
-                    focusColor: Colors.white24,
-                    borderRadius: BorderRadius.circular(8),
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
