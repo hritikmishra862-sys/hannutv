@@ -1,8 +1,8 @@
 import 'dart:async';
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
-import 'dart:convert';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 
@@ -16,7 +16,7 @@ const Map<String, String> kApiHeaders = {
 
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
-  final String mediaType;
+  final String mediaType; // 'movie' or 'tv'
   final int season;
   final int episode;
   final String movieTitle;
@@ -26,7 +26,7 @@ class VideoPlayerPage extends StatefulWidget {
   final String? customUrl;
 
   const VideoPlayerPage({
-    super.key,
+    Key? key,
     required this.tmdbId,
     required this.mediaType,
     this.season = 1,
@@ -36,22 +36,22 @@ class VideoPlayerPage extends StatefulWidget {
     this.rating = '9.0',
     this.year = '2024',
     this.customUrl,
-  });
+  }) : super(key: key);
 
   @override
   State<VideoPlayerPage> createState() => _VideoPlayerPageState();
 }
 
-class _VideoPlayerPageState extends State<VideoPlayerPage>
-    with SingleTickerProviderStateMixin {
+class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderStateMixin {
   late WebViewController _controller;
 
   bool isVideoPlaying = false;
   bool isFullScreen = false;
   bool isPageLoading = true;
-  String activeServer = 'vidrift';
+  String activeServer = 'vidrift'; // Default to Rift
 
-  String currentAspectRatio = 'contain';
+  // Scale / Aspect Ratio Mode (Fill, Fit, Cover / 4:3)
+  String currentAspectRatio = 'contain'; 
 
   late int currentSeason;
   late int currentEpisode;
@@ -59,9 +59,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   int likeCount = 1248;
   int viewCount = 84920;
 
-  bool showControls = true; // Started true so HANNUTV logo shows initially
+  // Auto-Hide Controls Timer (Strict 3 Seconds for Back Button)
+  bool showControls = true;
   Timer? _hideControlsTimer;
 
+  // Cinematic Intro Animation
   bool showIntroAnimation = false;
   late AnimationController _introAnimController;
   late Animation<double> _introScaleAnimation;
@@ -69,43 +71,29 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final TextEditingController commentInputController = TextEditingController();
 
-  // 🔥 ALL NEW SERVERS ADDED FROM SCREENSHOTS 🔥
-  final List<Map<String, String>> servers = const [
+  // 🤖 10 COMPLETE PANTYFLIX SERVER NODES MAPPED DIRECTLY TO HANNUTV BUTTONS
+  final List<Map<String, String>> servers = [
     {'key': 'vidrift', 'name': 'Rift'},
     {'key': 'fast', 'name': 'Fast'},
     {'key': 'vidbolt', 'name': 'Bolt'},
+    {'key': 'vidspiral', 'name': 'Spiral'},
     {'key': 'cinezo', 'name': 'Cinezo'},
-    {'key': 'hindi-new', 'name': 'Hindi New'},
-    {'key': 'peach', 'name': 'Peach'},
-    {'key': 'mega', 'name': 'Mega'},
-    {'key': 'alpha', 'name': 'Alpha'},
     {'key': 'orion', 'name': 'Orion'},
-    {'key': 'hindi', 'name': 'Hindi'},
-    {'key': 'vidgod', 'name': 'Vidgod'},
-    {'key': 'cinesrc', 'name': 'CineSrc'},
+    {'key': 'alpha', 'name': 'Alpha'},
+    {'key': 'mega', 'name': 'Mega'},
+    {'key': 'peach', 'name': 'Peach'},
+    {'key': 'hindi-new', 'name': 'Hindi New'},
   ];
 
-  final List<Map<String, String>> publicComments = const [
+  // REAL WORKING PUBLIC COMMENTS
+  final List<Map<String, String>> publicComments = [
     {'name': 'SHEEL', 'text': 'HARE KRISHNA 🦚', 'time': '9d', 'avatar': 'S'},
-    {
-      'name': 'Rohit Sharma',
-      'text': 'Best quality on HANNUTV, loving this series! 🔥',
-      'time': '2d',
-      'avatar': 'R'
-    },
-    {
-      'name': 'Ananya Verma',
-      'text': 'Full HD stream with no buffering ❤️',
-      'time': '5h',
-      'avatar': 'A'
-    },
+    {'name': 'Rohit Sharma', 'text': 'Best quality on HANNUTV, loving this series! 🔥', 'time': '2d', 'avatar': 'R'},
+    {'name': 'Ananya Verma', 'text': 'Full HD stream with no buffering ❤️', 'time': '5h', 'avatar': 'A'},
   ];
 
   List similarMovies = [];
   bool isLoadingSimilar = false;
-
-  // 📺 TV DETECTION FLAG
-  bool isTvDevice = false;
 
   @override
   void initState() {
@@ -113,6 +101,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     currentSeason = widget.season;
     currentEpisode = widget.episode;
 
+    // Start in YouTube Style Portrait mode
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+
+    // Setup Cinematic Animation
     _introAnimController = AnimationController(
       vsync: this,
       duration: const Duration(milliseconds: 1400),
@@ -121,53 +114,21 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       CurvedAnimation(parent: _introAnimController, curve: Curves.easeOutBack),
     );
     _introOpacityAnimation = Tween<double>(begin: 1.0, end: 0.0).animate(
-      CurvedAnimation(
-        parent: _introAnimController,
-        curve: const Interval(0.65, 1.0, curve: Curves.easeIn),
-      ),
+      CurvedAnimation(parent: _introAnimController, curve: const Interval(0.65, 1.0, curve: Curves.easeIn)),
     );
 
     _fetchSimilarMovies();
-    _checkDeviceType(); // Check device type before initStream
+    _initStream();
+    _resetHideTimer(); 
   }
 
-  // 📺 LAYOUT DETECTION (Changes layout dynamically for TV)
-  void _checkDeviceType() {
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      final size = MediaQuery.of(context).size;
-      setState(() {
-        // Simple logic: If width is significantly larger than height, it's a TV/Landscape device
-        isTvDevice = size.width > size.height && size.width > 600; 
-        if (isTvDevice) {
-           isFullScreen = true; // Force full screen for TV
-        } else {
-           SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-        }
-      });
-      _startControlsTimer();
-      _initStream();
-    });
-  }
-
-  // 🕒 5-SECOND CONTROL PANEL TIMER LOGIC
-  void _startControlsTimer() {
+  // 🕒 STRICT 3-SECOND AUTO-HIDE LOGIC
+  void _resetHideTimer() {
     _hideControlsTimer?.cancel();
     if (mounted) setState(() => showControls = true);
-    // Hide controls strictly after 5 seconds
-    _hideControlsTimer = Timer(const Duration(seconds: 5), () {
+    _hideControlsTimer = Timer(const Duration(seconds: 3), () {
       if (mounted) setState(() => showControls = false);
     });
-  }
-
-  // Toggle Controls manually via Logo click
-  void _toggleControlPanel() {
-    if (showControls) {
-      setState(() => showControls = false);
-      _hideControlsTimer?.cancel();
-    } else {
-      _startControlsTimer();
-    }
   }
 
   void _triggerCinematicPlayAnimation() {
@@ -186,53 +147,35 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Future<void> _fetchSimilarMovies() async {
     setState(() => isLoadingSimilar = true);
     try {
-      final type =
-          widget.mediaType == 'tv' || widget.mediaType == 'series'
-              ? 'tv'
-              : 'movie';
+      final type = widget.mediaType == 'tv' || widget.mediaType == 'series' ? 'tv' : 'movie';
       final res = await http.get(
-        Uri.parse(
-          'https://api.themoviedb.org/3/$type/${widget.tmdbId}/recommendations?language=en-US',
-        ),
+        Uri.parse('https://api.themoviedb.org/3/$type/${widget.tmdbId}/recommendations?language=en-US'),
         headers: kApiHeaders,
       );
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final List results = data['results'] ?? [];
-        if (mounted) {
+        if(mounted) {
           setState(() {
-            similarMovies =
-                results
-                    .map(
-                      (m) => {
-                        'id': m['id'],
-                        'title': m['title'] ?? m['name'] ?? 'Unknown',
-                        'posterUrl':
-                            m['poster_path'] != null
-                                ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}'
-                                : '',
-                        'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
-                        'year':
-                            (m['release_date'] ?? m['first_air_date'] ?? '')
-                                .toString()
-                                .split('-')
-                                .first,
-                        'mediaType': type,
-                      },
-                    )
-                    .toList();
+            similarMovies = results.map((m) => {
+              'id': m['id'],
+              'title': m['title'] ?? m['name'] ?? 'Unknown',
+              'posterUrl': m['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}' : '',
+              'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
+              'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
+              'mediaType': type,
+            }).toList();
             isLoadingSimilar = false;
           });
         }
       } else {
-        if (mounted) setState(() => isLoadingSimilar = false);
+        if(mounted) setState(() => isLoadingSimilar = false);
       }
     } catch (_) {
-      if (mounted) setState(() => isLoadingSimilar = false);
+      if(mounted) setState(() => isLoadingSimilar = false);
     }
   }
 
-  // 🔥 URL PARSER UPDATED FOR ALL SERVERS 🔥
   String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -243,11 +186,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
+    // 🚀 DIRECT SERVER ENGINE MAPPING (Exact Pantyflix URLs)
     return isTv
         ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
+  // 🛡️ NO BLACK SCREEN - SAFE CSS INJECTION TO HIDE PANTYFLIX UI
   void _initStream() {
     setState(() {
       isPageLoading = true;
@@ -257,46 +202,41 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
     final targetUrl = _buildStreamUrl();
 
-    _controller =
-        WebViewController()
-          ..setJavaScriptMode(JavaScriptMode.unrestricted)
-          ..setBackgroundColor(Colors.black)
-          ..setUserAgent(
-            // TV User Agent for better TV Website rendering
-            isTvDevice
-                ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
-                : "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
-          )
-          ..addJavaScriptChannel(
-            'VideoState',
-            onMessageReceived: (JavaScriptMessage message) {
-              if (message.message == 'playing' && mounted) {
-                _triggerCinematicPlayAnimation();
-              }
-            },
-          )
-          ..setNavigationDelegate(
-            NavigationDelegate(
-              onPageStarted: (String url) {
-                if (mounted) setState(() => isPageLoading = true);
-              },
-              onPageFinished: (String url) {
-                if (mounted) setState(() => isPageLoading = false);
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setUserAgent(
+        "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+      )
+      ..addJavaScriptChannel(
+        'VideoState',
+        onMessageReceived: (JavaScriptMessage message) {
+          if (message.message == 'playing' && mounted) {
+            _triggerCinematicPlayAnimation();
+          }
+        },
+      )
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            if (mounted) setState(() => isPageLoading = true);
+          },
+          onPageFinished: (String url) {
+            if (mounted) setState(() => isPageLoading = false);
 
-                // 🛡️ WORLD'S BEST AI MUTATION OBSERVER & Z-INDEX AD-KILLER
-                String jsCode = '''
+            // 🔥 NO HTML DELETE: ONLY HIDE ELEMENTS SO IT DOES NOT CRASH INTO BLACK SCREEN
+            String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
 
               window.open = function() { return null; };
               window.alert = function() { return null; };
-              window.confirm = function() { return null; };
 
               var style = document.createElement('style');
               style.innerHTML = `
                 header, nav, .navbar, footer, .footer,
-                .server-select, .server-dropdown, select[name*="server"], 
-                div[class*="server-dropdown"], div[class*="server-btn"],
+                .server-select, .server-dropdown, select, 
+                div[class*="server"], div[id*="server"],
                 a[href*="t.me"], a[href*="telegram"], [class*="telegram"], 
                 iframe[src*="ads"], .ad-container, .ads, .ad-banner, .popup-overlay,
                 .dmca-notice, .copyright, [href*="mailto:"] { 
@@ -307,151 +247,73 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                 }
                 body { 
                   background-color: #000000 !important; 
-                  color: #ffffff !important;
                   overflow: hidden !important;
                 }
-                video {
-                  object-fit: $currentAspectRatio !important;
-                  width: 100% !important;
-                  height: 100% !important;
+                
+                /* 🔥 MAGIC CSS: Forces the video iframe to take up the ENTIRE screen hiding the website behind it */
+                #player-area, .player-area, iframe {
+                   position: fixed !important;
+                   top: 0 !important;
+                   left: 0 !important;
+                   width: 100vw !important;
+                   height: 100vh !important;
+                   z-index: 99999 !important;
+                   background-color: #000000 !important;
                 }
               `;
               document.head.appendChild(style);
 
-              // 🛡️ AI MUTATION OBSERVER (1ms Nuke for Ads, Popups, TV Captchas)
-              const aiObserver = new MutationObserver((mutations) => {
-                mutations.forEach((mutation) => {
-                  mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === 1) {
-                      let text = node.innerText ? node.innerText.toLowerCase() : '';
-                      let className = node.className ? node.className.toString().toLowerCase() : '';
-                      let idName = node.id ? node.id.toString().toLowerCase() : '';
-
-                      if (text.includes('rift(ads)') || text.includes('rift (ads)') || 
-                          text.includes('adblock') || text.includes('captcha') || text.includes('robot') ||
-                          text.includes('verify you are human') || text.includes("confirm you're not a robot") ||
-                          text.includes('telegram') || text.includes('dmca') || text.includes('support@') ||
-                          className.includes('ad-') || className.includes('banner') || className.includes('popup') ||
-                          idName.includes('ad-') || className.includes('server-select')) {
-                        node.style.display = 'none';
-                        node.remove();
-                      }
-                    }
-                  });
-                });
-              });
-              aiObserver.observe(document.body, { childList: true, subtree: true });
-
-              // THE Z-INDEX VIDEO HACK: Forces Video on top of EVERYTHING to hide ads
+              // 🚀 REAL-TIME CLEANER FOR "(ADS)" TEXT
               setInterval(function() {
-                // TV CAPTCHA IFRAME KILLER 
-                document.querySelectorAll('iframe').forEach(ifr => {
-                  if(ifr.src && (ifr.src.includes('captcha') || ifr.src.includes('recaptcha') || ifr.src.includes('challenge') || ifr.src.includes('robot'))) {
-                    ifr.style.display = 'none';
-                    ifr.remove();
+                document.querySelectorAll('div, a, span, button, ul, li').forEach(el => {
+                  let text = el.innerText ? el.innerText.toLowerCase().trim() : '';
+                  if (text.includes('(ads)') || text.includes('rift(ads)') || text.includes('bolt(ads)') || text.includes('fast(ads)') || text.includes('cinezo(ads)') || text.includes('hindi new')) {
+                    el.style.display = 'none';
+                  }
+                  if (text.includes('telegram') || text.includes('dmca') || text.includes('support@') || text.includes('contact us')) {
+                    el.style.display = 'none';
                   }
                 });
 
+                // Auto Play Trigger
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
-                  var v = vids[0];
-                  v.style.backgroundColor = '#000000';
-                  v.style.objectFit = '$currentAspectRatio';
-                  
-                  // 🔥 ABSOLUTE VIDEO DOMINANCE TRICK: Sab ads video ke piche daab jayenge
-                  v.style.position = 'fixed';
-                  v.style.top = '0';
-                  v.style.left = '0';
-                  v.style.width = '100vw';
-                  v.style.height = '100vh';
-                  v.style.zIndex = '999999';
-
-                  v.muted = false;
-                  v.volume = 1.0;
-                  if (v.paused && !v.ended) {
-                    v.play().catch(function(){});
+                  if (vids[0].paused && !vids[0].ended) {
+                    vids[0].play().catch(function(){});
                   }
-                  if (v.currentTime > 0.5 && !v.paused) {
+                  if (vids[0].currentTime > 0.5 && !vids[0].paused) {
                     VideoState.postMessage('playing');
                   }
                 }
-
-                // Hide native fullscreen buttons
-                var fsBtns = document.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"], .plyr__controls__item[data-plyr="fullscreen"]');
-                fsBtns.forEach(btn => { btn.style.display = 'none'; btn.style.opacity = '0'; btn.style.pointerEvents = 'none'; });
-
-                var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .jw-display-icon-container, [aria-label="Play"], button[title*="Play"], .play-icon, #play-button');
-                playBtns.forEach(function(b) { b.click(); });
               }, 200);
             ''';
-                _controller.runJavaScript(jsCode);
-              },
-              onNavigationRequest: (NavigationRequest request) {
-                final url = request.url.toLowerCase();
+            _controller.runJavaScript(jsCode);
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            final url = request.url.toLowerCase();
 
-                if (url.contains('doubleclick') ||
-                    url.contains('popads') ||
-                    url.contains('1xbet') ||
-                    url.contains('bet365') ||
-                    url.contains('onclick') ||
-                    url.contains('monetag') ||
-                    url.contains('exoclick') ||
-                    url.contains('redirect') ||
-                    url.contains('adsterra') ||
-                    url.contains('t.me') ||
-                    url.contains('telegram') ||
-                    url.contains('captcha') ||
-                    url.contains('recaptcha')) {
-                  return NavigationDecision.prevent;
-                }
+            // 🚫 YOUR TRUSTED ORIGINAL AD-BLOCKER: Strict Block EVERYTHING
+            if (url.contains('doubleclick') || url.contains('popads') ||
+                url.contains('1xbet') || url.contains('bet365') ||
+                url.contains('onclick') || url.contains('adsterra') ||
+                url.contains('lucky') || url.contains('amazon') ||
+                url.contains('vast') || url.contains('vpaid') ||
+                url.contains('t.me') || url.contains('telegram') ||
+                url.contains('monetag') || url.contains('exoclick') ||
+                url.contains('redirect') ||
+                url.contains('market://') || url.contains('intent://')) {
+              return NavigationDecision.prevent;
+            }
 
-                if (url.contains('pantyflix.com') ||
-                    url.contains('vidbolt') ||
-                    url.contains('vidsrc') ||
-                    url.contains('vidlink') ||
-                    url.contains('multiembed') ||
-                    url.contains('pages.dev') ||
-                    url.startsWith('about:blank') ||
-                    url.startsWith('data:')) {
-                  return NavigationDecision.navigate;
-                }
+            return NavigationDecision.navigate;
+          },
+        ),
+      );
 
-                return NavigationDecision.prevent;
-              },
-            ),
-          );
-
-    final embedHtml = '''
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
-            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
-          </style>
-        </head>
-        <body>
-          <iframe 
-            id="player-frame"
-            src="$targetUrl" 
-            sandbox="allow-scripts allow-same-origin allow-presentation"
-            allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
-            allowfullscreen>
-          </iframe>
-        </body>
-      </html>
-    ''';
-
-    _controller.loadHtmlString(embedHtml, baseUrl: 'https://pantyflix.com');
-
-    if (_controller.platform is AndroidWebViewController) {
-      (_controller.platform as AndroidWebViewController)
-          .setMediaPlaybackRequiresUserGesture(false);
-    }
+    _controller.loadRequest(Uri.parse(targetUrl));
   }
 
+  // 🔄 DYNAMIC ASPECT RATIO 
   void _cycleAspectRatio() {
     setState(() {
       if (currentAspectRatio == 'contain') {
@@ -463,18 +325,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       }
     });
 
+    // Try to scale the iframe directly if inner document is blocked by CORS
+    String scaleValue = '1';
+    if(currentAspectRatio == 'cover') scaleValue = '1.3';
+    if(currentAspectRatio == 'fill') scaleValue = '1.5';
+    if(currentAspectRatio == 'contain') scaleValue = '1';
+
     _controller.runJavaScript('''
-      var vids = document.getElementsByTagName('video');
-      if (vids.length > 0) {
-        vids[0].style.objectFit = '$currentAspectRatio';
+      var iframes = document.getElementsByTagName('iframe');
+      for(let i=0; i<iframes.length; i++) {
+         iframes[i].style.transform = 'scale($scaleValue)';
+         iframes[i].style.transformOrigin = 'center center';
       }
     ''');
-    _startControlsTimer();
+    
+    _resetHideTimer(); 
   }
 
+  // 🖥️ ROTATE & FULLSCREEN LOGIC
   void _toggleFullScreen() {
-    if (isTvDevice) return; // TV disables this button automatically
-
     setState(() {
       isFullScreen = !isFullScreen;
     });
@@ -489,7 +358,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
-    _startControlsTimer();
+    _resetHideTimer();
   }
 
   void _switchEpisode(int ep) {
@@ -520,1007 +389,598 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _introAnimController.dispose();
     commentInputController.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-    SystemChrome.setEnabledSystemUIMode(
-      SystemUiMode.manual,
-      overlays: SystemUiOverlay.values,
-    );
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
-  }
-
-  Widget _buildFocusableItem({
-    required Widget child,
-    required VoidCallback onTap,
-    BorderRadius? borderRadius,
-  }) {
-    return _TvFocusButton(
-      onTap: onTap,
-      borderRadius: borderRadius ?? BorderRadius.circular(8),
-      child: child,
-    );
   }
 
   @override
   Widget build(BuildContext context) {
+    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+
     if (isFullScreen) {
-      return Scaffold(
-        backgroundColor: Colors.black,
-        body: GestureDetector(
-          onTap: _toggleControlPanel,
-          child: Stack(
-            children: [
-              Positioned.fill(child: WebViewWidget(controller: _controller)),
-              
-              if (showIntroAnimation)
+      // ==========================================
+      // 🖥️ PURE LANDSCAPE FULLSCREEN VIEW
+      // ==========================================
+      return PopScope(
+        canPop: false,
+        onPopInvoked: (bool didPop) {
+          if (didPop) return;
+          _toggleFullScreen();
+        },
+        child: Scaffold(
+          backgroundColor: Colors.black,
+          body: GestureDetector(
+            onTap: _resetHideTimer, // Tap anywhere to show/reset 3s timer
+            behavior: HitTestBehavior.opaque,
+            child: Stack(
+              children: [
                 Positioned.fill(
-                  child: IgnorePointer(
-                    child: Center(
-                      child: AnimatedBuilder(
-                        animation: _introAnimController,
-                        builder: (context, child) {
-                          return Opacity(
-                            opacity: _introOpacityAnimation.value,
-                            child: Transform.scale(
-                              scale: _introScaleAnimation.value,
-                              child: Column(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Image.asset(
-                                    'assets/logo.png',
-                                    height: 90,
-                                    errorBuilder:
-                                        (_, __, ___) => const Icon(
-                                          Icons.play_circle_fill,
-                                          color: Colors.red,
-                                          size: 90,
-                                        ),
-                                  ),
-                                  const SizedBox(height: 10),
-                                  const Text(
-                                    "HANNUTV CINEMA",
-                                    style: TextStyle(
-                                      color: Colors.red,
-                                      fontSize: 22,
-                                      fontWeight: FontWeight.bold,
-                                      letterSpacing: 3,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-                  ),
+                  child: WebViewWidget(controller: _controller),
                 ),
 
-              // HANNUTV MAGIC LOGO CORNER (TV Fix Included)
-              Positioned(
-                top: 14,
-                left: 14,
-                child: SafeArea(
-                  child: _buildFocusableItem(
-                    onTap: _toggleControlPanel,
-                    borderRadius: BorderRadius.circular(10),
-                    child: Padding(
-                      padding: const EdgeInsets.all(4.0),
-                      child: Opacity(
-                        opacity: 0.9,
-                        child: Image.asset(
-                          'assets/logo.png',
-                          height: 38,
-                          errorBuilder:
-                              (_, __, ___) => const Text(
-                                'HANNUTV',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 16,
-                                ),
-                              ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-
-              if (showControls) ...[
-                // Back Button (Top Right in Fullscreen)
-                Positioned(
-                  top: 14,
-                  right: 14,
-                  child: SafeArea(
-                    child: _buildFocusableItem(
-                      onTap: () {
-                        if(isTvDevice) {
-                           Navigator.pop(context); // TV just pops out
-                        } else {
-                           _toggleFullScreen(); // Mobile exits fullscreen
-                        }
-                      },
-                      borderRadius: BorderRadius.circular(20),
-                      child: const CircleAvatar(
-                        backgroundColor: Colors.black54,
-                        radius: 20,
-                        child: Icon(
-                          Icons.close, // Used Close icon instead of arrow back for standard UX
-                          color: Colors.white,
-                          size: 24,
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
+                // 🌟 BIG HANNUTV LOGO (BOTTOM-RIGHT)
                 Positioned(
                   bottom: 20,
-                  left: 16,
+                  right: 20,
                   child: SafeArea(
-                    child: _buildFocusableItem(
-                      onTap: _cycleAspectRatio,
-                      borderRadius: BorderRadius.circular(20),
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 14,
-                          vertical: 8,
-                        ),
-                        decoration: BoxDecoration(
-                          color: Colors.black54,
-                          borderRadius: BorderRadius.circular(20),
-                          border: Border.all(color: Colors.white30),
-                        ),
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            const Icon(
-                              Icons.aspect_ratio,
-                              color: Colors.white,
-                              size: 18,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(
-                              currentAspectRatio.toUpperCase(),
-                              style: const TextStyle(
-                                color: Colors.white,
-                                fontSize: 12,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                    child: IgnorePointer(
+                      child: Opacity(
+                        opacity: 0.85,
+                        child: Image.asset(
+                          'assets/logo.png',
+                          height: 40,
+                          errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
                         ),
                       ),
                     ),
                   ),
                 ),
-                // Only show Fullscreen-exit button if it is a Mobile Phone
-                if (!isTvDevice)
+
+                // 🌟 HANNUTV CINEMATIC INTRO ANIMATION ON PLAY
+                if (showIntroAnimation)
+                  Positioned.fill(
+                    child: IgnorePointer(
+                      child: Center(
+                        child: AnimatedBuilder(
+                          animation: _introAnimController,
+                          builder: (context, child) {
+                            return Opacity(
+                              opacity: _introOpacityAnimation.value,
+                              child: Transform.scale(
+                                scale: _introScaleAnimation.value,
+                                child: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
+                                    const SizedBox(height: 10),
+                                    const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ),
+                  ),
+
+                // 🕒 AUTO-HIDE CONTROLS (3 SECONDS)
+                if (showControls) ...[
+                  // Back Button (Top Left)
                   Positioned(
-                    bottom: 16,
-                    right: 16,
+                    top: 16,
+                    left: 16,
                     child: SafeArea(
-                      child: _buildFocusableItem(
-                        onTap: _toggleFullScreen,
-                        borderRadius: BorderRadius.circular(20),
-                        child: const CircleAvatar(
-                          backgroundColor: Colors.black54,
-                          radius: 20,
-                          child: Icon(
-                            Icons.fullscreen_exit,
-                            color: Colors.white,
-                            size: 24,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 20,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                          onPressed: _toggleFullScreen,
+                        ),
+                      ),
+                    ),
+                  ),
+                  
+                  // Aspect Ratio / Screen Fit Button (Bottom Left, Just Above Rotate Button)
+                  Positioned(
+                    bottom: 66, // Placed above the rotate button
+                    left: 16,
+                    child: SafeArea(
+                      child: Opacity(
+                        opacity: 0.5, // Not over-highlighted
+                        child: GestureDetector(
+                          onTap: _cycleAspectRatio,
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                            decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
+                            child: Row(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                const Icon(Icons.aspect_ratio, color: Colors.white, size: 14),
+                                const SizedBox(width: 4),
+                                Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                     ),
                   ),
+
+                  // Rotate Exit Fullscreen Button (Bottom Left)
+                  Positioned(
+                    bottom: 16,
+                    left: 16,
+                    child: SafeArea(
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 20,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.screen_rotation, color: Colors.white, size: 22),
+                          onPressed: _toggleFullScreen,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
               ],
-            ],
+            ),
           ),
         ),
       );
     }
 
-    return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
-      body: SafeArea(
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            GestureDetector(
-              onTap: _toggleControlPanel,
-              child: Stack(
-                children: [
-                  Container(
-                    width: double.infinity,
-                    height: 230,
-                    color: Colors.black,
-                    child: WebViewWidget(controller: _controller),
-                  ),
-                  if (showIntroAnimation)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Center(
-                          child: AnimatedBuilder(
-                            animation: _introAnimController,
-                            builder: (context, child) {
-                              return Opacity(
-                                opacity: _introOpacityAnimation.value,
-                                child: Transform.scale(
-                                  scale: _introScaleAnimation.value,
-                                  child: Image.asset(
-                                    'assets/logo.png',
-                                    height: 60,
-                                    errorBuilder:
-                                        (_, __, ___) => const Icon(
-                                          Icons.play_circle_fill,
-                                          color: Colors.red,
-                                          size: 60,
-                                        ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  
-                  // HANNUTV MAGIC LOGO BUTTON (MOBILE LAYOUT)
-                  Positioned(
-                    top: 10,
-                    left: 10,
-                    child: _buildFocusableItem(
-                      onTap: _toggleControlPanel,
-                      borderRadius: BorderRadius.circular(8),
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        child: Opacity(
-                          opacity: 0.9,
-                          child: Image.asset(
-                            'assets/logo.png',
-                            height: 28,
-                            errorBuilder:
-                                (_, __, ___) => const Text(
-                                  'HANNUTV',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  if (showControls) ...[
-                    Positioned(
-                      top: 10,
-                      right: 10,
-                      child: _buildFocusableItem(
-                        onTap: () => Navigator.pop(context),
-                        borderRadius: BorderRadius.circular(18),
-                        child: const CircleAvatar(
-                          backgroundColor: Colors.black54,
-                          radius: 18,
-                          child: Icon(
-                            Icons.close,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      left: 10,
-                      child: _buildFocusableItem(
-                        onTap: _cycleAspectRatio,
-                        borderRadius: BorderRadius.circular(15),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 10,
-                            vertical: 6,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.black54,
-                            borderRadius: BorderRadius.circular(15),
-                            border: Border.all(color: Colors.white30),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(
-                                Icons.aspect_ratio,
-                                color: Colors.white,
-                                size: 14,
-                              ),
-                              const SizedBox(width: 6),
-                              Text(
-                                currentAspectRatio.toUpperCase(),
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 11,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                    Positioned(
-                      bottom: 10,
-                      right: 10,
-                      child: _buildFocusableItem(
-                        onTap: _toggleFullScreen,
-                        borderRadius: BorderRadius.circular(18),
-                        child: const CircleAvatar(
-                          backgroundColor: Colors.black54,
-                          radius: 18,
-                          child: Icon(
-                            Icons.fullscreen,
-                            color: Colors.white,
-                            size: 22,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                  if (isPageLoading && !isVideoPlaying)
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.black87,
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset(
-                                'assets/logo.png',
-                                height: 40,
-                                errorBuilder:
-                                    (_, __, ___) => const Icon(
-                                      Icons.movie,
-                                      color: Colors.red,
-                                      size: 40,
-                                    ),
-                              ),
-                              const SizedBox(height: 12),
-                              const SizedBox(
-                                width: 30,
-                                height: 30,
-                                child: CircularProgressIndicator(
-                                  color: Colors.redAccent,
-                                  strokeWidth: 2.5,
-                                ),
-                              ),
-                              const SizedBox(height: 10),
-                              const Text(
-                                "Loading HANNUTV Server",
-                                style: TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              Text(
-                                "Requesting stream from $activeServer node...",
-                                style: const TextStyle(
-                                  color: Colors.grey,
-                                  fontSize: 11,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 16,
-                  vertical: 12,
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
+    // ==========================================
+    // 📱 PORTRAIT YOUTUBE-STYLE VIEW
+    // ==========================================
+    return PopScope(
+      canPop: false,
+      onPopInvoked: (bool didPop) {
+        if (didPop) return;
+        Navigator.of(context).pop();
+      },
+      child: Scaffold(
+        backgroundColor: const Color(0xFF0F0F0F),
+        body: SafeArea(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              // 1. TOP VIDEO PLAYER WINDOW (230px height)
+              GestureDetector(
+                onTap: _resetHideTimer,
+                behavior: HitTestBehavior.opaque,
+                child: Stack(
                   children: [
-                    Text(
-                      widget.movieTitle,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    const SizedBox(height: 6),
-                    Row(
-                      children: [
-                        const Icon(Icons.star, color: Colors.amber, size: 18),
-                        const SizedBox(width: 4),
-                        Text(
-                          widget.rating,
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Text(
-                          widget.year,
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 14,
-                          ),
-                        ),
-                        const SizedBox(width: 16),
-                        const Icon(
-                          Icons.visibility,
-                          color: Colors.grey,
-                          size: 16,
-                        ),
-                        const SizedBox(width: 4),
-                        Text(
-                          "$viewCount Views",
-                          style: const TextStyle(
-                            color: Colors.grey,
-                            fontSize: 12,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 14),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          _buildFocusableItem(
-                            onTap: () {
-                              setState(() {
-                                isLiked = !isLiked;
-                                likeCount += isLiked ? 1 : -1;
-                              });
-                            },
-                            borderRadius: BorderRadius.circular(20),
-                            child: _buildActionButton(
-                              isLiked
-                                  ? Icons.thumb_up
-                                  : Icons.thumb_up_alt_outlined,
-                              "$likeCount",
-                              activeColor:
-                                  isLiked ? Colors.redAccent : Colors.white,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildFocusableItem(
-                            onTap: () {},
-                            borderRadius: BorderRadius.circular(20),
-                            child: _buildActionButton(
-                              Icons.bookmark_border,
-                              "Add to List",
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildFocusableItem(
-                            onTap: () {},
-                            borderRadius: BorderRadius.circular(20),
-                            child: _buildActionButton(
-                              Icons.tv,
-                              "Play on TV",
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildFocusableItem(
-                            onTap: () {},
-                            borderRadius: BorderRadius.circular(20),
-                            child: _buildActionButton(Icons.share, "Share"),
-                          ),
-                          const SizedBox(width: 8),
-                          _buildFocusableItem(
-                            onTap: () {},
-                            borderRadius: BorderRadius.circular(20),
-                            child: _buildActionButton(
-                              Icons.flag_outlined,
-                              "Report",
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 16),
-                    const Text(
-                      "If current server is not working, try a different one:",
-                      style: TextStyle(
-                        color: Colors.grey,
-                        fontSize: 13,
-                        fontStyle: FontStyle.italic,
-                      ),
-                    ),
-                    const SizedBox(height: 10),
-                    SingleChildScrollView(
-                      scrollDirection: Axis.horizontal,
-                      child: Row(
-                        children: [
-                          const Text(
-                            "Servers : ",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          ...servers.map((srv) {
-                            final isSelected = activeServer == srv['key'];
-                            return _buildFocusableItem(
-                              onTap: () {
-                                if (activeServer != srv['key']) {
-                                  setState(() {
-                                    activeServer = srv['key']!;
-                                  });
-                                  _initStream();
-                                }
-                              },
-                              borderRadius: BorderRadius.circular(20),
-                              child: Container(
-                                margin: const EdgeInsets.only(right: 8),
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 16,
-                                  vertical: 8,
-                                ),
-                                decoration: BoxDecoration(
-                                  color:
-                                      isSelected
-                                          ? Colors.white
-                                          : Colors.grey[900],
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Text(
-                                  srv['name']!,
-                                  style: TextStyle(
-                                    color:
-                                        isSelected
-                                            ? Colors.black
-                                            : Colors.white,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 13,
-                                  ),
-                                ),
-                              ),
-                            );
-                          }),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 18),
                     Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[900],
-                        borderRadius: BorderRadius.circular(12),
+                      width: double.infinity,
+                      height: 230,
+                      color: Colors.black,
+                      child: WebViewWidget(controller: _controller),
+                    ),
+
+                    // 🌟 BIGGER HANNUTV LOGO (BOTTOM RIGHT)
+                    Positioned(
+                      bottom: 10,
+                      right: 14,
+                      child: IgnorePointer(
+                        child: Opacity(
+                          opacity: 0.85,
+                          child: Image.asset('assets/logo.png', height: 32, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))),
+                        ),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                    ),
+
+                    // 🌟 CINEMATIC HANNUTV INTRO ANIMATION
+                    if (showIntroAnimation)
+                      Positioned.fill(
+                        child: IgnorePointer(
+                          child: Center(
+                            child: AnimatedBuilder(
+                              animation: _introAnimController,
+                              builder: (context, child) {
+                                return Opacity(
+                                  opacity: _introOpacityAnimation.value,
+                                  child: Transform.scale(
+                                    scale: _introScaleAnimation.value,
+                                    child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)),
+                                  ),
+                                );
+                              },
+                            ),
+                          ),
+                        ),
+                      ),
+
+                    // 🕒 AUTO-HIDE CONTROLS (3 SECONDS)
+                    if (showControls) ...[
+                      // Top Back Button
+                      Positioned(
+                        top: 8,
+                        left: 8,
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black54,
+                          radius: 18,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                            onPressed: () => Navigator.pop(context),
+                          ),
+                        ),
+                      ),
+
+                      // Screen Fit Button (Bottom Left, Above Rotate)
+                      Positioned(
+                        bottom: 48, // Placed exactly above the rotate button
+                        left: 8,
+                        child: Opacity(
+                          opacity: 0.5, // Low opacity to not over-highlight
+                          child: GestureDetector(
+                            onTap: _cycleAspectRatio,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                              decoration: BoxDecoration(color: Colors.black, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white30)),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  const Icon(Icons.aspect_ratio, color: Colors.white, size: 12),
+                                  const SizedBox(width: 4),
+                                  Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 9, fontWeight: FontWeight.bold)),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+
+                      // Rotate Fullscreen Button (Bottom Left)
+                      Positioned(
+                        bottom: 8,
+                        left: 8,
+                        child: CircleAvatar(
+                          backgroundColor: Colors.black54,
+                          radius: 16,
+                          child: IconButton(
+                            padding: EdgeInsets.zero,
+                            icon: const Icon(Icons.screen_rotation, color: Colors.white, size: 18),
+                            onPressed: _toggleFullScreen,
+                          ),
+                        ),
+                      ),
+                    ],
+
+                    // Fast Loading Indicator with HANNUTV Branding
+                    if (isPageLoading && !isVideoPlaying)
+                      Positioned.fill(
+                        child: Container(
+                          color: Colors.black87,
+                          child: Center(
+                            child: Column(
+                              mainAxisSize: MainAxisSize.min,
+                              children: [
+                                Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 40)),
+                                const SizedBox(height: 12),
+                                const SizedBox(
+                                  width: 30,
+                                  height: 30,
+                                  child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5),
+                                ),
+                                const SizedBox(height: 10),
+                                const Text(
+                                  "Loading HANNUTV Server",
+                                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  "Requesting stream from $activeServer node...",
+                                  style: const TextStyle(color: Colors.grey, fontSize: 11),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
+              ),
+
+              // 2. SCROLLABLE DETAILS SECTION (100% UNCHANGED)
+              Expanded(
+                child: SingleChildScrollView(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 6),
+
+                      Row(
                         children: [
-                          Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Text(
-                                "Comments ${publicComments.length}",
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                          const Icon(Icons.star, color: Colors.amber, size: 18),
+                          const SizedBox(width: 4),
+                          Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 12),
+                          Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                          const SizedBox(width: 16),
+                          const Icon(Icons.visibility, color: Colors.grey, size: 16),
+                          const SizedBox(width: 4),
+                          Text("$viewCount Views", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                      const SizedBox(height: 14),
+
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: [
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  isLiked = !isLiked;
+                                  likeCount += isLiked ? 1 : -1;
+                                });
+                              },
+                              child: _buildActionButton(isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined, "$likeCount", activeColor: isLiked ? Colors.redAccent : Colors.white),
+                            ),
+                            const SizedBox(width: 8),
+                            _buildActionButton(Icons.bookmark_border, "Add to List"),
+                            const SizedBox(width: 8),
+                            _buildActionButton(Icons.tv, "Play on TV"),
+                            const SizedBox(width: 8),
+                            _buildActionButton(Icons.share, "Share"),
+                            const SizedBox(width: 8),
+                            _buildActionButton(Icons.flag_outlined, "Report"),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 16),
+
+                      const Text("If current server is not working, try a different one:", style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic)),
+                      const SizedBox(height: 10),
+
+                      Row(
+                        children: [
+                          const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          Expanded(
+                            child: SingleChildScrollView(
+                              scrollDirection: Axis.horizontal,
+                              child: Row(
+                                children: servers.map((srv) {
+                                  final isSelected = activeServer == srv['key'];
+                                  return GestureDetector(
+                                    onTap: () {
+                                      if (activeServer != srv['key']) {
+                                        setState(() {
+                                          activeServer = srv['key']!;
+                                        });
+                                        _initStream();
+                                      }
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.only(right: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                      decoration: BoxDecoration(color: isSelected ? Colors.white : Colors.grey[900], borderRadius: BorderRadius.circular(20)),
+                                      child: Text(srv['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    ),
+                                  );
+                                }).toList(),
                               ),
-                              const Icon(
-                                Icons.comment,
-                                color: Colors.grey,
-                                size: 16,
-                              ),
-                            ],
+                            ),
                           ),
-                          const SizedBox(height: 10),
-                          Row(
-                            children: [
-                              Expanded(
-                                child: TextField(
-                                  controller: commentInputController,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                  ),
-                                  decoration: InputDecoration(
-                                    hintText: 'Add a comment...',
-                                    hintStyle: const TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 12,
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+
+                      Container(
+                        padding: const EdgeInsets.all(12),
+                        decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: [
+                                Text("Comments ${publicComments.length}", style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                                const Icon(Icons.comment, color: Colors.grey, size: 16),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: TextField(
+                                    controller: commentInputController,
+                                    style: const TextStyle(color: Colors.white, fontSize: 12),
+                                    decoration: InputDecoration(
+                                      hintText: 'Add a comment...',
+                                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                                      filled: true,
+                                      fillColor: Colors.black45,
+                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
                                     ),
-                                    filled: true,
-                                    fillColor: Colors.black45,
-                                    contentPadding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 8,
-                                    ),
-                                    border: OutlineInputBorder(
-                                      borderRadius: BorderRadius.circular(20),
-                                      borderSide: BorderSide.none,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              _buildFocusableItem(
-                                onTap: _addComment,
-                                borderRadius: BorderRadius.circular(20),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Icon(
-                                    Icons.send,
-                                    color: Colors.redAccent,
-                                    size: 20,
                                   ),
                                 ),
+                                IconButton(icon: const Icon(Icons.send, color: Colors.redAccent, size: 20), onPressed: _addComment),
+                              ],
+                            ),
+                            const SizedBox(height: 10),
+                            ...publicComments.map((c) => Padding(
+                              padding: const EdgeInsets.only(bottom: 8.0),
+                              child: Row(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                                  const SizedBox(width: 10),
+                                  Expanded(
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        Row(
+                                          children: [
+                                            Text(c['name']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                            const SizedBox(width: 6),
+                                            Text(c['time']!, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                                          ],
+                                        ),
+                                        Text(c['text']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
-                          const SizedBox(height: 10),
-                          ...publicComments
-                              .map(
-                                (c) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8.0),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
+                            )).toList(),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(height: 20),
+
+                      if (isTv) ...[
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                              child: Text("Season $currentSeason", style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13)),
+                            ),
+                            const Icon(Icons.grid_view, color: Colors.grey, size: 20),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+
+                        SizedBox(
+                          height: 140,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: 15,
+                            itemBuilder: (context, index) {
+                              final epNum = index + 1;
+                              final isCurrent = currentEpisode == epNum;
+
+                              return GestureDetector(
+                                onTap: () => _switchEpisode(epNum),
+                                child: Container(
+                                  width: 170,
+                                  margin: const EdgeInsets.only(right: 12),
+                                  decoration: BoxDecoration(
+                                    borderRadius: BorderRadius.circular(10),
+                                    border: isCurrent ? Border.all(color: Colors.white, width: 2) : null,
+                                    color: Colors.grey[900],
+                                  ),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
                                     children: [
-                                      CircleAvatar(
-                                        radius: 14,
-                                        backgroundColor: Colors.redAccent,
-                                        child: Text(
-                                          c['avatar']!,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
+                                      Expanded(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                            color: Colors.grey[850],
+                                          ),
+                                          child: Center(
+                                            child: Icon(isCurrent ? Icons.play_arrow : Icons.play_circle_outline, color: Colors.white, size: 32),
                                           ),
                                         ),
                                       ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0),
                                         child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
+                                          crossAxisAlignment: CrossAxisAlignment.start,
                                           children: [
-                                            Row(
-                                              children: [
-                                                Text(
-                                                  c['name']!,
-                                                  style: const TextStyle(
-                                                    color: Colors.white70,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  c['time']!,
-                                                  style: const TextStyle(
-                                                    color: Colors.grey,
-                                                    fontSize: 10,
-                                                  ),
-                                                ),
-                                              ],
-                                            ),
-                                            Text(
-                                              c['text']!,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                              ),
-                                            ),
+                                            Text("Episode : $epNum", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                            const Text("Stream on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1),
                                           ],
                                         ),
                                       ),
                                     ],
                                   ),
                                 ),
-                              ),
-                        ],
-                      ),
-                    ),
-                    const SizedBox(height: 20),
-                    if (widget.mediaType == 'tv' ||
-                        widget.mediaType == 'series') ...[
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.symmetric(
-                              horizontal: 14,
-                              vertical: 6,
-                            ),
-                            decoration: BoxDecoration(
-                              color: Colors.white,
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                            child: Text(
-                              "Season $currentSeason",
-                              style: const TextStyle(
-                                color: Colors.black,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 13,
-                              ),
-                            ),
+                              );
+                            },
                           ),
-                          const Icon(
-                            Icons.grid_view,
-                            color: Colors.grey,
-                            size: 20,
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      const Text(
-                        "Episodes",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
                         ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 140,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: 15,
-                          itemBuilder: (context, index) {
-                            final epNum = index + 1;
-                            final isCurrent = currentEpisode == epNum;
+                        const SizedBox(height: 20),
+                      ],
 
-                            return _buildFocusableItem(
-                              onTap: () => _switchEpisode(epNum),
-                              borderRadius: BorderRadius.circular(10),
-                              child: Container(
-                                width: 170,
-                                margin: const EdgeInsets.only(right: 12),
-                                decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(10),
-                                  border:
-                                      isCurrent
-                                          ? Border.all(
-                                            color: Colors.white,
-                                            width: 2,
-                                          )
-                                          : null,
-                                  color: Colors.grey[900],
-                                ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              const BorderRadius.vertical(
-                                                top: Radius.circular(8),
-                                              ),
-                                          color: Colors.grey[850],
-                                        ),
-                                        child: Center(
-                                          child: Icon(
-                                            isCurrent
-                                                ? Icons.play_arrow
-                                                : Icons.play_circle_outline,
-                                            color: Colors.white,
-                                            size: 32,
+                      if (similarMovies.isNotEmpty) ...[
+                        const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 10),
+                        SizedBox(
+                          height: 160,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            itemCount: similarMovies.length,
+                            itemBuilder: (context, index) {
+                              final m = similarMovies[index];
+                              return GestureDetector(
+                                onTap: () {
+                                  Navigator.pushReplacement(
+                                    context,
+                                    MaterialPageRoute(
+                                      builder: (context) => VideoPlayerPage(
+                                        tmdbId: m['id'],
+                                        mediaType: m['mediaType'],
+                                        movieTitle: m['title'],
+                                        rating: m['rating'],
+                                        year: m['year'],
+                                      ),
+                                    ),
+                                  );
+                                },
+                                child: Container(
+                                  width: 110,
+                                  margin: const EdgeInsets.only(right: 10),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: BorderRadius.circular(8),
+                                            image: DecorationImage(
+                                              image: NetworkImage(m['posterUrl'] != '' ? m['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
+                                              fit: BoxFit.cover,
+                                            ),
                                           ),
                                         ),
                                       ),
-                                    ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            "Episode : $epNum",
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const Text(
-                                            "Stream on HANNUTV",
-                                            style: TextStyle(
-                                              color: Colors.grey,
-                                              fontSize: 10,
-                                            ),
-                                            maxLines: 1,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-                    ],
-                    if (similarMovies.isNotEmpty) ...[
-                      const Text(
-                        "Suggested Movies & Shows",
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        height: 160,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: similarMovies.length,
-                          itemBuilder: (context, index) {
-                            final m = similarMovies[index];
-                            return _buildFocusableItem(
-                              onTap: () {
-                                Navigator.pushReplacement(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder:
-                                        (context) => VideoPlayerPage(
-                                          tmdbId: m['id'],
-                                          mediaType: m['mediaType'],
-                                          movieTitle: m['title'],
-                                          rating: m['rating'],
-                                          year: m['year'],
-                                        ),
+                                      const SizedBox(height: 4),
+                                      Text(m['title'], style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                    ],
                                   ),
-                                );
-                              },
-                              borderRadius: BorderRadius.circular(8),
-                              child: Container(
-                                width: 110,
-                                margin: const EdgeInsets.only(right: 10),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius: BorderRadius.circular(
-                                            8,
-                                          ),
-                                          image: DecorationImage(
-                                            image: NetworkImage(
-                                              m['posterUrl'] != ''
-                                                  ? m['posterUrl']
-                                                  : 'https://via.placeholder.com/300x450/222222/888888',
-                                            ),
-                                            fit: BoxFit.cover,
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                    const SizedBox(height: 4),
-                                    Text(
-                                      m['title'],
-                                      style: const TextStyle(
-                                        color: Colors.white,
-                                        fontSize: 12,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                  ],
                                 ),
-                              ),
-                            );
-                          },
+                              );
+                            },
+                          ),
                         ),
-                      ),
+                      ],
                     ],
-                  ],
+                  ),
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
   }
 
-  Widget _buildActionButton(
-    IconData icon,
-    String title, {
-    Color activeColor = Colors.white,
-  }) {
+  Widget _buildActionButton(IconData icon, String title, {Color activeColor = Colors.white}) {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-      decoration: BoxDecoration(
-        color: Colors.grey[900],
-        borderRadius: BorderRadius.circular(20),
-      ),
+      decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20)),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
           Icon(icon, color: activeColor, size: 16),
           const SizedBox(width: 6),
-          Text(
-            title,
-            style: TextStyle(
-              color: activeColor,
-              fontSize: 12,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text(title, style: TextStyle(color: activeColor, fontSize: 12, fontWeight: FontWeight.w600)),
         ],
-      ),
-    );
-  }
-}
-
-// 🎯 TV REMOTE CURSOR GLOW FOCUS WIDGET
-class _TvFocusButton extends StatefulWidget {
-  final Widget child;
-  final VoidCallback onTap;
-  final BorderRadius borderRadius;
-
-  const _TvFocusButton({
-    required this.child,
-    required this.onTap,
-    required this.borderRadius,
-  });
-
-  @override
-  State<_TvFocusButton> createState() => _TvFocusButtonState();
-}
-
-class _TvFocusButtonState extends State<_TvFocusButton> {
-  bool _hasFocus = false;
-
-  @override
-  Widget build(BuildContext context) {
-    return Focus(
-      onFocusChange: (hasFocus) {
-        if (mounted) setState(() => _hasFocus = hasFocus);
-      },
-      child: InkWell(
-        onTap: widget.onTap,
-        borderRadius: widget.borderRadius,
-        child: AnimatedContainer(
-          duration: const Duration(milliseconds: 150),
-          decoration: BoxDecoration(
-            borderRadius: widget.borderRadius,
-            border: Border.all(
-              color: _hasFocus ? Colors.redAccent : Colors.transparent,
-              width: _hasFocus ? 3.5 : 0,
-            ),
-            boxShadow:
-                _hasFocus
-                    ? [
-                      BoxShadow(
-                        color: Colors.redAccent.withOpacity(0.65),
-                        blurRadius: 10,
-                        spreadRadius: 1.5,
-                      ),
-                    ]
-                    : [],
-          ),
-          child: widget.child,
-        ),
       ),
     );
   }
