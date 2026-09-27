@@ -1,14 +1,13 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:firebase_core/firebase_core.dart'; // Add Firebase import
+import 'package:firebase_core/firebase_core.dart'; // Firebase import kiya
 import 'dashboard.dart';
 
 void main() async {
-  // Ensure widgets are initialized before Firebase
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Initialize Firebase
-  await Firebase.initializeApp(); 
+  // Firebase Initialize karne ke liye (Bohot zaroori hai)
+  await Firebase.initializeApp();
 
   runApp(const HannuTvApp());
 }
