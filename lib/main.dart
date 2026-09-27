@@ -1,13 +1,22 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'package:firebase_core/firebase_core.dart'; // Firebase import kiya
+import 'package:firebase_core/firebase_core.dart';
+import 'package:firebase_messaging/firebase_messaging.dart'; // Messaging import kiya
 import 'dashboard.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // Firebase Initialize karne ke liye (Bohot zaroori hai)
+  // Firebase Initialize kiya
   await Firebase.initializeApp();
+
+  // Android 13+ ke liye Notification Permission maangna zaroori hai
+  FirebaseMessaging messaging = FirebaseMessaging.instance;
+  await messaging.requestPermission(
+    alert: true,
+    badge: true,
+    sound: true,
+  );
 
   runApp(const HannuTvApp());
 }
@@ -33,7 +42,7 @@ class HannuTvApp extends StatelessWidget {
   }
 }
 
-// ── SPLASH SCREEN (Ab kabhi nahi rukegi) ──────────────────────────
+// ── SPLASH SCREEN ──────────────────────────
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
 
@@ -49,7 +58,6 @@ class _SplashScreenState extends State<SplashScreen> {
     Timer(const Duration(milliseconds: 2500), () {
       Navigator.pushReplacement(
         context,
-        // DEEP FIX: Yahan se 'const' hata diya gaya hai jisse build fail ho rahi thi
         MaterialPageRoute(builder: (context) => DashboardPage()), 
       );
     });
