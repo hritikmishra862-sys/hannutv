@@ -69,13 +69,20 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final TextEditingController commentInputController = TextEditingController();
 
+  // 🔥 ALL NEW SERVERS ADDED FROM SCREENSHOTS 🔥
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'spiral', 'name': 'Spiral'},
-    {'key': 'hydra', 'name': 'Hydra'},
-    {'key': 'vidbolt', 'name': 'VidBolt VIP'},
-    {'key': 'zenith', 'name': 'Zenith'},
-    {'key': 'nova', 'name': 'Nova'},
+    {'key': 'fast', 'name': 'Fast'},
+    {'key': 'vidbolt', 'name': 'Bolt'},
+    {'key': 'cinezo', 'name': 'Cinezo'},
+    {'key': 'hindi-new', 'name': 'Hindi New'},
+    {'key': 'peach', 'name': 'Peach'},
+    {'key': 'mega', 'name': 'Mega'},
+    {'key': 'alpha', 'name': 'Alpha'},
+    {'key': 'orion', 'name': 'Orion'},
+    {'key': 'hindi', 'name': 'Hindi'},
+    {'key': 'vidgod', 'name': 'Vidgod'},
+    {'key': 'cinesrc', 'name': 'CineSrc'},
   ];
 
   final List<Map<String, String>> publicComments = const [
@@ -225,6 +232,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
+  // 🔥 URL PARSER UPDATED FOR ALL SERVERS 🔥
   String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -235,35 +243,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    if (activeServer == 'vidrift') {
-      return isTv
-          ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=vidrift'
-          : 'https://pantyflix.com/watch/play/movie/$id?server=vidrift';
-    }
-    if (activeServer == 'spiral') {
-      return isTv
-          ? 'https://vidsrc.icu/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.icu/embed/movie/$id';
-    }
-    if (activeServer == 'hydra') {
-      return isTv
-          ? 'https://vidsrc.to/embed/tv/$id/$s/$e'
-          : 'https://vidsrc.to/embed/movie/$id';
-    }
-    if (activeServer == 'zenith') {
-      return isTv
-          ? 'https://vidlink.pro/tv/$id/$s/$e'
-          : 'https://vidlink.pro/movie/$id';
-    }
-    if (activeServer == 'nova') {
-      return isTv
-          ? 'https://multiembed.mov/?video_id=$id&tmdb=1&s=$s&e=$e'
-          : 'https://multiembed.mov/?video_id=$id&tmdb=1';
-    }
-
     return isTv
-        ? 'https://vidbolt.pro/tv/$id/$s/$e?quality=1080p&theme=e50914&autoPlay=true&audio=hindi'
-        : 'https://vidbolt.pro/movie/$id?quality=1080p&theme=e50914&autoPlay=true&audio=hindi';
+        ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
+        : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
   void _initStream() {
@@ -280,9 +262,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           ..setJavaScriptMode(JavaScriptMode.unrestricted)
           ..setBackgroundColor(Colors.black)
           ..setUserAgent(
-            // 🔥 TV CAPTCHA BYPASS: If TV, send PC user agent. If Mobile, keep original.
+            // TV User Agent for better TV Website rendering
             isTvDevice
-                ? "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+                ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
                 : "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
           )
           ..addJavaScriptChannel(
@@ -328,11 +310,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   color: #ffffff !important;
                   overflow: hidden !important;
                 }
-                video {
-                  object-fit: $currentAspectRatio !important;
-                  width: 100% !important;
-                  height: 100% !important;
-                }
               `;
               document.head.appendChild(style);
 
@@ -347,11 +324,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
                       if (text.includes('rift(ads)') || text.includes('rift (ads)') || 
                           text.includes('adblock') || text.includes('captcha') || text.includes('robot') ||
-                          text.includes("confirm you're not a robot") || text.includes('verify you are human') ||
                           text.includes('telegram') || text.includes('dmca') || text.includes('support@') ||
                           className.includes('ad-') || className.includes('banner') || className.includes('popup') ||
                           idName.includes('ad-') || className.includes('server-select')) {
-                        node.style.display = 'none';
                         node.remove();
                       }
                     }
@@ -362,14 +337,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
               // THE Z-INDEX VIDEO HACK: Forces Video on top of EVERYTHING to hide ads
               setInterval(function() {
-                // TV CAPTCHA IFRAME KILLER 
-                document.querySelectorAll('iframe').forEach(ifr => {
-                  if(ifr.src && (ifr.src.includes('captcha') || ifr.src.includes('recaptcha') || ifr.src.includes('challenge') || ifr.src.includes('robot'))) {
-                    ifr.style.display = 'none';
-                    ifr.remove();
-                  }
-                });
-
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -400,29 +367,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
                 var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .jw-display-icon-container, [aria-label="Play"], button[title*="Play"], .play-icon, #play-button');
                 playBtns.forEach(function(b) { b.click(); });
-                
-                document.querySelectorAll('div, a, span, img, section, modal, aside, p, select, button').forEach(el => {
-                  let text = el.innerText ? el.innerText.toLowerCase() : '';
-                  let className = el.className ? el.className.toString().toLowerCase() : '';
-
-                  if (text.includes('rift(ads)') || text.includes('rift (ads)') || className.includes('server-select') || className.includes('server-drop')) {
-                    el.style.display = 'none';
-                    el.remove();
-                  }
-
-                  if (text.includes('telegram') || text.includes('dmca') || text.includes('support@') || text.includes('contact us') || text.includes("confirm you're not a robot")) {
-                    el.remove();
-                  }
-
-                  let style = window.getComputedStyle(el);
-                  if ((style.position === 'fixed' || style.position === 'absolute') && 
-                      style.zIndex > 1000 && 
-                      el.tagName !== 'IFRAME' && 
-                      el.tagName !== 'VIDEO' &&
-                      !el.contains(document.querySelector('video'))) {
-                    el.remove();
-                  }
-                });
               }, 200);
             ''';
                 _controller.runJavaScript(jsCode);
@@ -442,9 +386,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     url.contains('t.me') ||
                     url.contains('telegram') ||
                     url.contains('googleads') ||
-                    url.contains('googlesyndication') ||
-                    url.contains('captcha') ||
-                    url.contains('recaptcha')) {
+                    url.contains('googlesyndication')) {
                   return NavigationDecision.prevent;
                 }
 
@@ -1036,9 +978,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                         onTap: () => Navigator.pop(context),
                         borderRadius: BorderRadius.circular(18),
                         child: const CircleAvatar(
-                          backgroundColor: Colors.black87,
+                          backgroundColor: Colors.black54,
                           radius: 18,
-                          child: Icon(Icons.close, color: Colors.white, size: 22),
+                          child: Icon(
+                            Icons.chevron_left,
+                            color: Colors.white,
+                            size: 28,
+                          ),
                         ),
                       ),
                     ),
@@ -1054,7 +1000,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             vertical: 6,
                           ),
                           decoration: BoxDecoration(
-                            color: Colors.black87,
+                            color: Colors.black54,
                             borderRadius: BorderRadius.circular(15),
                             border: Border.all(color: Colors.white30),
                           ),
@@ -1087,9 +1033,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                         onTap: _toggleFullScreen,
                         borderRadius: BorderRadius.circular(18),
                         child: const CircleAvatar(
-                          backgroundColor: Colors.black87,
+                          backgroundColor: Colors.black54,
                           radius: 18,
-                          child: Icon(Icons.fullscreen, color: Colors.white, size: 22),
+                          child: Icon(
+                            Icons.fullscreen,
+                            color: Colors.white,
+                            size: 22,
+                          ),
                         ),
                       ),
                     ),

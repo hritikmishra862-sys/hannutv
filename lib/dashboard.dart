@@ -220,7 +220,7 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // 🔥 TV Support Sheet Fixed: Restored WhatsApp and Telegram Both
+  // 🔥 TV Support Sheet Fixed: Restored WhatsApp and Telegram Both + App Version
   void _showSupportOptions() {
     showModalBottomSheet(
       context: context,
@@ -283,6 +283,11 @@ class DashboardPageState extends State<DashboardPage> {
                   ),
                 ),
               ),
+              const SizedBox(height: 24),
+              // 🔥 Added App Version Information here
+              const Center(
+                child: Text("App Version: v1.0.0", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
             ],
           ),
         );
@@ -316,6 +321,10 @@ class DashboardPageState extends State<DashboardPage> {
             ),
       ),
     ).then((_) => setState(() {}));
+  }
+
+  Widget _buildFocusableItem({required Widget child, required VoidCallback onTap}) {
+    return _TvFocusItem(onTap: onTap, child: child);
   }
 
   Widget _buildHorizontalList(String title, List moviesData) {
@@ -402,6 +411,18 @@ class DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
+          // 🔥 NEW: Notification Bell Icon 
+          _TvFocusItem(
+            onTap: () {
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text("No new notifications", style: TextStyle(color: Colors.white)), backgroundColor: Colors.redAccent),
+              );
+            },
+            child: const Padding(
+              padding: EdgeInsets.all(8.0),
+              child: Icon(Icons.notifications_active, color: Colors.white, size: 28),
+            ),
+          ),
           // 🔥 FIXED: Calls Support Sheet correctly now
           _TvFocusButton(
             onTap: _showSupportOptions,
@@ -730,6 +751,47 @@ class DashboardPageState extends State<DashboardPage> {
             ],
             const SizedBox(height: 40),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TvFocusItem extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+
+  const _TvFocusItem({Key? key, required this.child, required this.onTap}) : super(key: key);
+
+  @override
+  State<_TvFocusItem> createState() => _TvFocusItemState();
+}
+
+class _TvFocusItemState extends State<_TvFocusItem> {
+  bool _hasFocus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (hasFocus) {
+        if (mounted) {
+          setState(() => _hasFocus = hasFocus);
+        }
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: _hasFocus ? Colors.redAccent : Colors.transparent, 
+              width: _hasFocus ? 4 : 0
+            ),
+            boxShadow: _hasFocus ? [BoxShadow(color: Colors.redAccent.withOpacity(0.6), blurRadius: 10)] : [],
+          ),
+          child: widget.child,
         ),
       ),
     );
