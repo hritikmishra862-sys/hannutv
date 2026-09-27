@@ -409,62 +409,64 @@ class DashboardPageState extends State<DashboardPage> {
                       children: [
                         isSearching
                             ? Expanded(
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(
-                                  horizontal: 12,
-                                ),
-                                decoration: BoxDecoration(
-                                  color: Colors.black87,
-                                  borderRadius: BorderRadius.circular(25),
-                                  border: Border.all(color: Colors.redAccent),
-                                ),
-                                child: TextField(
-                                  controller: searchController,
-                                  style: const TextStyle(color: Colors.white),
-                                  autofocus: true,
-                                  decoration: InputDecoration(
-                                    hintText:
-                                        'Search Movies & Shows on HANNUTV...',
-                                    border: InputBorder.none,
-                                    prefixIcon: const Icon(
-                                      Icons.search,
-                                      color: Colors.redAccent,
-                                    ),
-                                    suffixIcon: IconButton(
-                                      icon: const Icon(
-                                        Icons.close,
-                                        color: Colors.white,
-                                      ),
-                                      onPressed: () {
-                                        setState(() {
-                                          isSearching = false;
-                                          searchController.clear();
-                                          searchResults.clear();
-                                        });
-                                      },
-                                    ),
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 12,
                                   ),
-                                  onChanged: onSearchChanged,
+                                  decoration: BoxDecoration(
+                                    color: Colors.black87,
+                                    borderRadius: BorderRadius.circular(25),
+                                    border: Border.all(color: Colors.redAccent),
+                                  ),
+                                  child: TextField(
+                                    controller: searchController,
+                                    style: const TextStyle(color: Colors.white),
+                                    autofocus: true,
+                                    decoration: InputDecoration(
+                                      hintText:
+                                          'Search Movies & Shows on HANNUTV...',
+                                      border: InputBorder.none,
+                                      prefixIcon: const Icon(
+                                        Icons.search,
+                                        color: Colors.redAccent,
+                                      ),
+                                      suffixIcon: IconButton(
+                                        icon: const Icon(
+                                          Icons.close,
+                                          color: Colors.white,
+                                        ),
+                                        onPressed: () {
+                                          setState(() {
+                                            isSearching = false;
+                                            searchController.clear();
+                                            searchResults.clear();
+                                          });
+                                        },
+                                      ),
+                                    ),
+                                    onChanged: onSearchChanged,
+                                  ),
                                 ),
                               )
                             : Expanded(
-                              child: Align(
-                                alignment: Alignment.centerLeft,
-                                child: Image.asset(
-                                  'assets/logo.png',
-                                  height: 35,
-                                  errorBuilder:
-                                      (_, __, ___) => const Text(
-                                        'HANNUTV',
-                                        style: TextStyle(
-                                          color: Colors.red,
-                                          fontSize: 24,
-                                          fontWeight: FontWeight.bold,
-                                          letterSpacing: 1.5),
+                                child: Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: Image.asset(
+                                    'assets/logo.png',
+                                    height: 35,
+                                    errorBuilder:
+                                        (_, __, ___) => const Text(
+                                          'HANNUTV',
+                                          style: TextStyle(
+                                            color: Colors.red,
+                                            fontSize: 24,
+                                            fontWeight: FontWeight.bold,
+                                            letterSpacing: 1.5,
+                                          ),
                                         ),
+                                  ),
                                 ),
                               ),
-                            ),
                         if (!isSearching)
                           _TvFocusButton(
                             onTap: () => setState(() => isSearching = true),
