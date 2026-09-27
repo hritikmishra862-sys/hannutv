@@ -9,6 +9,12 @@ import 'package:webview_flutter_android/webview_flutter_android.dart';
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
 
+// 🔥 FIX: Added missing kApiHeaders here so the API calls work perfectly
+const Map<String, String> kApiHeaders = {
+  'Authorization': 'Bearer $kTmdbToken',
+  'accept': 'application/json',
+};
+
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
   final String mediaType; // 'movie' or 'tv'
@@ -183,7 +189,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 🚀 DIRECT PANTYFLIX SERVER ROUTING (Matches your screenshots exactly)
+    // 🚀 DIRECT PANTYFLIX SERVER ROUTING
     return isTv
         ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
@@ -233,8 +239,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               var style = document.createElement('style');
               style.innerHTML = `
                 header, nav, .navbar, footer, .footer,
-                .server-select, .server-dropdown, select, 
-                div[class*="server"], div[id*="server"],
+                .server-select, .server-dropdown, select[name*="server"], 
+                div[class*="server-dropdown"], div[class*="server-btn"],
                 a[href*="t.me"], a[href*="telegram"], [class*="telegram"], 
                 iframe[src*="ads"], .ad-container, .ads, .ad-banner, .popup-overlay,
                 .dmca-notice, .copyright, [href*="mailto:"] { 
@@ -377,7 +383,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
         vids[0].style.objectFit = '$currentAspectRatio';
       }
     ''');
-    _startControlsTimer();
+    _startHideTimer(); // 🔥 FIX: Using correct timer method
   }
 
   void _toggleFullScreen() {
@@ -397,7 +403,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
-    _startControlsTimer();
+    _startHideTimer(); // 🔥 FIX: Using correct timer method
   }
 
   void _switchEpisode(int ep) {
@@ -436,59 +442,521 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   Widget build(BuildContext context) {
     if (isFullScreen) {
       // 🖥️ PURE ROTATED COMPUTER-STYLE FULLSCREEN (CLEAN VIDEO WITH AUTO-HIDE 3s CONTROLS)
-      return PopScope(
-        canPop: false,
-        onPopInvoked: (bool didPop) {
-          if (didPop) return;
-          _toggleFullScreen();
-        },
-        child: Scaffold(
-          backgroundColor: Colors.black,
-          body: GestureDetector(
-            onTap: _onPlayerTapped,
-            behavior: HitTestBehavior.opaque,
-            child: Stack(
-              children: [
+      return Scaffold(
+        backgroundColor: Colors.black,
+        body: GestureDetector(
+          onTap: _onPlayerTapped,
+          behavior: HitTestBehavior.opaque,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: WebViewWidget(controller: _controller),
+              ),
+
+              // 🌟 BIGGER CORNER WATERMARK HANNUTV LOGO
+              Positioned(
+                top: 14,
+                right: 20,
+                child: SafeArea(
+                  child: IgnorePointer(
+                    child: Opacity(
+                      opacity: 0.85,
+                      child: Image.asset(
+                        'assets/logo.png',
+                        height: 38,
+                        errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+
+              // 🌟 HANNUTV NETFLIX-STYLE CINEMATIC INTRO ANIMATION ON PLAY
+              if (showIntroAnimation)
                 Positioned.fill(
-                  child: WebViewWidget(controller: _controller),
+                  child: IgnorePointer(
+                    child: Center(
+                      child: AnimatedBuilder(
+                        animation: _introAnimController,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _introOpacityAnimation.value,
+                            child: Transform.scale(
+                              scale: _introScaleAnimation.value,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
+                                  const SizedBox(height: 10),
+                                  const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ),
 
-                // 🌟 BIGGER CORNER WATERMARK HANNUTV LOGO
+              // Auto-Hide Controls (3 Seconds)
+              if (showControls) ...[
+                // Back Button (Left Top)
                 Positioned(
                   top: 14,
-                  right: 20,
+                  left: 14,
                   child: SafeArea(
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: 0.85,
-                        child: Image.asset(
-                          'assets/logo.png',
-                          height: 38,
-                          errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16)),
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black54,
+                      radius: 20,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
+                        onPressed: _toggleFullScreen,
+                      ),
+                    ),
+                  ),
+                ),
+
+                // Aspect Ratio / Screen Fit Button (4:3 / Fit / Fill)
+                Positioned(
+                  bottom: 20,
+                  right: 80,
+                  child: SafeArea(
+                    child: GestureDetector(
+                      onTap: _cycleAspectRatio,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.aspect_ratio, color: Colors.white, size: 18),
+                            const SizedBox(width: 6),
+                            Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
                         ),
                       ),
                     ),
                   ),
                 ),
 
-                // 🌟 HANNUTV NETFLIX-STYLE CINEMATIC INTRO ANIMATION ON PLAY
-                if (showIntroAnimation)
-                  Positioned.fill(
+                // Exit Fullscreen Button (Right Bottom)
+                Positioned(
+                  bottom: 16,
+                  right: 16,
+                  child: SafeArea(
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black54,
+                      radius: 20,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 24),
+                        onPressed: _toggleFullScreen,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ],
+          ),
+        ),
+      );
+    }
+
+    // 📱 YOUTUBE-STYLE PORTRAIT UI (EXACT SCREENSHOT LAYOUT)
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
+      body: SafeArea(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 1. TOP VIDEO PLAYER WINDOW (230px height, fixed ratio)
+            GestureDetector(
+              onTap: _onPlayerTapped,
+              behavior: HitTestBehavior.opaque,
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: 230,
+                    color: Colors.black,
+                    child: WebViewWidget(controller: _controller),
+                  ),
+
+                  // 🌟 BIGGER TOP RIGHT HANNUTV WATERMARK LOGO
+                  Positioned(
+                    top: 10,
+                    right: 14,
                     child: IgnorePointer(
-                      child: Center(
-                        child: AnimatedBuilder(
-                          animation: _introAnimController,
-                          builder: (context, child) {
-                            return Opacity(
-                              opacity: _introOpacityAnimation.value,
-                              child: Transform.scale(
-                                scale: _introScaleAnimation.value,
+                      child: Opacity(
+                        opacity: 0.85,
+                        child: Image.asset('assets/logo.png', height: 34, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15))),
+                      ),
+                    ),
+                  ),
+
+                  // 🌟 CINEMATIC HANNUTV INTRO ANIMATION
+                  if (showIntroAnimation)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Center(
+                          child: AnimatedBuilder(
+                            animation: _introAnimController,
+                            builder: (context, child) {
+                              return Opacity(
+                                opacity: _introOpacityAnimation.value,
+                                child: Transform.scale(
+                                  scale: _introScaleAnimation.value,
+                                  child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
+                    ),
+
+                  // Top Back Button (3-Second Auto-Hide)
+                  if (showControls)
+                    Positioned(
+                      top: 8,
+                      left: 8,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 18,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
+                          onPressed: () => Navigator.pop(context),
+                        ),
+                      ),
+                    ),
+
+                  // Fullscreen & Screen Fit Buttons
+                  if (showControls) ...[
+                    Positioned(
+                      bottom: 8,
+                      right: 48,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 16,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.aspect_ratio, color: Colors.white, size: 18),
+                          onPressed: _cycleAspectRatio,
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 8,
+                      right: 8,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black54,
+                        radius: 16,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.fullscreen, color: Colors.white, size: 22),
+                          onPressed: _toggleFullScreen,
+                        ),
+                      ),
+                    ),
+                  ],
+
+                  // Fast Loading Indicator with HANNUTV Branding
+                  if (isPageLoading && !isVideoPlaying)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black87,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 40)),
+                              const SizedBox(height: 12),
+                              const SizedBox(
+                                width: 30,
+                                height: 30,
+                                child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5),
+                              ),
+                              const SizedBox(height: 10),
+                              const Text(
+                                "Loading HANNUTV Server",
+                                style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                "Requesting stream from $activeServer node...",
+                                style: const TextStyle(color: Colors.grey, fontSize: 11),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
+              ),
+            ),
+
+            // 2. SCROLLABLE DETAILS SECTION (EXACT SCREENSHOT BUTTONS & SERVERS)
+            Expanded(
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Title
+                    Text(
+                      widget.movieTitle,
+                      style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
+                    ),
+                    const SizedBox(height: 6),
+
+                    // Star Rating, Year & Views Count
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 18),
+                        const SizedBox(width: 4),
+                        Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 12),
+                        Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                        const SizedBox(width: 16),
+                        const Icon(Icons.visibility, color: Colors.grey, size: 16),
+                        const SizedBox(width: 4),
+                        Text("$viewCount Views", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+
+                    // Action Buttons Row (Like, Add to List, Play on TV, Share, Report)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          GestureDetector(
+                            onTap: () {
+                              setState(() {
+                                isLiked = !isLiked;
+                                likeCount += isLiked ? 1 : -1;
+                              });
+                            },
+                            child: _buildActionButton(
+                              isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined,
+                              "$likeCount",
+                              activeColor: isLiked ? Colors.redAccent : Colors.white,
+                            ),
+                          ),
+                          const SizedBox(width: 8),
+                          _buildActionButton(Icons.bookmark_border, "Add to List"),
+                          const SizedBox(width: 8),
+                          _buildActionButton(Icons.tv, "Play on TV"),
+                          const SizedBox(width: 8),
+                          _buildActionButton(Icons.share, "Share"),
+                          const SizedBox(width: 8),
+                          _buildActionButton(Icons.flag_outlined, "Report"),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+
+                    // Server Section Title
+                    const Text(
+                      "If current server is not working, try a different one:",
+                      style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic),
+                    ),
+                    const SizedBox(height: 10),
+
+                    // Server Switcher Buttons (Rift, Spiral, Hydra, VidBolt, Zenith, Nova)
+                    SingleChildScrollView(
+                      scrollDirection: Axis.horizontal,
+                      child: Row(
+                        children: [
+                          const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          const SizedBox(width: 8),
+                          ...servers.map((srv) {
+                            final isSelected = activeServer == srv['key'];
+                            return GestureDetector(
+                              onTap: () {
+                                if (activeServer != srv['key']) {
+                                  setState(() {
+                                    activeServer = srv['key']!;
+                                  });
+                                  _initStream();
+                                }
+                              },
+                              child: Container(
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(
+                                  color: isSelected ? Colors.white : Colors.grey[900],
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Text(
+                                  srv['name']!,
+                                  style: TextStyle(
+                                    color: isSelected ? Colors.black : Colors.white,
+                                    fontWeight: FontWeight.bold,
+                                    fontSize: 13,
+                                  ),
+                                ),
+                              ),
+                            );
+                          }).toList(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+
+                    // Working Comments Section (Interactive Add & Read)
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(
+                        color: Colors.grey[900],
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text("Comments ${publicComments.length}", style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                              const Icon(Icons.comment, color: Colors.grey, size: 16),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Comment Input Box
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: commentInputController,
+                                  style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  decoration: InputDecoration(
+                                    hintText: 'Add a comment...',
+                                    hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
+                                    filled: true,
+                                    fillColor: Colors.black45,
+                                    contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                                    border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
+                                  ),
+                                ),
+                              ),
+                              IconButton(
+                                icon: const Icon(Icons.send, color: Colors.redAccent, size: 20),
+                                onPressed: _addComment,
+                              ),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+
+                          // Comments List
+                          ...publicComments.map((c) => Padding(
+                            padding: const EdgeInsets.only(bottom: 8.0),
+                            child: Row(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                CircleAvatar(
+                                  radius: 14,
+                                  backgroundColor: Colors.redAccent,
+                                  child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                ),
+                                const SizedBox(width: 10),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Text(c['name']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                          const SizedBox(width: 6),
+                                          Text(c['time']!, style: const TextStyle(color: Colors.grey, fontSize: 10)),
+                                        ],
+                                      ),
+                                      Text(c['text']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          )).toList(),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 20),
+
+                    // Episodes Section (If TV Show)
+                    if (widget.mediaType == 'tv' || widget.mediaType == 'series') ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                            decoration: BoxDecoration(
+                              color: Colors.white,
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            child: Text(
+                              "Season $currentSeason",
+                              style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
+                            ),
+                          ),
+                          const Icon(Icons.grid_view, color: Colors.grey, size: 20),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+
+                      // Episodes Grid Cards
+                      SizedBox(
+                        height: 140,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: 15,
+                          itemBuilder: (context, index) {
+                            final epNum = index + 1;
+                            final isCurrent = currentEpisode == epNum;
+
+                            return GestureDetector(
+                              onTap: () => _switchEpisode(epNum),
+                              child: Container(
+                                width: 170,
+                                margin: const EdgeInsets.only(right: 12),
+                                decoration: BoxDecoration(
+                                  borderRadius: BorderRadius.circular(10),
+                                  border: isCurrent ? Border.all(color: Colors.white, width: 2) : null,
+                                  color: Colors.grey[900],
+                                ),
                                 child: Column(
-                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
-                                    const SizedBox(height: 10),
-                                    const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                          color: Colors.grey[850],
+                                        ),
+                                        child: Center(
+                                          child: Icon(
+                                            isCurrent ? Icons.play_arrow : Icons.play_circle_outline,
+                                            color: Colors.white,
+                                            size: 32,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    Padding(
+                                      padding: const EdgeInsets.all(8.0),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text("Episode : $epNum", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                          const Text("Stream on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1),
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
@@ -496,534 +964,72 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
                           },
                         ),
                       ),
-                    ),
-                  ),
+                      const SizedBox(height: 20),
+                    ],
 
-                // Auto-Hide Controls (3 Seconds)
-                if (showControls) ...[
-                  // Aspect Ratio / Screen Fit Button (4:3 / Fit / Fill) - Moved next to back button
-                  Positioned(
-                    top: 14,
-                    left: 64, // Placed next to back button
-                    child: SafeArea(
-                      child: GestureDetector(
-                        onTap: _cycleAspectRatio,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                          decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              const Icon(Icons.aspect_ratio, color: Colors.white, size: 18),
-                              const SizedBox(width: 6),
-                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Back Button (Left Top)
-                  Positioned(
-                    top: 14,
-                    left: 14,
-                    child: SafeArea(
-                      child: CircleAvatar(
-                        backgroundColor: Colors.black54,
-                        radius: 20,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.arrow_back, color: Colors.white, size: 24),
-                          onPressed: _toggleFullScreen,
-                        ),
-                      ),
-                    ),
-                  ),
-
-                  // Exit Fullscreen Button (Right Bottom)
-                  Positioned(
-                    bottom: 16,
-                    right: 16,
-                    child: SafeArea(
-                      child: CircleAvatar(
-                        backgroundColor: Colors.black54,
-                        radius: 20,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 24),
-                          onPressed: _toggleFullScreen,
-                        ),
-                      ),
-                    ),
-                  ),
-                ],
-              ],
-            ),
-          ),
-        ),
-      );
-    }
-
-    // 📱 YOUTUBE-STYLE PORTRAIT UI (EXACT SCREENSHOT LAYOUT)
-    return PopScope(
-      canPop: false,
-      onPopInvoked: (bool didPop) {
-        if (didPop) return;
-        Navigator.of(context).pop();
-      },
-      child: Scaffold(
-        backgroundColor: const Color(0xFF0F0F0F),
-        body: SafeArea(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 1. TOP VIDEO PLAYER WINDOW (230px height, fixed ratio)
-              GestureDetector(
-                onTap: _startControlsTimer,
-                child: Stack(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      height: 230,
-                      color: Colors.black,
-                      child: WebViewWidget(controller: _controller),
-                    ),
-
-                    // 🌟 BIGGER TOP RIGHT HANNUTV WATERMARK LOGO
-                    Positioned(
-                      top: 10,
-                      right: 14,
-                      child: IgnorePointer(
-                        child: Opacity(
-                          opacity: 0.85,
-                          child: Image.asset('assets/logo.png', height: 34, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15))),
-                        ),
-                      ),
-                    ),
-
-                    // 🌟 CINEMATIC HANNUTV INTRO ANIMATION
-                    if (showIntroAnimation)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: Center(
-                            child: AnimatedBuilder(
-                              animation: _introAnimController,
-                              builder: (context, child) {
-                                return Opacity(
-                                  opacity: _introOpacityAnimation.value,
-                                  child: Transform.scale(
-                                    scale: _introScaleAnimation.value,
-                                    child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)),
+                    // 🎬 SUGGESTED / SIMILAR MOVIES SECTION
+                    if (similarMovies.isNotEmpty) ...[
+                      const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 160,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: similarMovies.length,
+                          itemBuilder: (context, index) {
+                            final m = similarMovies[index];
+                            return GestureDetector(
+                              onTap: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder: (context) => VideoPlayerPage(
+                                      tmdbId: m['id'],
+                                      mediaType: m['mediaType'],
+                                      movieTitle: m['title'],
+                                      rating: m['rating'],
+                                      year: m['year'],
+                                    ),
                                   ),
                                 );
                               },
-                            ),
-                          ),
-                        ),
-                      ),
-
-                    // Top Back Button (3-Second Auto-Hide)
-                    if (showControls)
-                      Positioned(
-                        top: 8,
-                        left: 8,
-                        child: CircleAvatar(
-                          backgroundColor: Colors.black54,
-                          radius: 18,
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
-                            onPressed: () => Navigator.pop(context),
-                          ),
-                        ),
-                      ),
-
-                    // Fullscreen Button
-                    if (showControls) ...[
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: CircleAvatar(
-                          backgroundColor: Colors.black54,
-                          radius: 16,
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.fullscreen, color: Colors.white, size: 22),
-                            onPressed: _toggleFullScreen,
-                          ),
+                              child: Container(
+                                width: 110,
+                                margin: const EdgeInsets.only(right: 10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(8),
+                                          image: DecorationImage(
+                                            image: NetworkImage(m['posterUrl'] != '' ? m['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      m['title'],
+                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
                         ),
                       ),
                     ],
-
-                    // Fast Loading Indicator with HANNUTV Branding
-                    if (isPageLoading && !isVideoPlaying)
-                      Positioned.fill(
-                        child: Container(
-                          color: Colors.black87,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 40)),
-                                const SizedBox(height: 12),
-                                const SizedBox(
-                                  width: 30,
-                                  height: 30,
-                                  child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5),
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  "Loading HANNUTV Server",
-                                  style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold),
-                                ),
-                                const SizedBox(height: 4),
-                                Text(
-                                  "Requesting stream from $activeServer node...",
-                                  style: const TextStyle(color: Colors.grey, fontSize: 11),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
                   ],
                 ),
               ),
-
-              // 2. SCROLLABLE DETAILS SECTION (EXACT SCREENSHOT BUTTONS & SERVERS)
-              Expanded(
-                child: SingleChildScrollView(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      // Title
-                      Text(
-                        widget.movieTitle,
-                        style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 6),
-
-                      // Star Rating, Year & Views Count
-                      Row(
-                        children: [
-                          const Icon(Icons.star, color: Colors.amber, size: 18),
-                          const SizedBox(width: 4),
-                          Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                          const SizedBox(width: 12),
-                          Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                          const SizedBox(width: 16),
-                          const Icon(Icons.visibility, color: Colors.grey, size: 16),
-                          const SizedBox(width: 4),
-                          Text("$viewCount Views", style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                        ],
-                      ),
-                      const SizedBox(height: 14),
-
-                      // Action Buttons Row (Like, Add to List, Play on TV, Share, Report)
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            GestureDetector(
-                              onTap: () {
-                                setState(() {
-                                  isLiked = !isLiked;
-                                  likeCount += isLiked ? 1 : -1;
-                                });
-                              },
-                              child: _buildActionButton(
-                                isLiked ? Icons.thumb_up : Icons.thumb_up_alt_outlined,
-                                "$likeCount",
-                                activeColor: isLiked ? Colors.redAccent : Colors.white,
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            _buildActionButton(Icons.bookmark_border, "Add to List"),
-                            const SizedBox(width: 8),
-                            _buildActionButton(Icons.tv, "Play on TV"),
-                            const SizedBox(width: 8),
-                            _buildActionButton(Icons.share, "Share"),
-                            const SizedBox(width: 8),
-                            _buildActionButton(Icons.flag_outlined, "Report"),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 16),
-
-                      // Server Section Title
-                      const Text(
-                        "If current server is not working, try a different one:",
-                        style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic),
-                      ),
-                      const SizedBox(height: 10),
-
-                      // Server Switcher Buttons (Rift, Spiral, Hydra, VidBolt, Zenith, Nova)
-                      SingleChildScrollView(
-                        scrollDirection: Axis.horizontal,
-                        child: Row(
-                          children: [
-                            const Text("Servers : ", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                            const SizedBox(width: 8),
-                            ...servers.map((srv) {
-                              final isSelected = activeServer == srv['key'];
-                              return GestureDetector(
-                                onTap: () {
-                                  if (activeServer != srv['key']) {
-                                    setState(() {
-                                      activeServer = srv['key']!;
-                                    });
-                                    _initStream();
-                                  }
-                                },
-                                child: Container(
-                                  margin: const EdgeInsets.only(right: 8),
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  decoration: BoxDecoration(
-                                    color: isSelected ? Colors.white : Colors.grey[900],
-                                    borderRadius: BorderRadius.circular(20),
-                                  ),
-                                  child: Text(
-                                    srv['name']!,
-                                    style: TextStyle(
-                                      color: isSelected ? Colors.black : Colors.white,
-                                      fontWeight: FontWeight.bold,
-                                      fontSize: 13,
-                                    ),
-                                  ),
-                                ),
-                              );
-                            }).toList(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 18),
-
-                      // Working Comments Section (Interactive Add & Read)
-                      Container(
-                        padding: const EdgeInsets.all(12),
-                        decoration: BoxDecoration(
-                          color: Colors.grey[900],
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: [
-                                Text("Comments ${publicComments.length}", style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                const Icon(Icons.comment, color: Colors.grey, size: 16),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Comment Input Box
-                            Row(
-                              children: [
-                                Expanded(
-                                  child: TextField(
-                                    controller: commentInputController,
-                                    style: const TextStyle(color: Colors.white, fontSize: 12),
-                                    decoration: InputDecoration(
-                                      hintText: 'Add a comment...',
-                                      hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
-                                      filled: true,
-                                      fillColor: Colors.black45,
-                                      contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                      border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none),
-                                    ),
-                                  ),
-                                ),
-                                IconButton(
-                                  icon: const Icon(Icons.send, color: Colors.redAccent, size: 20),
-                                  onPressed: _addComment,
-                                ),
-                              ],
-                            ),
-                            const SizedBox(height: 10),
-
-                            // Comments List
-                            ...publicComments.map((c) => Padding(
-                              padding: const EdgeInsets.only(bottom: 8.0),
-                              child: Row(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  CircleAvatar(
-                                    radius: 14,
-                                    backgroundColor: Colors.redAccent,
-                                    child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                  ),
-                                  const SizedBox(width: 10),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Row(
-                                          children: [
-                                            Text(c['name']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                                            const SizedBox(width: 6),
-                                            Text(c['time']!, style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                                          ],
-                                        ),
-                                        Text(c['text']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            )).toList(),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 20),
-
-                      // Episodes Section (If TV Show)
-                      if (widget.mediaType == 'tv' || widget.mediaType == 'series') ...[
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 6),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text(
-                                "Season $currentSeason",
-                                style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 13),
-                              ),
-                            ),
-                            const Icon(Icons.grid_view, color: Colors.grey, size: 20),
-                          ],
-                        ),
-                        const SizedBox(height: 12),
-                        const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-
-                        // Episodes Grid Cards
-                        SizedBox(
-                          height: 140,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: 15,
-                            itemBuilder: (context, index) {
-                              final epNum = index + 1;
-                              final isCurrent = currentEpisode == epNum;
-
-                              return GestureDetector(
-                                onTap: () => _switchEpisode(epNum),
-                                child: Container(
-                                  width: 170,
-                                  margin: const EdgeInsets.only(right: 12),
-                                  decoration: BoxDecoration(
-                                    borderRadius: BorderRadius.circular(10),
-                                    border: isCurrent ? Border.all(color: Colors.white, width: 2) : null,
-                                    color: Colors.grey[900],
-                                  ),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
-                                            color: Colors.grey[850],
-                                          ),
-                                          child: Center(
-                                            child: Icon(
-                                              isCurrent ? Icons.play_arrow : Icons.play_circle_outline,
-                                              color: Colors.white,
-                                              size: 32,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      Padding(
-                                        padding: const EdgeInsets.all(8.0),
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text("Episode : $epNum", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                            const Text("Stream on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                        const SizedBox(height: 20),
-                      ],
-
-                      // 🎬 SUGGESTED / SIMILAR MOVIES SECTION
-                      if (similarMovies.isNotEmpty) ...[
-                        const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 10),
-                        SizedBox(
-                          height: 160,
-                          child: ListView.builder(
-                            scrollDirection: Axis.horizontal,
-                            itemCount: similarMovies.length,
-                            itemBuilder: (context, index) {
-                              final m = similarMovies[index];
-                              return GestureDetector(
-                                onTap: () {
-                                  Navigator.pushReplacement(
-                                    context,
-                                    MaterialPageRoute(
-                                      builder: (context) => VideoPlayerPage(
-                                        tmdbId: m['id'],
-                                        mediaType: m['mediaType'],
-                                        movieTitle: m['title'],
-                                        rating: m['rating'],
-                                        year: m['year'],
-                                      ),
-                                    ),
-                                  );
-                                },
-                                child: Container(
-                                  width: 110,
-                                  margin: const EdgeInsets.only(right: 10),
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Expanded(
-                                        child: Container(
-                                          decoration: BoxDecoration(
-                                            borderRadius: BorderRadius.circular(8),
-                                            image: DecorationImage(
-                                              image: NetworkImage(m['posterUrl'] != '' ? m['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
-                                              fit: BoxFit.cover,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(height: 4),
-                                      Text(
-                                        m['title'],
-                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ),
-              ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
