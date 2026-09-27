@@ -41,7 +41,7 @@ class DashboardPageState extends State<DashboardPage> {
   int _currentPage = 0;
   String selectedPlatform = 'all';
 
-  // 🌟 PURE HANNUTV BRANDED OTT & CHANNELS (NETFLIX, HOTSTAR, PRIME, JIO, ANIME, APPLE TV)
+  // 🌟 PURE HANNUTV OTT WATCH CHANNELS (NETFLIX, HOTSTAR, PRIME, JIO, ANIME, APPLE TV)
   final List<Map<String, dynamic>> ottPlatforms = [
     {"name": "🔥 HANNUTV VIP", "color": Colors.red, "providerId": "all"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
@@ -117,7 +117,6 @@ class DashboardPageState extends State<DashboardPage> {
     try {
       String base = 'https://api.themoviedb.org/3';
       
-      // Smart filter: Hotstar/Jio/AppleTV/Netflix/Anime
       String prov = (providerId != null && providerId != 'all' && providerId != 'anime')
           ? '&with_watch_providers=$providerId&watch_region=IN'
           : '';
@@ -386,7 +385,7 @@ class DashboardPageState extends State<DashboardPage> {
               ],
             ),
             
-            // 🌟 PURE HANNUTV OTT WATCH PROVIDERS (NO PANTYFLIX BRANDING)
+            // 🌟 OTT WATCH CHANNELS (PURE HANNUTV BRANDED)
             const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold))),
             SizedBox(
               height: 50,
