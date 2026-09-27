@@ -241,7 +241,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🤖 ADVANCED AI DOM MUTATION OBSERVER (Kills Ads inside the page)
             String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
@@ -321,7 +320,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
         ),
       );
 
-    // Using Sandbox attribute to literally kill popups at HTML root level
     final embedHtml = '''
       <!DOCTYPE html>
       <html>
@@ -590,7 +588,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     if (isTvDevice) return _buildTVLayout(); 
 
     // ==========================================
-    // 📱 MOBILE LAYOUT (Untouched Mobile Code, with Focus Highlight added)
+    // 📱 MOBILE LAYOUT (Untouched Mobile Code)
     // ==========================================
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
