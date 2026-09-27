@@ -46,10 +46,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   late WebViewController _controller;
 
   bool isVideoPlaying = false;
-  
-  // 🔥 FIX: Reverted to false so it starts normally without causing Black Screen on phones
-  bool isFullScreen = false; 
-  
+  bool isFullScreen = false;
   bool isPageLoading = true;
   String activeServer = 'vidrift'; // Default to Rift
 
@@ -62,8 +59,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
   int likeCount = 1248;
   int viewCount = 84920;
 
-  // Auto-Hide Controls Timer (Strict 3 Seconds)
-  bool showControls = true;
+  // 🔥 5-SECOND CONTROL PANEL TIMER
+  bool showControls = false; // Start hidden, triggered by Logo Click
   Timer? _hideControlsTimer;
 
   // Cinematic Intro Animation
@@ -104,7 +101,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     currentSeason = widget.season;
     currentEpisode = widget.episode;
 
-    // Start safely in Portrait mode to prevent Android WebView Black Screen Crash
+    // Start in YouTube Style Portrait mode
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
 
@@ -122,16 +119,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
 
     _fetchSimilarMovies();
     _initStream();
-    _resetHideTimer(); 
+    _showControlPanel(); // Show controls for the first 5 seconds on load
   }
 
-  // 🕒 STRICT 3-SECOND AUTO-HIDE LOGIC
-  void _resetHideTimer() {
+  // 🕒 5-SECOND LOGO CONTROL PANEL LOGIC
+  void _showControlPanel() {
+    setState(() => showControls = true);
     _hideControlsTimer?.cancel();
-    if (mounted) setState(() => showControls = true);
-    _hideControlsTimer = Timer(const Duration(seconds: 3), () {
+    _hideControlsTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) setState(() => showControls = false);
     });
+  }
+
+  void _toggleControlPanel() {
+    if (showControls) {
+      setState(() => showControls = false);
+      _hideControlsTimer?.cancel();
+    } else {
+      _showControlPanel();
+    }
   }
 
   void _triggerCinematicPlayAnimation() {
@@ -189,13 +195,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 🚀 DIRECT SERVER ENGINE MAPPING
+    // 🚀 DIRECT SERVER ENGINE MAPPING (Exact Pantyflix URLs)
     return isTv
         ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
-  // 🛡️ THE NUCLEAR AD-BLOCKER (YOUR ORIGINAL TRUSTED LOGIC)
+  // 🛡️ THE NUCLEAR AD-BLOCKER (100% UNTOUCHED ORIGINAL LOGIC)
   void _initStream() {
     setState(() {
       isPageLoading = true;
@@ -299,7 +305,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
 
-            // 🚫 YOUR TRUSTED OLD AD-BLOCKER: Strict Block EVERYTHING
+            // 🚫 YOUR TRUSTED OLD AD-BLOCKER: Strict Block EVERYTHING (Untouched)
             if (url.contains('doubleclick') || url.contains('popads') ||
                 url.contains('1xbet') || url.contains('bet365') ||
                 url.contains('onclick') || url.contains('adsterra') ||
@@ -325,7 +331,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
               return NavigationDecision.navigate;
             }
 
-            // STRICT FALLBACK BLOCK FOR ANY OTHER AD DOMAIN
             return NavigationDecision.prevent;
           },
         ),
@@ -368,10 +373,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
         vids[0].style.objectFit = '$currentAspectRatio';
       }
     ''');
-    _resetHideTimer(); 
+    _showControlPanel(); // Restart the 5-second timer
   }
 
-  // 🖥️ ROTATE & FULLSCREEN LOGIC (TV COMPATIBLE)
+  // 🖥️ ROTATE & FULLSCREEN LOGIC
   void _toggleFullScreen() {
     setState(() {
       isFullScreen = !isFullScreen;
@@ -387,7 +392,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
       SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     }
-    _resetHideTimer();
+    _showControlPanel();
   }
 
   void _switchEpisode(int ep) {
@@ -434,130 +439,139 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
         canPop: false,
         onPopInvoked: (bool didPop) {
           if (didPop) return;
-          _toggleFullScreen(); 
+          _toggleFullScreen();
         },
         child: Scaffold(
           backgroundColor: Colors.black,
-          body: GestureDetector(
-            onTap: _resetHideTimer, // Tap anywhere to show/reset 3s timer
-            behavior: HitTestBehavior.opaque,
-            child: Stack(
-              children: [
+          body: Stack(
+            children: [
+              // 1. WEBVIEW: Fully interactive when controls are hidden
+              Positioned.fill(
+                child: WebViewWidget(controller: _controller),
+              ),
+
+              // 🌟 HANNUTV CINEMATIC INTRO ANIMATION ON PLAY
+              if (showIntroAnimation)
                 Positioned.fill(
-                  child: WebViewWidget(controller: _controller),
+                  child: IgnorePointer(
+                    child: Center(
+                      child: AnimatedBuilder(
+                        animation: _introAnimController,
+                        builder: (context, child) {
+                          return Opacity(
+                            opacity: _introOpacityAnimation.value,
+                            child: Transform.scale(
+                              scale: _introScaleAnimation.value,
+                              child: Column(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
+                                  const SizedBox(height: 10),
+                                  const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
+                                ],
+                              ),
+                            ),
+                          );
+                        },
+                      ),
+                    ),
+                  ),
                 ),
 
-                // 🌟 HANNUTV CINEMATIC INTRO ANIMATION ON PLAY
-                if (showIntroAnimation)
-                  Positioned.fill(
-                    child: IgnorePointer(
-                      child: Center(
-                        child: AnimatedBuilder(
-                          animation: _introAnimController,
-                          builder: (context, child) {
-                            return Opacity(
-                              opacity: _introOpacityAnimation.value,
-                              child: Transform.scale(
-                                scale: _introScaleAnimation.value,
-                                child: Column(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Image.asset('assets/logo.png', height: 90, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 90)),
-                                    const SizedBox(height: 10),
-                                    const Text("HANNUTV CINEMA", style: TextStyle(color: Colors.red, fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 3)),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ),
+              // 2. DIM OVERLAY: Makes control panel buttons clear when active
+              if (showControls)
+                Positioned.fill(
+                  child: IgnorePointer(
+                    child: Container(color: Colors.black38),
                   ),
+                ),
 
-                // 🕒 AUTO-HIDE CONTROLS (3 SECONDS)
-                if (showControls) ...[
-                  
-                  // 🔥 LOGO & BACK BUTTON MOVED TO TOP-LEFT (NO OVERLAP)
-                  Positioned(
-                    top: 20,
-                    left: 20,
-                    child: SafeArea(
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          CircleAvatar(
-                            backgroundColor: Colors.black54,
-                            radius: 22,
-                            child: IconButton(
-                              padding: EdgeInsets.zero,
-                              icon: const Icon(Icons.arrow_back, color: Colors.white, size: 28),
-                              onPressed: () {
-                                SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-                                SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
-                                Navigator.pop(context); // Close entirely
-                              },
-                            ),
-                          ),
-                          const SizedBox(width: 16),
-                          Opacity(
-                            opacity: 0.9,
-                            child: Image.asset(
-                              'assets/logo.png',
-                              height: 38,
-                              errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 20)),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-
-                  // 🌟 SCREEN FIT/ASPECT RATIO BUTTON (TOP-RIGHT, LOW OPACITY)
-                  Positioned(
-                    top: 20,
-                    right: 20,
-                    child: SafeArea(
+              // 🌟 3. PERMANENT HANNUTV LOGO (Top-Left) -> THE MAGIC TRIGGER
+              Positioned(
+                top: 20,
+                left: 20,
+                child: SafeArea(
+                  child: GestureDetector(
+                    onTap: _toggleControlPanel,
+                    child: Container(
+                      padding: const EdgeInsets.all(4), // Easier to tap
                       child: Opacity(
-                        opacity: 0.6,
-                        child: GestureDetector(
-                          onTap: _cycleAspectRatio,
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                            decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
-                            child: Row(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                const Icon(Icons.aspect_ratio, color: Colors.white, size: 18),
-                                const SizedBox(width: 8),
-                                Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
-                              ],
-                            ),
-                          ),
+                        opacity: 0.9,
+                        child: Image.asset(
+                          'assets/logo.png',
+                          height: 38,
+                          errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 18)),
                         ),
                       ),
                     ),
                   ),
+                ),
+              ),
 
-                  // Rotate Exit Fullscreen Button (Bottom-Right)
-                  Positioned(
-                    bottom: 20,
-                    right: 20,
-                    child: SafeArea(
-                      child: CircleAvatar(
-                        backgroundColor: Colors.black54,
-                        radius: 22,
-                        child: IconButton(
-                          padding: EdgeInsets.zero,
-                          icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 28),
-                          onPressed: _toggleFullScreen,
+              // 🕒 4. CONTROL PANEL BUTTONS (5 SECONDS AUTO-HIDE)
+              if (showControls) ...[
+                // Back Button (Top-Right)
+                Positioned(
+                  top: 20,
+                  right: 20,
+                  child: SafeArea(
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black87,
+                      radius: 22,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.close, color: Colors.white, size: 28),
+                        onPressed: () {
+                          SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+                          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+                          Navigator.pop(context);
+                        },
+                      ),
+                    ),
+                  ),
+                ),
+                
+                // Aspect Ratio / Crop Fit Button (Bottom-Left)
+                Positioned(
+                  bottom: 20, 
+                  left: 20,
+                  child: SafeArea(
+                    child: GestureDetector(
+                      onTap: _cycleAspectRatio,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                        decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white30)),
+                        child: Row(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const Icon(Icons.aspect_ratio, color: Colors.white, size: 16),
+                            const SizedBox(width: 8),
+                            Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                          ],
                         ),
                       ),
                     ),
                   ),
-                ],
+                ),
+
+                // Rotate / Exit Fullscreen Button (Bottom-Right)
+                Positioned(
+                  bottom: 20,
+                  right: 20,
+                  child: SafeArea(
+                    child: CircleAvatar(
+                      backgroundColor: Colors.black87,
+                      radius: 22,
+                      child: IconButton(
+                        padding: EdgeInsets.zero,
+                        icon: const Icon(Icons.fullscreen_exit, color: Colors.white, size: 28),
+                        onPressed: _toggleFullScreen,
+                      ),
+                    ),
+                  ),
+                ),
               ],
-            ),
+            ],
           ),
         ),
       );
@@ -579,128 +593,136 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> with TickerProviderSt
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 1. TOP VIDEO PLAYER WINDOW (230px height)
-              GestureDetector(
-                onTap: _resetHideTimer,
-                behavior: HitTestBehavior.opaque,
-                child: Stack(
-                  children: [
-                    Container(
-                      width: double.infinity,
-                      height: 230,
-                      color: Colors.black,
-                      child: WebViewWidget(controller: _controller),
+              Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    height: 230,
+                    color: Colors.black,
+                    child: WebViewWidget(controller: _controller),
+                  ),
+
+                  // 🌟 CINEMATIC HANNUTV INTRO ANIMATION
+                  if (showIntroAnimation)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Center(
+                          child: AnimatedBuilder(
+                            animation: _introAnimController,
+                            builder: (context, child) {
+                              return Opacity(
+                                opacity: _introOpacityAnimation.value,
+                                child: Transform.scale(
+                                  scale: _introScaleAnimation.value,
+                                  child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      ),
                     ),
 
-                    // 🌟 CINEMATIC HANNUTV INTRO ANIMATION
-                    if (showIntroAnimation)
-                      Positioned.fill(
-                        child: IgnorePointer(
-                          child: Center(
-                            child: AnimatedBuilder(
-                              animation: _introAnimController,
-                              builder: (context, child) {
-                                return Opacity(
-                                  opacity: _introOpacityAnimation.value,
-                                  child: Transform.scale(
-                                    scale: _introScaleAnimation.value,
-                                    child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)),
-                                  ),
-                                );
-                              },
-                            ),
-                          ),
-                        ),
+                  // 2. DIM OVERLAY FOR CONTROLS
+                  if (showControls)
+                    Positioned.fill(
+                      child: IgnorePointer(
+                        child: Container(color: Colors.black38),
                       ),
+                    ),
 
-                    // 🕒 AUTO-HIDE CONTROLS (3 SECONDS)
-                    if (showControls) ...[
-                      // 🔥 LOGO & BACK BUTTON MOVED TO TOP-LEFT
-                      Positioned(
-                        top: 10,
-                        left: 10,
-                        child: Row(
-                          children: [
-                            CircleAvatar(
-                              backgroundColor: Colors.black54,
-                              radius: 18,
-                              child: IconButton(
-                                padding: EdgeInsets.zero,
-                                icon: const Icon(Icons.chevron_left, color: Colors.white, size: 28),
-                                onPressed: () => Navigator.pop(context),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Opacity(
-                              opacity: 0.9,
-                              child: Image.asset('assets/logo.png', height: 28, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))),
-                            ),
-                          ],
-                        ),
-                      ),
-
-                      // 🌟 SCREEN FIT/ASPECT RATIO BUTTON (TOP-RIGHT, LOW OPACITY)
-                      Positioned(
-                        top: 10,
-                        right: 10,
+                  // 🌟 3. PERMANENT HANNUTV LOGO (Top-Left) -> MAGIC TRIGGER
+                  Positioned(
+                    top: 10,
+                    left: 10,
+                    child: GestureDetector(
+                      onTap: _toggleControlPanel,
+                      child: Container(
+                        padding: const EdgeInsets.all(4),
                         child: Opacity(
-                          opacity: 0.6,
-                          child: GestureDetector(
-                            onTap: _cycleAspectRatio,
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
-                              decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white30)),
-                              child: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  const Icon(Icons.aspect_ratio, color: Colors.white, size: 14),
-                                  const SizedBox(width: 6),
-                                  Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
-                                ],
-                              ),
-                            ),
-                          ),
+                          opacity: 0.9,
+                          child: Image.asset('assets/logo.png', height: 28, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))),
                         ),
                       ),
+                    ),
+                  ),
 
-                      // Rotate Fullscreen Button (Bottom Right)
-                      Positioned(
-                        bottom: 8,
-                        right: 8,
-                        child: CircleAvatar(
-                          backgroundColor: Colors.black54,
-                          radius: 18,
-                          child: IconButton(
-                            padding: EdgeInsets.zero,
-                            icon: const Icon(Icons.fullscreen, color: Colors.white, size: 22),
-                            onPressed: _toggleFullScreen,
-                          ),
+                  // 🕒 4. CONTROL PANEL BUTTONS (5 SECONDS AUTO-HIDE)
+                  if (showControls) ...[
+                    // Back Button (Top-Right)
+                    Positioned(
+                      top: 10,
+                      right: 10,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black87,
+                        radius: 18,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.close, color: Colors.white, size: 22),
+                          onPressed: () => Navigator.pop(context),
                         ),
                       ),
-                    ],
+                    ),
 
-                    // Fast Loading Indicator with HANNUTV Branding
-                    if (isPageLoading && !isVideoPlaying)
-                      Positioned.fill(
+                    // Screen Fit Button (Bottom-Left)
+                    Positioned(
+                      bottom: 10,
+                      left: 10,
+                      child: GestureDetector(
+                        onTap: _cycleAspectRatio,
                         child: Container(
-                          color: Colors.black87,
-                          child: Center(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 40)),
-                                const SizedBox(height: 12),
-                                const SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)),
-                                const SizedBox(height: 10),
-                                const Text("Loading HANNUTV Server", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
-                                const SizedBox(height: 4),
-                                Text("Requesting stream from $activeServer node...", style: const TextStyle(color: Colors.grey, fontSize: 11)),
-                              ],
-                            ),
+                          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                          decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(15), border: Border.all(color: Colors.white30)),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              const Icon(Icons.aspect_ratio, color: Colors.white, size: 14),
+                              const SizedBox(width: 6),
+                              Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 11, fontWeight: FontWeight.bold)),
+                            ],
                           ),
                         ),
                       ),
+                    ),
+
+                    // Rotate Fullscreen Button (Bottom-Right)
+                    Positioned(
+                      bottom: 10,
+                      right: 10,
+                      child: CircleAvatar(
+                        backgroundColor: Colors.black87,
+                        radius: 18,
+                        child: IconButton(
+                          padding: EdgeInsets.zero,
+                          icon: const Icon(Icons.fullscreen, color: Colors.white, size: 22),
+                          onPressed: _toggleFullScreen,
+                        ),
+                      ),
+                    ),
                   ],
-                ),
+
+                  // Fast Loading Indicator with HANNUTV Branding
+                  if (isPageLoading && !isVideoPlaying)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black87,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset('assets/logo.png', height: 40, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 40)),
+                              const SizedBox(height: 12),
+                              const SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)),
+                              const SizedBox(height: 10),
+                              const Text("Loading HANNUTV Server", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                              const SizedBox(height: 4),
+                              Text("Requesting stream from $activeServer node...", style: const TextStyle(color: Colors.grey, fontSize: 11)),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
 
               // 2. SCROLLABLE DETAILS SECTION (100% UNCHANGED)
