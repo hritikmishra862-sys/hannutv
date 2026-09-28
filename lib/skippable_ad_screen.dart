@@ -1,15 +1,16 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
+import 'dart:math';
 import 'package:webview_flutter/webview_flutter.dart';
 
 class SkippableAdScreen extends StatefulWidget {
   final Widget nextScreen; 
-  final int adDuration; // 🚀 NAYA PARAMETER: 10s aur 30s ke liye
+  final int adDuration; 
 
   const SkippableAdScreen({
     Key? key, 
     required this.nextScreen,
-    this.adDuration = 30, // Default time
+    this.adDuration = 30, 
   }) : super(key: key);
 
   @override
@@ -22,36 +23,25 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   bool _canSkip = false;
   Timer? _timer;
 
+  // 🚀 WORLD'S BEST HARDCODING: Sirf Full-Screen Direct Links 🚀
+  final List<String> _fullScreenAdLinks = [
+    "https://omg10.com/4/11914245", // Industrious link
+    "https://omg10.com/4/11914244", // Lovey-dovey link
+  ];
+
   @override
   void initState() {
     super.initState();
-    _timeLeft = widget.adDuration; // 🚀 Dashboard se 10s ya 30s set hoga
+    _timeLeft = widget.adDuration; // 🚀 Dashboard se 10s ya 30s aayega
     
-    // 🚀 HARDCODING: Aapka Original Social Bar Script 🚀
-    final String socialBarHtml = '''
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            body { background-color: #000000; margin: 0; padding: 0; height: 100vh; display: flex; justify-content: center; align-items: center; color: #ffffff; font-family: sans-serif; overflow: hidden; }
-          </style>
-        </head>
-        <body>
-          <div style="text-align:center; color: #555555;">
-            <p>Loading Sponsor...</p>
-          </div>
-          <!-- Adsterra Social Bar Script -->
-          <script src="https://pl31557058.profitableratecpmnetwork.com/24/32/49/243249a822e50b5522ab86b067ae152f.js"></script>
-        </body>
-      </html>
-    ''';
+    final _random = Random();
+    String selectedAd = _fullScreenAdLinks[_random.nextInt(_fullScreenAdLinks.length)];
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF000000))
-      // baseUrl lagaya hai taaki script block na ho
-      ..loadHtmlString(socialBarHtml, baseUrl: 'https://hannutv.blogspot.com');
+      // Direct Link load kar rahe hain taaki 100% Full Screen Ad aaye
+      ..loadRequest(Uri.parse(selectedAd));
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_timeLeft > 0) {
@@ -83,8 +73,10 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
       body: SafeArea(
         child: Stack(
           children: [
+            // WebView jisme Full Screen Ad chalega
             WebViewWidget(controller: _controller),
             
+            // Skip Button Overlay
             Positioned(
               top: 15,
               right: 15,
