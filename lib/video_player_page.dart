@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'banner_ad_widget.dart'; // 🚀 Added Banner Ad Import
+import 'skippable_ad_screen.dart'; // 🚀 Added Skippable Ad Import
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -1253,6 +1255,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       ),
                     ),
                     const SizedBox(height: 18),
+                    
+                    // 🚀 DEEP CODING: BANNER AD EXACTLY ABOVE COMMENTS 🚀
+                    const CustomBannerAd(
+                      htmlBannerCode: '<iframe src="https://omg10.com/4/11914245" width="320" height="50" frameborder="0" scrolling="no" style="overflow: hidden; border: none; padding: 0; margin: 0;"></iframe>',
+                    ),
+                    
+                    const SizedBox(height: 18),
+
                     Container(
                       padding: const EdgeInsets.all(12),
                       decoration: BoxDecoration(
@@ -1530,16 +1540,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             final m = similarMovies[index];
                             return _buildFocusableItem(
                               onTap: () {
+                                // 🚀 DEEP CODING: Suggested movies click on Ad 🚀
                                 Navigator.pushReplacement(
                                   context,
                                   MaterialPageRoute(
                                     builder:
-                                        (context) => VideoPlayerPage(
-                                          tmdbId: m['id'],
-                                          mediaType: m['mediaType'],
-                                          movieTitle: m['title'],
-                                          rating: m['rating'],
-                                          year: m['year'],
+                                        (context) => SkippableAdScreen(
+                                          nextScreen: VideoPlayerPage(
+                                            tmdbId: m['id'],
+                                            mediaType: m['mediaType'],
+                                            movieTitle: m['title'],
+                                            rating: m['rating'],
+                                            year: m['year'],
+                                          ),
                                         ),
                                   ),
                                 );
@@ -1627,7 +1640,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 }
 
-// 🎯 TV REMOTE CURSOR GLOW FOCUS WIDGET
 class _TvFocusButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;

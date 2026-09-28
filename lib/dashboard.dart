@@ -4,6 +4,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'video_player_page.dart';
+import 'skippable_ad_screen.dart'; // 🚀 Added Skippable Ad Screen Import
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -304,19 +305,22 @@ class DashboardPageState extends State<DashboardPage> {
             ? media['id']
             : int.tryParse(media['id'].toString()) ?? 0;
 
+    // 🚀 DEEP CODING: Video Player se pehle 30-Second Skippable Ad chalega
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
-            (context) => VideoPlayerPage(
-              tmdbId: tId,
-              mediaType: type,
-              season: 1,
-              episode: 1,
-              movieTitle: media['title'] ?? 'Title',
-              overview: media['overview'] ?? '',
-              rating: media['rating'] ?? '9.0',
-              year: media['year'] ?? '2024',
+            (context) => SkippableAdScreen(
+              nextScreen: VideoPlayerPage(
+                tmdbId: tId,
+                mediaType: type,
+                season: 1,
+                episode: 1,
+                movieTitle: media['title'] ?? 'Title',
+                overview: media['overview'] ?? '',
+                rating: media['rating'] ?? '9.0',
+                year: media['year'] ?? '2024',
+              ),
             ),
       ),
     ).then((_) => setState(() {}));
