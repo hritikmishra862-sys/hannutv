@@ -61,7 +61,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   int likeCount = 1248;
   int viewCount = 84920;
 
-  bool showControls = true; // Started true so HANNUTV logo shows initially
+  bool showControls = true; 
   Timer? _hideControlsTimer;
 
   bool showIntroAnimation = false;
@@ -71,7 +71,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final TextEditingController commentInputController = TextEditingController();
 
-  // 🔥 ALL NEW SERVERS ADDED FROM SCREENSHOTS 🔥
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
     {'key': 'fast', 'name': 'Fast'},
@@ -106,7 +105,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   List similarMovies = [];
   bool isLoadingSimilar = false;
 
-  // 📺 TV DETECTION FLAG
   bool isTvDevice = false;
 
   @override
@@ -130,18 +128,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
 
     _fetchSimilarMovies();
-    _checkDeviceType(); // Check device type before initStream
+    _checkDeviceType(); 
   }
 
-  // 📺 LAYOUT DETECTION (Changes layout dynamically for TV)
   void _checkDeviceType() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final size = MediaQuery.of(context).size;
       setState(() {
-        // Simple logic: If width is significantly larger than height, it's a TV/Landscape device
         isTvDevice = size.width > size.height && size.width > 600; 
         if (isTvDevice) {
-           isFullScreen = true; // Force full screen for TV
+           isFullScreen = true; 
         } else {
            SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
            SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
@@ -152,17 +148,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     });
   }
 
-  // 🕒 5-SECOND CONTROL PANEL TIMER LOGIC
   void _startControlsTimer() {
     _hideControlsTimer?.cancel();
     if (mounted) setState(() => showControls = true);
-    // Hide controls strictly after 5 seconds
     _hideControlsTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) setState(() => showControls = false);
     });
   }
 
-  // Toggle Controls manually via Logo click
   void _toggleControlPanel() {
     if (showControls) {
       setState(() => showControls = false);
@@ -234,7 +227,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
-  // 🔥 URL PARSER UPDATED FOR ALL SERVERS 🔥
   String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -264,7 +256,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           ..setJavaScriptMode(JavaScriptMode.unrestricted)
           ..setBackgroundColor(Colors.black)
           ..setUserAgent(
-            // TV User Agent for better TV Website rendering
             isTvDevice
                 ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
                 : "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
@@ -285,7 +276,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               onPageFinished: (String url) {
                 if (mounted) setState(() => isPageLoading = false);
 
-                // 🛡️ WORLD'S BEST AI MUTATION OBSERVER & Z-INDEX AD-KILLER
                 String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
@@ -315,7 +305,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               `;
               document.head.appendChild(style);
 
-              // 🛡️ AI MUTATION OBSERVER (1ms Nuke for Ads, Popups, Captchas)
               const aiObserver = new MutationObserver((mutations) => {
                 mutations.forEach((mutation) => {
                   mutation.addedNodes.forEach((node) => {
@@ -337,7 +326,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               });
               aiObserver.observe(document.body, { childList: true, subtree: true });
 
-              // THE Z-INDEX VIDEO HACK: Forces Video on top of EVERYTHING to hide ads
               setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
@@ -345,7 +333,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   v.style.backgroundColor = '#000000';
                   v.style.objectFit = '$currentAspectRatio';
                   
-                  // 🔥 Absolute Video Dominance Trick (Hides everything behind video)
                   v.style.position = 'fixed';
                   v.style.top = '0';
                   v.style.left = '0';
@@ -363,7 +350,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   }
                 }
 
-                // Hide native fullscreen buttons
                 var fsBtns = document.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"], .plyr__controls__item[data-plyr="fullscreen"]');
                 fsBtns.forEach(btn => { btn.style.display = 'none'; btn.style.opacity = '0'; btn.style.pointerEvents = 'none'; });
 
@@ -408,7 +394,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             ),
           );
 
-    // 🔥 FIX: Sandbox Error removed exactly here!
     final embedHtml = '''
       <!DOCTYPE html>
       <html>
@@ -460,7 +445,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 
   void _toggleFullScreen() {
-    if (isTvDevice) return; // Ignore if TV
+    if (isTvDevice) return; 
 
     setState(() {
       isFullScreen = !isFullScreen;
@@ -526,9 +511,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // ==========================================
-  // 📺 TV UI LAYOUT (Full Screen Video Background)
-  // ==========================================
   Widget _buildTVLayout() {
     return Scaffold(
       backgroundColor: Colors.black,
@@ -636,7 +618,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               ),
             ),
           ],
-          
           Positioned(
             top: 30,
             left: 40,
@@ -677,9 +658,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Widget build(BuildContext context) {
     if (isTvDevice) return _buildTVLayout(); 
 
-    // ==========================================
-    // 📱 MOBILE LAYOUT (Untouched Mobile Code)
-    // ==========================================
     if (isFullScreen) {
       return Scaffold(
         backgroundColor: Colors.black,
@@ -753,8 +731,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   ),
                 ),
               ),
-            
-            // MAGIC LOGO TRIGGER
             Positioned(
               top: 20,
               left: 20,
@@ -784,7 +760,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                 ),
               ),
             ),
-
             if (showControls) ...[
               Positioned.fill(
                 child: IgnorePointer(
@@ -937,8 +912,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                         ),
                       ),
                     ),
-                  
-                  // MAGIC LOGO TRIGGER
                   Positioned(
                     top: 10,
                     left: 10,
@@ -966,7 +939,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       ),
                     ),
                   ),
-
                   if (showControls) ...[
                     Positioned.fill(
                       child: IgnorePointer(
@@ -1256,9 +1228,20 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                     const SizedBox(height: 18),
                     
-                    // 🚀 DEEP CODING: BANNER AD EXACTLY ABOVE COMMENTS 🚀
+                    // 🚀 WORLD'S BEST HARDCODING: Aapka Original Banner Script (320x50) 🚀
                     const CustomBannerAd(
-                      htmlBannerCode: '<iframe src="https://omg10.com/4/11914245" width="320" height="50" frameborder="0" scrolling="no" style="overflow: hidden; border: none; padding: 0; margin: 0;"></iframe>',
+                      htmlBannerCode: '''
+                        <script type="text/javascript">
+                          atOptions = {
+                            'key' : 'a39df283f6ad10c34e229e5715bceff5',
+                            'format' : 'iframe',
+                            'height' : 50,
+                            'width' : 320,
+                            'params' : {}
+                          };
+                        </script>
+                        <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
+                      ''',
                     ),
                     
                     const SizedBox(height: 18),
@@ -1546,6 +1529,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                   MaterialPageRoute(
                                     builder:
                                         (context) => SkippableAdScreen(
+                                          adDuration: 30, // Suggested me 30s fix kiya hai
                                           nextScreen: VideoPlayerPage(
                                             tmdbId: m['id'],
                                             mediaType: m['mediaType'],

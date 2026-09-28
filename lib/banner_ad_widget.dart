@@ -17,10 +17,10 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
   void initState() {
     super.initState();
     
-    // WebView v4.x initialization for Banner
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
+      // 🚀 HARDCODING: Script Block bypass karne ke liye baseUrl zaroori hai
       ..loadHtmlString('''
         <!DOCTYPE html>
         <html>
@@ -34,17 +34,17 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
             ${widget.htmlBannerCode}
           </body>
         </html>
-      ''');
+      ''', baseUrl: 'https://hannutv.blogspot.com');
   }
 
   @override
   Widget build(BuildContext context) {
     return Container(
       width: double.infinity,
-      height: 60, // Banner ki height
+      height: 60, 
       margin: const EdgeInsets.symmetric(vertical: 10, horizontal: 10),
       decoration: BoxDecoration(
-        color: Colors.black, // Background color
+        color: Colors.black, 
         borderRadius: BorderRadius.circular(8),
         border: Border.all(color: Colors.grey.withOpacity(0.2)),
       ),

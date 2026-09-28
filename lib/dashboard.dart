@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'video_player_page.dart';
-import 'skippable_ad_screen.dart'; // 🚀 Added Skippable Ad Screen Import
+import 'skippable_ad_screen.dart'; 
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -24,6 +24,9 @@ class DashboardPage extends StatefulWidget {
 }
 
 class DashboardPageState extends State<DashboardPage> {
+  // 🚀 MAGIC VARIABLE: 10s aur 30s ad ko alternate ghumane ke liye 🚀
+  bool _isNextAd10Sec = true; 
+
   List trendingList = [];
   List bollywoodList = [];
   List hollywoodList = [];
@@ -284,7 +287,6 @@ class DashboardPageState extends State<DashboardPage> {
                 ),
               ),
               const SizedBox(height: 24),
-              // 🔥 Added App Version here
               const Center(
                 child: Text("App Version: v1.0.0", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
               ),
@@ -305,12 +307,16 @@ class DashboardPageState extends State<DashboardPage> {
             ? media['id']
             : int.tryParse(media['id'].toString()) ?? 0;
 
-    // 🚀 DEEP CODING: Video Player se pehle 30-Second Skippable Ad chalega
+    // 🚀 DEEP CODING: 10s and 30s Alternating Logic 🚀
+    int currentAdDuration = _isNextAd10Sec ? 10 : 30;
+    _isNextAd10Sec = !_isNextAd10Sec; // Toggles for the next click
+
     Navigator.push(
       context,
       MaterialPageRoute(
         builder:
             (context) => SkippableAdScreen(
+              adDuration: currentAdDuration,
               nextScreen: VideoPlayerPage(
                 tmdbId: tId,
                 mediaType: type,
@@ -414,7 +420,6 @@ class DashboardPageState extends State<DashboardPage> {
         backgroundColor: Colors.transparent,
         elevation: 0,
         actions: [
-          // 🔥 Notification Bell Added
           _TvFocusItem(
             onTap: () {
               ScaffoldMessenger.of(context).showSnackBar(
@@ -800,7 +805,6 @@ class _TvFocusItemState extends State<_TvFocusItem> {
   }
 }
 
-// 🎯 TV REMOTE CURSOR GLOW FOCUS WIDGET
 class _TvFocusButton extends StatefulWidget {
   final Widget child;
   final VoidCallback onTap;
