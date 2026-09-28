@@ -2,16 +2,56 @@ import 'package:flutter/material.dart';
 import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
-import 'package:firebase_remote_config/firebase_remote_config.dart'; // Naya package
+import 'package:firebase_remote_config/firebase_remote_config.dart';
 import 'dashboard.dart';
+
+// 🚀 1. DEEP BACKGROUND HANDLER (Hardcoded System-Level Listener)
+@pragma('vm:entry-point')
+Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
+  await Firebase.initializeApp();
+  print("🔥 Background Notification Hit: ${message.messageId}");
+}
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+  
+  // 🚀 2. INITIALIZE FIREBASE CORE
   await Firebase.initializeApp();
 
-  // Notification Permission
+  // 🚀 3. REGISTER BACKGROUND LISTENER
+  FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
+
+  // 🚀 4. AGGRESSIVE PERMISSION REQUEST (Badge, Sound, Alert)
   FirebaseMessaging messaging = FirebaseMessaging.instance;
-  await messaging.requestPermission(alert: true, badge: true, sound: true);
+  await messaging.requestPermission(
+    alert: true,
+    announcement: true,
+    badge: true,
+    carPlay: false,
+    criticalAlert: true,
+    provisional: false,
+    sound: true,
+  );
+
+  // 🚀 5. FORCE FOREGROUND HEADS-UP POPUP
+  await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
+    alert: true, 
+    badge: true, 
+    sound: true, 
+  );
+
+  // 🚀 6. FOREGROUND MESSAGE LISTENER (App open hone par notification)
+  FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+    print('🔥 Foreground Notification Hit!');
+    if (message.notification != null) {
+      print('Title: ${message.notification?.title}');
+    }
+  });
+
+  // 🚀 7. FETCH DEVICE TOKEN (Connection Test)
+  messaging.getToken().then((token) {
+    print("📲 FIREBASE DEVICE TOKEN: $token");
+  });
 
   runApp(const HannuTvApp());
 }
@@ -34,7 +74,7 @@ class HannuTvApp extends StatelessWidget {
   }
 }
 
-// ── SPLASH SCREEN (With Kill Switch Logic) ──────────────────────────
+// ── SPLASH SCREEN (Deep Kill Switch Logic) ──────────────────────────
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
 
@@ -44,7 +84,7 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool isMaintenance = false;
-  String maintenanceMsg = "Server is updating. Please install the new app.";
+  String maintenanceMsg = "System Upgrade in Progress. Please update HANNUTV.";
   bool isLoading = true;
 
   @override
@@ -56,9 +96,10 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> checkMaintenance() async {
     try {
       final remoteConfig = FirebaseRemoteConfig.instance;
+      // Hardcoded Fast Fetch (0 seconds cache for instant kill switch action)
       await remoteConfig.setConfigSettings(RemoteConfigSettings(
-        fetchTimeout: const Duration(seconds: 10),
-        minimumFetchInterval: const Duration(seconds: 0), // Fast Sync
+        fetchTimeout: const Duration(seconds: 15),
+        minimumFetchInterval: const Duration(seconds: 0),
       ));
       await remoteConfig.fetchAndActivate();
 
@@ -70,19 +111,17 @@ class _SplashScreenState extends State<SplashScreen> {
         }
       });
     } catch (e) {
-      print("Remote config error: $e");
+      print("⚠️ Remote Config Error: $e");
     }
 
-    // Agar maintenance ON nahi hai, toh Dashboard par bhej do
     if (!isMaintenance) {
-      Timer(const Duration(milliseconds: 2000), () {
+      Timer(const Duration(milliseconds: 2500), () {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => DashboardPage()), 
         );
       });
     } else {
-      // Agar ON hai, toh Loading rok do aur Block Screen dikhao
       setState(() {
         isLoading = false; 
       });
@@ -91,7 +130,7 @@ class _SplashScreenState extends State<SplashScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔴 MAINTENANCE SCREEN (App Blocked)
+    // 🔴 BLOCKED STATE
     if (isMaintenance && !isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
@@ -101,27 +140,35 @@ class _SplashScreenState extends State<SplashScreen> {
             child: Column(
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
-                const Icon(Icons.system_update, color: Colors.red, size: 80),
-                const SizedBox(height: 20),
+                const Icon(Icons.warning_rounded, color: Colors.redAccent, size: 85),
+                const SizedBox(height: 25),
                 const Text(
-                  'UPDATE REQUIRED',
-                  style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold, letterSpacing: 1),
+                  'MANDATORY UPDATE',
+                  style: TextStyle(color: Colors.white, fontSize: 26, fontWeight: FontWeight.w900, letterSpacing: 1.5),
                 ),
                 const SizedBox(height: 15),
                 Text(
                   maintenanceMsg,
                   textAlign: TextAlign.center,
-                  style: const TextStyle(color: Colors.grey, fontSize: 16),
+                  style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),
                 ),
-                const SizedBox(height: 40),
+                const SizedBox(height: 45),
                 const Text(
-                  'Please download new version from:',
-                  style: TextStyle(color: Colors.white, fontSize: 14),
+                  'Get the latest version here:',
+                  style: TextStyle(color: Colors.grey, fontSize: 13),
                 ),
-                const SizedBox(height: 5),
-                const Text(
-                  'hannutv.blogspot.com', // Aapki website ka link
-                  style: TextStyle(color: Colors.red, fontSize: 18, fontWeight: FontWeight.bold),
+                const SizedBox(height: 8),
+                Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: Colors.red.withOpacity(0.1),
+                    border: Border.all(color: Colors.redAccent, width: 2),
+                    borderRadius: BorderRadius.circular(10)
+                  ),
+                  child: const Text(
+                    'hannutv.blogspot.com', 
+                    style: TextStyle(color: Colors.redAccent, fontSize: 18, fontWeight: FontWeight.bold),
+                  ),
                 ),
               ],
             ),
@@ -130,32 +177,29 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     }
 
-    // 🟢 NORMAL SPLASH SCREEN (App Open)
+    // 🟢 APP STARTING STATE
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       body: Center(
-        child: Padding(
-          padding: const EdgeInsets.all(32.0),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Image.asset(
-                'assets/logo.png',
-                height: 120,
-                errorBuilder: (_, __, ___) => const Text(
-                  'HANNUTV',
-                  style: TextStyle(color: Colors.red, fontSize: 36, fontWeight: FontWeight.bold, letterSpacing: 2),
-                ),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Image.asset(
+              'assets/logo.png',
+              height: 130,
+              errorBuilder: (_, __, ___) => const Text(
+                'HANNUTV',
+                style: TextStyle(color: Colors.red, fontSize: 40, fontWeight: FontWeight.w900, letterSpacing: 2),
               ),
-              const SizedBox(height: 40),
-              const CircularProgressIndicator(color: Colors.red),
-              const SizedBox(height: 20),
-              const Text(
-                'Starting HANNUTV...',
-                style: TextStyle(color: Colors.grey, fontSize: 16),
-              ),
-            ],
-          ),
+            ),
+            const SizedBox(height: 50),
+            const CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 3),
+            const SizedBox(height: 25),
+            const Text(
+              'Connecting to Secure Servers...',
+              style: TextStyle(color: Colors.grey, fontSize: 14, letterSpacing: 0.5),
+            ),
+          ],
         ),
       ),
     );
