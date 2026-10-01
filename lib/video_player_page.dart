@@ -1,13 +1,10 @@
 import 'dart:async';
-import 'dart:ui'; // 🚀 ADDED: Glass Blur
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:share_plus/share_plus.dart'; // 🚀 ADDED
-import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 ADDED
 import 'banner_ad_widget.dart'; // 🚀 Added Banner Ad Import
 import 'skippable_ad_screen.dart'; // 🚀 Added Skippable Ad Import
 
@@ -29,7 +26,7 @@ class VideoPlayerPage extends StatefulWidget {
   final String rating;
   final String year;
   final String? customUrl;
-  final String? mbpSignCookie; // 🚀 ADDED FOR MOVIEBOX BYPASS
+  final bool isPixelflix; // 🚀 ADDED FLAG FOR PIXELFLIX
 
   const VideoPlayerPage({
     super.key,
@@ -42,7 +39,7 @@ class VideoPlayerPage extends StatefulWidget {
     this.rating = '9.0',
     this.year = '2024',
     this.customUrl,
-    this.mbpSignCookie, // 🚀 ADDED
+    this.isPixelflix = false, // 🚀 DEFAULT IS PANTYFLIX
   });
 
   @override
@@ -57,7 +54,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   bool isFullScreen = false;
   bool isPageLoading = true;
   String activeServer = 'vidrift';
-  int currentServerIndex = 0; // 🚀 ADDED
 
   String currentAspectRatio = 'contain';
 
@@ -102,7 +98,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     },
     {
       'name': 'Ananya Verma',
-      'text': 'Full HD stream with no buffering ❤️',
+      'text': 'Full HD stream with no buffering ❤️️',
       'time': '5h',
       'avatar': 'A'
     },
@@ -118,7 +114,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     super.initState();
     currentSeason = widget.season;
     currentEpisode = widget.episode;
-    activeServer = servers[0]['key']!;
 
     _introAnimController = AnimationController(
       vsync: this,
@@ -185,20 +180,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     });
   }
 
-  // 🚀 ADDED: AI AUTO-HEALER
-  void _autoSwitchServer() {
-    if (currentServerIndex < servers.length - 1) {
-      setState(() {
-        currentServerIndex++;
-        activeServer = servers[currentServerIndex]['key']!;
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text("AI Auto-Fix: Connecting to ${servers[currentServerIndex]['name']}..."), backgroundColor: Colors.green)
-      );
-      _initStream();
-    }
-  }
-
   Future<void> _fetchSimilarMovies() async {
     setState(() => isLoadingSimilar = true);
     try {
@@ -248,22 +229,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
-  // 🚀 ADDED: MOVIEBOX BYPASS DECODE
-  String _decodeMbpBypassUrl() {
-    if (widget.mbpSignCookie != null && widget.mbpSignCookie!.contains('urlprefix=')) {
-      try {
-        String base64Str = widget.mbpSignCookie!.split('urlprefix=')[1].split(';')[0];
-        String decodedUrl = utf8.decode(base64Decode(base64Str));
-        return "$decodedUrl/index.m3u8"; 
-      } catch (e) {
-        return widget.customUrl ?? ''; 
-      }
-    }
-    return '';
-  }
-
+  // 🚀 ADDED PIXELFLIX URL LOGIC HERE
   String _buildStreamUrl() {
-    if (widget.mbpSignCookie != null) return _decodeMbpBypassUrl(); // 🚀 TRIGGER BYPASS
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
     }
@@ -273,6 +240,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
+    // 🚀 PIXELFLIX
+    if (widget.isPixelflix) {
+      return isTv
+          ? 'https://pixelflix.cc/watch/tv/$id?season=$s&episode=$e'
+          : 'https://pixelflix.cc/watch/movie/$id';
+    }
+
+    // 🚀 PANTYFLIX
     return isTv
         ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
@@ -301,10 +276,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             onMessageReceived: (JavaScriptMessage message) {
               if (message.message == 'playing' && mounted) {
                 _triggerCinematicPlayAnimation();
-              }
-              // 🚀 ADDED: AI LISTENER FOR ERROR SWITCH
-              if (message.message == 'server_failed' && mounted) {
-                _autoSwitchServer();
               }
             },
           )
@@ -367,12 +338,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               aiObserver.observe(document.body, { childList: true, subtree: true });
 
               setInterval(function() {
-                // 🚀 ADDED: AI DETECTS SERVER ERROR & TRIGGERS FLUTTER Auto-Heal
-                let errorText = document.body.innerText.toLowerCase();
-                if (errorText.includes("failed to respond") || errorText.includes("can't play right now") || errorText.includes("usually temporary")) {
-                  VideoState.postMessage('server_failed');
-                }
-
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -425,6 +390,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                 }
 
                 if (url.contains('pantyflix.com') ||
+                    url.contains('pixelflix.cc') || // 🚀 ALLOW PIXELFLIX
                     url.contains('vidbolt') ||
                     url.contains('vidsrc') ||
                     url.contains('vidlink') ||
@@ -440,34 +406,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             ),
           );
 
-    final embedHtml = '''
-      <!DOCTYPE html>
-      <html>
-        <head>
-          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <style>
-            * { margin: 0; padding: 0; box-sizing: border-box; }
-            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
-            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
-          </style>
-        </head>
-        <body>
-          <iframe 
-            id="player-frame"
-            src="$targetUrl" 
-            allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
-            allowfullscreen>
-          </iframe>
-        </body>
-      </html>
-    ''';
-
-    _controller.loadHtmlString(embedHtml, baseUrl: 'https://pantyflix.com');
-
     if (_controller.platform is AndroidWebViewController) {
       (_controller.platform as AndroidWebViewController)
           .setMediaPlaybackRequiresUserGesture(false);
     }
+
+    // 🚀 FIXED: Iframe tag completely removed. Loaded directly via URL Request to bypass Sandbox Block!
+    _controller.loadRequest(Uri.parse(targetUrl));
   }
 
   void _cycleAspectRatio() {
@@ -517,34 +462,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _initStream();
   }
 
-  // 🚀 ADDED: DEEP LINK SHARE
-  void _shareDeepLink() {
-    String deepLink = 'https://hannutv.blogspot.com/watch?id=${widget.tmdbId}&type=${widget.mediaType}';
-    Share.share('Watch ${widget.movieTitle} on HANNUTV for free! 🍿\n\nDirect Play Link:\n$deepLink');
-  }
-
-  // 🚀 ADDED: LIVE FIREBASE COMMENTS UPLOAD
-  void _addLiveComment() async {
+  void _addComment() {
     final text = commentInputController.text.trim();
     if (text.isNotEmpty) {
-      try {
-        await FirebaseFirestore.instance.collection('comments_${widget.tmdbId}').add({
-          'name': 'HANNUTV User',
+      setState(() {
+        publicComments.insert(0, {
+          'name': 'You',
           'text': text,
-          'timestamp': FieldValue.serverTimestamp(),
-          'avatar': 'U'
+          'time': 'Just now',
+          'avatar': 'Y',
         });
-      } catch (e) {
-        setState(() {
-          publicComments.insert(0, {
-            'name': 'You',
-            'text': text,
-            'time': 'Just now',
-            'avatar': 'Y',
-          });
-        });
-      }
-      commentInputController.clear();
+        commentInputController.clear();
+      });
     }
   }
 
@@ -1002,15 +931,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                   ),
                   if (showControls) ...[
-                    // 🚀 ADDED: PREMIUM BLUR TO CONTROLS
                     Positioned.fill(
                       child: IgnorePointer(
-                        child: ClipRect(
-                          child: BackdropFilter(
-                            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
-                            child: Container(color: Colors.black45),
-                          ),
-                        ),
+                        child: Container(color: Colors.black38),
                       ),
                     ),
                     Positioned(
@@ -1213,7 +1136,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           ),
                           const SizedBox(width: 8),
                           _buildFocusableItem(
-                            onTap: _shareDeepLink, // 🚀 ADDED DEEP SHARE
+                            onTap: () {},
                             borderRadius: BorderRadius.circular(20),
                             child: _buildActionButton(Icons.share, "Share"),
                           ),
@@ -1371,7 +1294,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                 ),
                               ),
                               _buildFocusableItem(
-                                onTap: _addLiveComment, // 🚀 ADDED LIVE ACTION
+                                onTap: _addComment,
                                 borderRadius: BorderRadius.circular(20),
                                 child: const Padding(
                                   padding: EdgeInsets.all(8.0),
@@ -1385,63 +1308,66 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             ],
                           ),
                           const SizedBox(height: 10),
-                          
-                          // 🚀 ADDED: LIVE FIREBASE STREAM (Fallback me aapka list loop bhi hai)
-                          StreamBuilder<QuerySnapshot>(
-                            stream: FirebaseFirestore.instance.collection('comments_${widget.tmdbId}').orderBy('timestamp', descending: true).snapshots(),
-                            builder: (context, snapshot) {
-                              if (snapshot.hasError || !snapshot.hasData) {
-                                return Column(
-                                  children: publicComments.map((c) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(children: [Text(c['name']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(width: 6), Text(c['time']!, style: const TextStyle(color: Colors.grey, fontSize: 10))]),
-                                              Text(c['text']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                                            ],
+                          ...publicComments
+                              .map(
+                                (c) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8.0),
+                                  child: Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.start,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 14,
+                                        backgroundColor: Colors.redAccent,
+                                        child: Text(
+                                          c['avatar']!,
+                                          style: const TextStyle(
+                                            color: Colors.white,
+                                            fontSize: 12,
+                                            fontWeight: FontWeight.bold,
                                           ),
                                         ),
-                                      ],
-                                    ),
-                                  )).toList(),
-                                );
-                              }
-                              var docs = snapshot.data!.docs;
-                              if (docs.isEmpty) return const Text("Be the first to comment!", style: TextStyle(color: Colors.grey));
-                              
-                              return Column(
-                                children: docs.map((doc) {
-                                  var data = doc.data() as Map<String, dynamic>;
-                                  return Padding(
-                                    padding: const EdgeInsets.only(bottom: 8.0),
-                                    child: Row(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(data['avatar'] ?? 'U', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
-                                        const SizedBox(width: 10),
-                                        Expanded(
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              Row(children: [Text(data['name'] ?? 'User', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(width: 6), const Text('Live', style: TextStyle(color: Colors.green, fontSize: 10))]),
-                                              Text(data['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
-                                            ],
-                                          ),
+                                      ),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Row(
+                                              children: [
+                                                Text(
+                                                  c['name']!,
+                                                  style: const TextStyle(
+                                                    color: Colors.white70,
+                                                    fontSize: 12,
+                                                    fontWeight: FontWeight.bold,
+                                                  ),
+                                                ),
+                                                const SizedBox(width: 6),
+                                                Text(
+                                                  c['time']!,
+                                                  style: const TextStyle(
+                                                    color: Colors.grey,
+                                                    fontSize: 10,
+                                                  ),
+                                                ),
+                                              ],
+                                            ),
+                                            Text(
+                                              c['text']!,
+                                              style: const TextStyle(
+                                                color: Colors.white,
+                                                fontSize: 12,
+                                              ),
+                                            ),
+                                          ],
                                         ),
-                                      ],
-                                    ),
-                                  );
-                                }).toList(),
-                              );
-                            },
-                          ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
                         ],
                       ),
                     ),
@@ -1593,13 +1519,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                   MaterialPageRoute(
                                     builder:
                                         (context) => SkippableAdScreen(
-                                          adDuration: 30, // Suggested me 30s fix kiya hai
+                                          adDuration: 30, 
                                           nextScreen: VideoPlayerPage(
                                             tmdbId: m['id'],
                                             mediaType: m['mediaType'],
                                             movieTitle: m['title'],
                                             rating: m['rating'],
                                             year: m['year'],
+                                            isPixelflix: widget.isPixelflix, // 🚀 CARRY FORWARD FLAG
                                           ),
                                         ),
                                   ),
@@ -1672,7 +1599,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, color: activeColor, size: 16),
+          Icon(icon, activeColor, size: 16),
           const SizedBox(width: 6),
           Text(
             title,

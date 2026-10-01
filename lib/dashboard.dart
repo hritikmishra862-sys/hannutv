@@ -1,10 +1,9 @@
-import 'dart:ui'; // 🚀 ADDED FOR PREMIUM GLASS BLUR
+import 'dart:ui'; // 🚀 ADDED FOR PREMIUM GLASS BLUR UI
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:crypto/crypto.dart'; // 🚀 ADDED FOR MOVIEBOX API
 import 'video_player_page.dart';
 import 'skippable_ad_screen.dart'; 
 
@@ -37,14 +36,12 @@ class DashboardPageState extends State<DashboardPage> {
   List comedyList = [];
   List horrorList = [];
   List searchResults = [];
-  List pixelflixResults = []; // 🚀 ADDED FOR PIXELFLIX SEARCH
 
   bool isLoading = true;
   bool isSearching = false;
-  bool isPixelflixSearch = false; // 🚀 ADDED TOGGLE FOR 2ND SEARCH BAR
-
+  
   final TextEditingController searchController = TextEditingController();
-  final TextEditingController pixelflixController = TextEditingController(); // 🚀 2ND SEARCH CONTROLLER
+  final TextEditingController pixelflixController = TextEditingController(); // 🚀 2ND SEARCH BAR CONTROLLER ADDED
 
   Timer? _debounce;
   final PageController _pageController = PageController();
@@ -205,51 +202,6 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // 🚀 ADDED: MOVIEBOX PRO BACKGROUND FETCH FOR DUAL PLAYER
-  Future<Map?> _checkMovieBoxProAvailability(String title) async {
-    try {
-      String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
-      String reversed = timestamp.split('').reversed.join('');
-      String hash = md5.convert(utf8.encode(reversed)).toString();
-      String xClientToken = "$timestamp,$hash"; 
-
-      final res = await http.post(
-        Uri.parse('https://api6.aoneroom.com/wefeed-mobile-bff/subject-api/search'),
-        headers: {'Content-Type': 'application/json;charset=UTF-8', 'User-Agent': 'MovieBoxPro/16.2.1 (Android 12; Pixel 6)', 'X-M-Version': '4.0.02', 'X-Client-Token': xClientToken},
-        body: json.encode({"keyword": title, "type": 0, "page": 1, "pageSize": 5})
-      );
-      if (res.statusCode == 200) {
-        final data = json.decode(res.body)['data'] ?? [];
-        if (data.isNotEmpty) {
-           return {
-             'id': data[0]['id'],
-             'mbpSignCookie': "urlprefix=aHR0cHM6Ly9zYmNkbjIuaGFrdW5heW1hdGF0YS5jb20=" 
-           };
-        }
-      }
-    } catch (_) {}
-    return null;
-  }
-
-  // 🚀 ADDED: PIXELFLIX SEARCH API INTEGRATION
-  Future<void> _searchPixelflix(String query) async {
-    setState(() => isLoading = true);
-    try {
-      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(query)}&language=en-US&include_adult=false'), headers: kApiHeaders);
-      final tmdbData = parseData(res);
-      // Format specifically for Pixelflix Server
-      setState(() {
-        pixelflixResults = tmdbData.map((m) => {
-          ...m,
-          'isPixelflix': true, // Custom flag for player to know it's Server 2
-        }).toList();
-        isLoading = false;
-      });
-    } catch (_) {
-      setState(() => isLoading = false);
-    }
-  }
-
   void onSearchChanged(String value) {
     if (value.isEmpty) {
       setState(() {
@@ -263,6 +215,7 @@ class DashboardPageState extends State<DashboardPage> {
     _debounce = Timer(const Duration(milliseconds: 300), () async {
       setState(() => isLoading = true);
       try {
+        // TMDB is Universal Database for both Pantyflix and Pixelflix! 🚀
         final url =
             'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
         final res = await http.get(Uri.parse(url), headers: kApiHeaders);
@@ -279,197 +232,173 @@ class DashboardPageState extends State<DashboardPage> {
   void _showSupportOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.transparent, // 🚀 CHANGED FOR GLASS UI
+      backgroundColor: Colors.grey[900],
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
-        return ClipRRect(
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          child: BackdropFilter(
-            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15), // 🚀 PREMIUM GLASS BLUR
-            child: Container(
-              padding: const EdgeInsets.all(20),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.65), // 🚀 PREMIUM GLASS BLUR
-                border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2))),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 20),
-                  InkWell(
-                    onTap: () async {
-                      Navigator.pop(context);
-                      if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication)) {}
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.send, color: Colors.blueAccent, size: 30),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text("Request for New Movie", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                              Text("Join Telegram", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                            ],
-                          ),
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(context);
+                  if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication)) {}
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.send, color: Colors.blueAccent, size: 30),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text("Request for New Movie", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text("Join Telegram", style: TextStyle(color: Colors.grey, fontSize: 12)),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 12),
-                  InkWell(
-                    onTap: () async {
-                      Navigator.pop(context);
-                      if (!await launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication)) {}
-                    },
-                    borderRadius: BorderRadius.circular(12),
-                    child: Container(
-                      padding: const EdgeInsets.all(12),
-                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.chat, color: Colors.greenAccent, size: 30),
-                          const SizedBox(width: 16),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text("New Movie Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                              Text("Join WhatsApp Channel", style: TextStyle(color: Colors.grey, fontSize: 12)),
-                            ],
-                          ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(context);
+                  if (!await launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication)) {}
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chat, color: Colors.greenAccent, size: 30),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text("New Movie Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text("Join WhatsApp Channel", style: TextStyle(color: Colors.grey, fontSize: 12)),
                         ],
                       ),
-                    ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
-                  const Center(
-                    child: Text("App Version: v1.0.0 VIP", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-                  ),
-                ],
+                ),
               ),
-            ),
+              const SizedBox(height: 24),
+              const Center(
+                child: Text("App Version: v1.0.0 VIP", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
         );
       },
     );
   }
 
-  // 🚀 ADDED: DUAL PLAYER BOTTOM SHEET (HANNUTV 1 & 2)
+  // 🚀 ADDED: PREMIUM DUAL-SERVER BOTTOM SHEET (HANNUTV 1 & 2) 🚀
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
 
-    // DUAL PLAYER GLASS MODAL[cite: 48, 49]
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent, // 🚀 GLASSMORPHISM
+      backgroundColor: Colors.transparent, // 🚀 FOR GLASSMORPHISM
       builder: (context) {
-        return StatefulBuilder(
-          builder: (BuildContext context, StateSetter setModalState) {
-            bool isCheckingMbp = true;
-            Map? mbpData;
-
-            // Fetch MovieBox in background
-            if (isCheckingMbp) {
-              _checkMovieBoxProAvailability(media['title'] ?? '').then((result) {
-                if (mounted) {
-                  setModalState(() {
-                    mbpData = result;
-                    isCheckingMbp = false;
-                  });
-                }
-              });
-            }
-
-            return ClipRRect(
-              borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
-              child: BackdropFilter(
-                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15), // 🚀 1000% PREMIUM BLUR
-                child: Container(
-                  padding: const EdgeInsets.all(24),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7), // Semi-transparent black
-                    border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1)),
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15), // 🚀 BLUR EFFECT
+            child: Container(
+              padding: const EdgeInsets.all(24),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.75),
+                border: Border(top: BorderSide(color: Colors.redAccent.withOpacity(0.5), width: 1.5)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Poster Section
+                  Container(
+                    height: 200, width: double.infinity,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16), 
+                      image: DecorationImage(image: NetworkImage(media['backdropUrl'] != '' ? media['backdropUrl'] : (media['posterUrl'] ?? '')), fit: BoxFit.cover),
+                      boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)]
+                    ),
                   ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  const SizedBox(height: 20),
+                  Text("Watch ${media['title']}", style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 16),
+                  const Text("Select Streaming Server:", style: TextStyle(color: Colors.grey, fontSize: 14)),
+                  const SizedBox(height: 12),
+                  
+                  // Dual Server Buttons
+                  Row(
                     children: [
-                      Container(
-                        height: 200, width: double.infinity,
-                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), image: DecorationImage(image: NetworkImage(media['backdropUrl'] != '' ? media['backdropUrl'] : media['posterUrl']), fit: BoxFit.cover), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)]),
-                      ),
-                      const SizedBox(height: 20),
-                      Text("Watch ${media['title']}", style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
-                      const SizedBox(height: 16),
-                      const Text("Select Server to Watch:", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                      const SizedBox(height: 12),
-                      Row(
-                        children: [
-                          // HANNUTV 1 (Pantyflix)
-                          Expanded(
-                            child: ElevatedButton(
-                              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.withOpacity(0.9), padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                              onPressed: () {
-                                Navigator.pop(context);
-                                _playVideo(media, null, media['isPixelflix'] == true);
-                              },
-                              child: const Text("HANNUTV 1", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                            ),
+                      // BUTTON 1: PANTYFLIX
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _playVideoWithAd(media, false); // isPixelflix = false
+                          },
+                          child: Column(
+                            children: const [
+                              Text("HANNUTV 1", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                              SizedBox(height: 4),
+                              Text("Cinema HD", style: TextStyle(color: Colors.white70, fontSize: 10)),
+                            ],
                           ),
-                          const SizedBox(width: 12),
-                          // HANNUTV 2 (MovieBox Pro VIP)
-                          Expanded(
-                            child: isCheckingMbp 
-                              ? const Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2)))
-                              : mbpData != null
-                                ? ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.1), padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.redAccent.withOpacity(0.5)))),
-                                    onPressed: () {
-                                      Navigator.pop(context);
-                                      media['id'] = mbpData!['id']; 
-                                      _playVideo(media, mbpData!['mbpSignCookie'], false);
-                                    },
-                                    child: const Text("HANNUTV 2", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                                  )
-                                : ElevatedButton(
-                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[900], padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                                    onPressed: null,
-                                    child: const Text("Offline", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                                  ),
-                          ),
-                        ],
+                        ),
                       ),
-                      const SizedBox(height: 20),
+                      const SizedBox(width: 12),
+                      
+                      // BUTTON 2: PIXELFLIX
+                      Expanded(
+                        child: ElevatedButton(
+                          style: ElevatedButton.styleFrom(backgroundColor: Colors.blueAccent, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                          onPressed: () {
+                            Navigator.pop(context);
+                            _playVideoWithAd(media, true); // isPixelflix = true
+                          },
+                          child: Column(
+                            children: const [
+                              Text("HANNUTV 2", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
+                              SizedBox(height: 4),
+                              Text("Ultra VIP", style: TextStyle(color: Colors.white70, fontSize: 10)),
+                            ],
+                          ),
+                        ),
+                      ),
                     ],
                   ),
-                ),
+                  const SizedBox(height: 20),
+                ],
               ),
-            );
-          }
+            ),
+          ),
         );
       }
     );
   }
 
-  // 🚀 ACTUAL VIDEO PLAYER LAUNCHER WITH YOUR 10s/30s LOGIC
-  void _playVideo(Map media, String? mbpCookie, bool isPixelflix) {
+  // 🚀 ORIGINAL AD LOOP LOGIC (100% PRESERVED)
+  void _playVideoWithAd(Map media, bool isPixelflix) {
     final type = media['mediaType'] ?? 'movie';
     final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
-    int currentAdDuration = _isNextAd10Sec ? 10 : 30;
-    _isNextAd10Sec = !_isNextAd10Sec; 
 
-    // Custom Pixelflix URL formatting
-    String? customPixelflixUrl;
-    if (isPixelflix) {
-      customPixelflixUrl = type == 'tv' ? "https://pixelflix.cc/tv/$tId-1-1/" : "https://pixelflix.cc/movie/$tId/";
-    }
+    int currentAdDuration = _isNextAd10Sec ? 10 : 30;
+    _isNextAd10Sec = !_isNextAd10Sec; // Toggles for the next click
 
     Navigator.push(
       context,
@@ -485,8 +414,7 @@ class DashboardPageState extends State<DashboardPage> {
             overview: media['overview'] ?? '',
             rating: media['rating'] ?? '9.0',
             year: media['year'] ?? '2024',
-            mbpSignCookie: mbpCookie,
-            customUrl: customPixelflixUrl,
+            isPixelflix: isPixelflix, // 🚀 PASS FLAG TO PLAYER
           ),
         ),
       ),
@@ -658,104 +586,81 @@ class DashboardPageState extends State<DashboardPage> {
                     ),
                     child: Row(
                       children: [
-                        // 🚀 ADDED: DUAL SEARCH BAR LOGIC
-                        isSearching || isPixelflixSearch
+                        isSearching
                             ? Expanded(
-                                child: ClipRRect(
-                                  borderRadius: BorderRadius.circular(25),
-                                  child: BackdropFilter(
-                                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), // 🚀 GLASS BLUR
-                                    child: Container(
+                                // 🚀 ADDED: DUAL SEARCH BAR UI
+                                child: Column(
+                                  children: [
+                                    // Search Bar 1: Pantyflix
+                                    Container(
                                       padding: const EdgeInsets.symmetric(horizontal: 12),
-                                      decoration: BoxDecoration(
-                                        color: Colors.black.withOpacity(0.5),
-                                        borderRadius: BorderRadius.circular(25),
-                                        border: Border.all(color: Colors.redAccent),
-                                      ),
+                                      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.redAccent)),
                                       child: TextField(
-                                        controller: isPixelflixSearch ? pixelflixController : searchController,
-                                        style: const TextStyle(color: Colors.white),
-                                        autofocus: true,
+                                        controller: searchController, style: const TextStyle(color: Colors.white), autofocus: true,
                                         decoration: InputDecoration(
-                                          hintText: isPixelflixSearch ? 'Search Pixelflix...' : 'Search HANNUTV...',
-                                          hintStyle: const TextStyle(color: Colors.grey),
-                                          border: InputBorder.none,
-                                          prefixIcon: const Icon(
-                                            Icons.search,
-                                            color: Colors.redAccent,
-                                          ),
-                                          suffixIcon: IconButton(
-                                            icon: const Icon(
-                                              Icons.close,
-                                              color: Colors.white,
-                                            ),
-                                            onPressed: () {
-                                              setState(() {
-                                                isSearching = false;
-                                                isPixelflixSearch = false;
-                                                searchController.clear();
-                                                pixelflixController.clear();
-                                                searchResults.clear();
-                                                pixelflixResults.clear();
-                                              });
-                                            },
-                                          ),
+                                          hintText: 'Search HANNUTV 1 (Cinema HD)...', hintStyle: const TextStyle(color: Colors.grey, fontSize: 13), border: InputBorder.none, prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
+                                          suffixIcon: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () { setState(() { isSearching = false; searchController.clear(); pixelflixController.clear(); searchResults.clear(); }); }),
                                         ),
-                                        onChanged: isPixelflixSearch ? (v) {
-                                          if (v.isEmpty) { setState(() { pixelflixResults = []; }); return; }
-                                          if (_debounce?.isActive ?? false) _debounce!.cancel();
-                                          _debounce = Timer(const Duration(milliseconds: 500), () => _searchPixelflix(v));
-                                        } : onSearchChanged,
+                                        onChanged: onSearchChanged,
                                       ),
                                     ),
-                                  ),
+                                    const SizedBox(height: 8),
+                                    // Search Bar 2: Pixelflix
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(25), border: Border.all(color: Colors.blueAccent)),
+                                      child: TextField(
+                                        controller: pixelflixController, style: const TextStyle(color: Colors.white),
+                                        decoration: const InputDecoration(
+                                          hintText: 'Search HANNUTV 2 (Ultra VIP)...', hintStyle: TextStyle(color: Colors.grey, fontSize: 13), border: InputBorder.none, prefixIcon: Icon(Icons.search, color: Colors.blueAccent),
+                                        ),
+                                        onChanged: onSearchChanged, // TMDB universal hai, toh dono ke liye same search API work karegi!
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               )
                             : Expanded(
                                 child: Align(
                                   alignment: Alignment.centerLeft,
-                                  child: Image.asset(
-                                    'assets/logo.png',
-                                    height: 35,
-                                    errorBuilder:
-                                        (_, __, ___) => const Text(
-                                          'HANNUTV',
-                                          style: TextStyle(
-                                            color: Colors.red,
-                                            fontSize: 24,
-                                            fontWeight: FontWeight.bold,
-                                            letterSpacing: 1.5,
-                                          ),
-                                        ),
+                                  child: Row(
+                                    children: [
+                                      Image.asset(
+                                        'assets/logo.png',
+                                        height: 35,
+                                        errorBuilder:
+                                            (_, __, ___) => const Text(
+                                              'HANNUTV',
+                                              style: TextStyle(
+                                                color: Colors.red,
+                                                fontSize: 24,
+                                                fontWeight: FontWeight.bold,
+                                                letterSpacing: 1.5,
+                                              ),
+                                            ),
+                                      ),
+                                    ],
                                   ),
                                 ),
                               ),
-                        if (!isSearching && !isPixelflixSearch)
-                          Row(
-                            children: [
-                              _TvFocusButton(
-                                onTap: () => setState(() => isPixelflixSearch = true),
-                                borderRadius: BorderRadius.circular(20),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Icon(Icons.explore, color: Colors.blueAccent, size: 26), // 🚀 PIXELFLIX SEARCH ICON
-                                ),
+                        if (!isSearching)
+                          _TvFocusButton(
+                            onTap: () => setState(() => isSearching = true),
+                            borderRadius: BorderRadius.circular(20),
+                            child: const Padding(
+                              padding: EdgeInsets.all(8.0),
+                              child: Icon(
+                                Icons.search,
+                                color: Colors.white,
+                                size: 28,
                               ),
-                              _TvFocusButton(
-                                onTap: () => setState(() => isSearching = true),
-                                borderRadius: BorderRadius.circular(20),
-                                child: const Padding(
-                                  padding: EdgeInsets.all(8.0),
-                                  child: Icon(Icons.search, color: Colors.white, size: 28),
-                                ),
-                              ),
-                            ],
+                            ),
                           ),
                       ],
                     ),
                   ),
                 ),
-                if (trendingList.isNotEmpty && !isSearching && !isPixelflixSearch)
+                if (trendingList.isNotEmpty && !isSearching)
                   Positioned(
                     bottom: 20,
                     left: 16,
@@ -830,6 +735,7 @@ class DashboardPageState extends State<DashboardPage> {
                     child: _TvFocusButton(
                       onTap: () {
                         searchController.clear();
+                        pixelflixController.clear();
                         setState(() => isSearching = false);
                         loadAllDashboards(providerId: srv['providerId']);
                       },
@@ -845,6 +751,7 @@ class DashboardPageState extends State<DashboardPage> {
                         ),
                         onPressed: () {
                           searchController.clear();
+                          pixelflixController.clear();
                           setState(() => isSearching = false);
                           loadAllDashboards(providerId: srv['providerId']);
                         },
@@ -869,7 +776,7 @@ class DashboardPageState extends State<DashboardPage> {
                   child: CircularProgressIndicator(color: Colors.red),
                 ),
               )
-            else if (isSearching || isPixelflixSearch)
+            else if (isSearching)
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -883,9 +790,9 @@ class DashboardPageState extends State<DashboardPage> {
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
-                itemCount: isPixelflixSearch ? pixelflixResults.length : searchResults.length,
+                itemCount: searchResults.length,
                 itemBuilder: (context, index) {
-                  final movie = isPixelflixSearch ? pixelflixResults[index] : searchResults[index];
+                  final movie = searchResults[index];
                   return _TvFocusButton(
                     onTap: () => launchPlayerDirect(movie),
                     borderRadius: BorderRadius.circular(8),
