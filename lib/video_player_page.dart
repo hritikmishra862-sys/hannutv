@@ -5,8 +5,10 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'banner_ad_widget.dart'; // 🚀 Added Banner Ad Import
-import 'skippable_ad_screen.dart'; // 🚀 Added Skippable Ad Import
+import 'package:share_plus/share_plus.dart'; // 🚀 ADDED
+import 'package:cloud_firestore/cloud_firestore.dart'; // 🚀 ADDED
+import 'banner_ad_widget.dart'; 
+import 'skippable_ad_screen.dart'; 
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -26,6 +28,7 @@ class VideoPlayerPage extends StatefulWidget {
   final String rating;
   final String year;
   final String? customUrl;
+  final String? mbpSignCookie; // 🚀 ADDED FOR BYPASS
 
   const VideoPlayerPage({
     super.key,
@@ -38,6 +41,7 @@ class VideoPlayerPage extends StatefulWidget {
     this.rating = '9.0',
     this.year = '2024',
     this.customUrl,
+    this.mbpSignCookie, // 🚀 ADDED FOR BYPASS
   });
 
   @override
@@ -51,6 +55,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   bool isVideoPlaying = false;
   bool isFullScreen = false;
   bool isPageLoading = true;
+  
+  // 🚀 AI HEALER VARIABLES ADDED
+  int currentServerIndex = 0;
   String activeServer = 'vidrift';
 
   String currentAspectRatio = 'contain';
@@ -112,6 +119,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     super.initState();
     currentSeason = widget.season;
     currentEpisode = widget.episode;
+    activeServer = servers[0]['key']!; // 🚀 ADDED DEFAULT SERVER
 
     _introAnimController = AnimationController(
       vsync: this,
@@ -146,6 +154,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       _startControlsTimer();
       _initStream();
     });
+  }
+
+  // 🚀 AI AUTO-HEALER LOGIC ADDED
+  void _autoSwitchServer() {
+    if (currentServerIndex < servers.length - 1) {
+      setState(() {
+        currentServerIndex++;
+        activeServer = servers[currentServerIndex]['key']!;
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text("AI Auto-Fix: Switching to ${servers[currentServerIndex]['name']} server...", style: const TextStyle(color: Colors.white)),
+          backgroundColor: Colors.green,
+          duration: const Duration(seconds: 2),
+        )
+      );
+      _initStream();
+    }
   }
 
   void _startControlsTimer() {
@@ -227,7 +253,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
+  // 🚀 MBP BYPASS DECODE ADDED
+  String _decodeMbpBypassUrl() {
+    if (widget.mbpSignCookie != null && widget.mbpSignCookie!.contains('urlprefix=')) {
+      try {
+        String base64Str = widget.mbpSignCookie!.split('urlprefix=')[1].split(';')[0];
+        String decodedUrl = utf8.decode(base64Decode(base64Str));
+        return "$decodedUrl/index.m3u8"; 
+      } catch (e) {
+        return widget.customUrl ?? ''; 
+      }
+    }
+    return '';
+  }
+
   String _buildStreamUrl() {
+    if (widget.mbpSignCookie != null) return _decodeMbpBypassUrl(); // 🚀 ADDED
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
     }
@@ -266,6 +307,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               if (message.message == 'playing' && mounted) {
                 _triggerCinematicPlayAnimation();
               }
+              // 🚀 AI ERROR LISTENER ADDED
+              if (message.message == 'server_failed' && mounted) {
+                _autoSwitchServer();
+              }
             },
           )
           ..setNavigationDelegate(
@@ -276,6 +321,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               onPageFinished: (String url) {
                 if (mounted) setState(() => isPageLoading = false);
 
+                // 🚀 AI OBSERVER ADDED HERE (Purana hack bilkul same hai)
                 String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
@@ -327,6 +373,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               aiObserver.observe(document.body, { childList: true, subtree: true });
 
               setInterval(function() {
+                // 🚀 AI ERROR CHECK LOGIC ADDED
+                let errorText = document.body.innerText.toLowerCase();
+                if (errorText.includes("failed to respond") || errorText.includes("can't play right now") || errorText.includes("usually temporary")) {
+                  VideoState.postMessage('server_failed');
+                }
+
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
                   var v = vids[0];
@@ -471,18 +523,35 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _initStream();
   }
 
-  void _addComment() {
+  // 🚀 DEEP SHARE LINKING ADDED
+  void _shareDeepLink() {
+    String deepLink = 'https://hannutv.blogspot.com/watch?id=${widget.tmdbId}&type=${widget.mediaType}';
+    Share.share('Watch ${widget.movieTitle} on HANNUTV for free! 🍿\n\nDirect Play Link:\n$deepLink');
+  }
+
+  // 🚀 FIREBASE LIVE COMMENTS ADDED
+  void _addLiveComment() async {
     final text = commentInputController.text.trim();
     if (text.isNotEmpty) {
-      setState(() {
-        publicComments.insert(0, {
-          'name': 'You',
+      try {
+        await FirebaseFirestore.instance.collection('comments_${widget.tmdbId}').add({
+          'name': 'HANNUTV User',
           'text': text,
-          'time': 'Just now',
-          'avatar': 'Y',
+          'timestamp': FieldValue.serverTimestamp(),
+          'avatar': 'U'
         });
-        commentInputController.clear();
-      });
+      } catch (e) {
+        // Fallback for Local
+        setState(() {
+          publicComments.insert(0, {
+            'name': 'You',
+            'text': text,
+            'time': 'Just now',
+            'avatar': 'Y',
+          });
+        });
+      }
+      commentInputController.clear();
     }
   }
 
@@ -1145,7 +1214,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           ),
                           const SizedBox(width: 8),
                           _buildFocusableItem(
-                            onTap: () {},
+                            onTap: _shareDeepLink, // 🚀 DEEP LINK ACTION ADDED
                             borderRadius: BorderRadius.circular(20),
                             child: _buildActionButton(Icons.share, "Share"),
                           ),
@@ -1228,7 +1297,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                     const SizedBox(height: 18),
                     
-                    // 🚀 WORLD'S BEST HARDCODING: Aapka Original Banner Script (320x50) 🚀
                     const CustomBannerAd(
                       htmlBannerCode: '''
                         <script type="text/javascript">
@@ -1303,7 +1371,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                 ),
                               ),
                               _buildFocusableItem(
-                                onTap: _addComment,
+                                onTap: _addLiveComment, // 🚀 FIREBASE COMMENT ACTION
                                 borderRadius: BorderRadius.circular(20),
                                 child: const Padding(
                                   padding: EdgeInsets.all(8.0),
@@ -1317,72 +1385,73 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             ],
                           ),
                           const SizedBox(height: 10),
-                          ...publicComments
-                              .map(
-                                (c) => Padding(
-                                  padding: const EdgeInsets.only(bottom: 8.0),
-                                  child: Row(
-                                    crossAxisAlignment:
-                                        CrossAxisAlignment.start,
-                                    children: [
-                                      CircleAvatar(
-                                        radius: 14,
-                                        backgroundColor: Colors.redAccent,
-                                        child: Text(
-                                          c['avatar']!,
-                                          style: const TextStyle(
-                                            color: Colors.white,
-                                            fontSize: 12,
-                                            fontWeight: FontWeight.bold,
-                                          ),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 10),
-                                      Expanded(
-                                        child: Column(
-                                          crossAxisAlignment:
-                                              CrossAxisAlignment.start,
-                                          children: [
-                                            Row(
+                          
+                          // 🚀 LIVE STREAM BUILDER ADDED
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance.collection('comments_${widget.tmdbId}').orderBy('timestamp', descending: true).snapshots(),
+                            builder: (context, snapshot) {
+                              if (snapshot.hasError || !snapshot.hasData) {
+                                // Fallback loop
+                                return Column(
+                                  children: publicComments
+                                      .map((c) => Padding(
+                                            padding: const EdgeInsets.only(bottom: 8.0),
+                                            child: Row(
+                                              crossAxisAlignment: CrossAxisAlignment.start,
                                               children: [
-                                                Text(
-                                                  c['name']!,
-                                                  style: const TextStyle(
-                                                    color: Colors.white70,
-                                                    fontSize: 12,
-                                                    fontWeight: FontWeight.bold,
-                                                  ),
-                                                ),
-                                                const SizedBox(width: 6),
-                                                Text(
-                                                  c['time']!,
-                                                  style: const TextStyle(
-                                                    color: Colors.grey,
-                                                    fontSize: 10,
+                                                CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                                                const SizedBox(width: 10),
+                                                Expanded(
+                                                  child: Column(
+                                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                                    children: [
+                                                      Row(children: [Text(c['name']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(width: 6), Text(c['time']!, style: const TextStyle(color: Colors.grey, fontSize: 10))]),
+                                                      Text(c['text']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                                    ],
                                                   ),
                                                 ),
                                               ],
                                             ),
-                                            Text(
-                                              c['text']!,
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 12,
-                                              ),
-                                            ),
-                                          ],
+                                          ))
+                                      .toList(),
+                                );
+                              }
+                              var docs = snapshot.data!.docs;
+                              if (docs.isEmpty) return const Text("Be the first to comment!", style: TextStyle(color: Colors.grey));
+                              
+                              return Column(
+                                children: docs.map((doc) {
+                                  var data = doc.data() as Map<String, dynamic>;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(data['avatar'] ?? 'U', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(children: [Text(data['name'] ?? 'User', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(width: 6), const Text('Live', style: TextStyle(color: Colors.green, fontSize: 10))]),
+                                              Text(data['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                              ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),
                     const SizedBox(height: 20),
                     if (widget.mediaType == 'tv' ||
                         widget.mediaType == 'series') ...[
+                      // 🚀 PREMIUM EPISODE UI ADDED WITHOUT DELETING
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
@@ -1422,7 +1491,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       ),
                       const SizedBox(height: 10),
                       SizedBox(
-                        height: 140,
+                        height: 40,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
                           itemCount: 15,
@@ -1432,70 +1501,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
                             return _buildFocusableItem(
                               onTap: () => _switchEpisode(epNum),
-                              borderRadius: BorderRadius.circular(10),
+                              borderRadius: BorderRadius.circular(6),
                               child: Container(
-                                width: 170,
-                                margin: const EdgeInsets.only(right: 12),
+                                margin: const EdgeInsets.only(right: 8),
+                                padding: const EdgeInsets.symmetric(horizontal: 24),
                                 decoration: BoxDecoration(
-                                  borderRadius: BorderRadius.circular(10),
-                                  border:
-                                      isCurrent
-                                          ? Border.all(
-                                            color: Colors.white,
-                                            width: 2,
-                                          )
-                                          : null,
-                                  color: Colors.grey[900],
+                                  borderRadius: BorderRadius.circular(6),
+                                  color: isCurrent ? Colors.green : Colors.grey[900], // 🚀 GREEN HIGHLIGHT FROM VIDEO
                                 ),
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Expanded(
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          borderRadius:
-                                              const BorderRadius.vertical(
-                                                top: Radius.circular(8),
-                                              ),
-                                          color: Colors.grey[850],
-                                        ),
-                                        child: Center(
-                                          child: Icon(
-                                            isCurrent
-                                                ? Icons.play_arrow
-                                                : Icons.play_circle_outline,
-                                            color: Colors.white,
-                                            size: 32,
-                                          ),
-                                        ),
-                                      ),
+                                child: Center(
+                                  child: Text(
+                                    epNum.toString().padLeft(2, '0'),
+                                    style: TextStyle(
+                                      color: isCurrent ? Colors.white : Colors.grey,
+                                      fontSize: 14,
+                                      fontWeight: FontWeight.bold,
                                     ),
-                                    Padding(
-                                      padding: const EdgeInsets.all(8.0),
-                                      child: Column(
-                                        crossAxisAlignment:
-                                            CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            "Episode : $epNum",
-                                            style: const TextStyle(
-                                              color: Colors.white,
-                                              fontSize: 12,
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                          ),
-                                          const Text(
-                                            "Stream on HANNUTV",
-                                            style: TextStyle(
-                                              color: Colors.grey,
-                                              fontSize: 10,
-                                            ),
-                                            maxLines: 1,
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ),
                             );
@@ -1523,7 +1545,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             final m = similarMovies[index];
                             return _buildFocusableItem(
                               onTap: () {
-                                // 🚀 DEEP CODING: Suggested movies click on Ad 🚀
                                 Navigator.pushReplacement(
                                   context,
                                   MaterialPageRoute(

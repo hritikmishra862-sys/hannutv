@@ -3,7 +3,12 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:uni_links/uni_links.dart'; // 🚀 DEEP LINKING ADDED
 import 'dashboard.dart';
+import 'video_player_page.dart'; // 🚀 ADDED FOR DEEP LINK ROUTING
+
+// 🚀 DEEP LINKING NAVIGATOR KEY
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // 🚀 1. DEEP BACKGROUND HANDLER (Hardcoded System-Level Listener)
 @pragma('vm:entry-point')
@@ -56,12 +61,67 @@ void main() async {
   runApp(const HannuTvApp());
 }
 
-class HannuTvApp extends StatelessWidget {
+class HannuTvApp extends StatefulWidget {
   const HannuTvApp({Key? key}) : super(key: key);
+
+  @override
+  State<HannuTvApp> createState() => _HannuTvAppState();
+}
+
+class _HannuTvAppState extends State<HannuTvApp> {
+  StreamSubscription? _sub;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDeepLinkListener(); // 🚀 DEEP LINK INITIALIZER ADDED
+  }
+
+  // 🚀 CATCH DEEP LINKS (Share kiye hue links yahan aayenge)
+  void _initDeepLinkListener() async {
+    try {
+      final initialUri = await getInitialUri();
+      if (initialUri != null) _handleDeepLink(initialUri);
+    } catch (e) { print(e); }
+
+    _sub = uriLinkStream.listen((Uri? uri) {
+      if (uri != null) _handleDeepLink(uri);
+    }, onError: (err) {});
+  }
+
+  void _handleDeepLink(Uri uri) {
+    // Format: https://hannutv.blogspot.com/watch?id=12345&type=movie
+    if (uri.path.contains('/watch')) {
+      String? idStr = uri.queryParameters['id'];
+      String? type = uri.queryParameters['type'] ?? 'movie';
+      
+      if (idStr != null) {
+        int id = int.tryParse(idStr) ?? 0;
+        if (id != 0) {
+          navigatorKey.currentState?.push(
+            MaterialPageRoute(
+              builder: (context) => VideoPlayerPage(
+                tmdbId: id,
+                mediaType: type,
+                movieTitle: "Shared Movie", // TMDB se andar fetch hoga
+              )
+            )
+          );
+        }
+      }
+    }
+  }
+
+  @override
+  void dispose() {
+    _sub?.cancel();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
+      navigatorKey: navigatorKey, // 🚀 KEY ADDED FOR DEEP ROUTING
       title: 'HANNUTV',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -118,7 +178,7 @@ class _SplashScreenState extends State<SplashScreen> {
       Timer(const Duration(milliseconds: 2500), () {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => DashboardPage()), 
+          MaterialPageRoute(builder: (context) => const DashboardPage()), 
         );
       });
     } else {

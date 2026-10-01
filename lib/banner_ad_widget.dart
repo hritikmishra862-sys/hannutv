@@ -20,7 +20,6 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
-      // 🚀 HARDCODING: Script Block bypass karne ke liye baseUrl zaroori hai
       ..loadHtmlString('''
         <!DOCTYPE html>
         <html>

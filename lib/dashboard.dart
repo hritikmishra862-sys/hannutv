@@ -3,6 +3,9 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:share_plus/share_plus.dart'; // 🚀 ADDED
+import 'package:shared_preferences/shared_preferences.dart'; // 🚀 ADDED
+import 'package:crypto/crypto.dart'; // 🚀 ADDED FOR MBP HASHING
 import 'video_player_page.dart';
 import 'skippable_ad_screen.dart'; 
 
@@ -66,6 +69,39 @@ class DashboardPageState extends State<DashboardPage> {
     super.initState();
     loadAllDashboards();
     _startCarousel();
+    _checkFirstClickViral(); // 🚀 AI VIRAL PROMPT ADDED
+  }
+
+  // 🚀 VIRAL PROMPT LOGIC ADDED
+  Future<void> _checkFirstClickViral() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool isFirstTime = prefs.getBool('first_time_share') ?? true;
+    if (isFirstTime) {
+      Future.delayed(const Duration(seconds: 4), () {
+        if(mounted) {
+          showDialog(
+            context: context,
+            builder: (context) => AlertDialog(
+              backgroundColor: Colors.grey[900],
+              title: const Text("🔥 App Recomendation!", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+              content: const Text("If you like HANNUTV, please share it with your friends to support us!", style: TextStyle(color: Colors.white70)),
+              actions: [
+                TextButton(child: const Text("Later", style: TextStyle(color: Colors.grey)), onPressed: () => Navigator.pop(context)),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                  onPressed: () { 
+                    Share.share("Watch Unlimited Free HD Movies on HANNUTV App! 🍿\nDownload now: https://hannutv.blogspot.com"); 
+                    Navigator.pop(context); 
+                  },
+                  child: const Text("Share Now", style: TextStyle(color: Colors.white)),
+                )
+              ],
+            )
+          );
+        }
+      });
+      prefs.setBool('first_time_share', false);
+    }
   }
 
   void _startCarousel() {
@@ -198,6 +234,44 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  // 🚀 MOVIEBOX PRO (v4.0.02) SECONDARY API FALLBACK ADDED
+  Future<void> fetchFromMovieBoxProAPI(String query) async {
+    try {
+      String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
+      String reversed = timestamp.split('').reversed.join('');
+      String hash = md5.convert(utf8.encode(reversed)).toString();
+      String xClientToken = "$timestamp,$hash"; 
+
+      final res = await http.post(
+        Uri.parse('https://api6.aoneroom.com/wefeed-mobile-bff/subject-api/search'),
+        headers: {
+          'Content-Type': 'application/json;charset=UTF-8',
+          'User-Agent': 'MovieBoxPro/16.2.1 (Android 12; Pixel 6)',
+          'X-M-Version': '4.0.02',
+          'X-Client-Token': xClientToken,
+        },
+        body: json.encode({"keyword": query, "type": 0, "page": 1, "pageSize": 20})
+      );
+
+      if (res.statusCode == 200) {
+        final mbpData = json.decode(res.body)['data'] ?? [];
+        if (mbpData.isNotEmpty) {
+           setState(() {
+             searchResults = mbpData.map((m) => {
+                'id': m['id'] ?? 0, 'title': m['title'] ?? 'Unknown MBP Stream', 'overview': '',
+                'posterUrl': m['poster'] ?? 'https://via.placeholder.com/300x450/222222/888888',
+                'rating': '9.0', 'year': '2026', 'mediaType': 'movie',
+                'isMbpFallback': true // Flag for Player Bypass
+             }).toList();
+             isLoading = false;
+           });
+           return;
+        }
+      }
+    } catch (_) {}
+    setState(() { searchResults = []; isLoading = false; });
+  }
+
   void onSearchChanged(String value) {
     if (value.isEmpty) {
       setState(() {
@@ -214,10 +288,13 @@ class DashboardPageState extends State<DashboardPage> {
         final url =
             'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
         final res = await http.get(Uri.parse(url), headers: kApiHeaders);
-        setState(() {
-          searchResults = parseData(res);
-          isLoading = false;
-        });
+        final data = parseData(res);
+        if (data.isEmpty) {
+          // 🚀 TMDB FAILED -> TRIGGER SECONDARY SEARCH
+          await fetchFromMovieBoxProAPI(value);
+        } else {
+          setState(() { searchResults = data; isLoading = false; });
+        }
       } catch (_) {
         setState(() => isLoading = false);
       }
@@ -310,6 +387,9 @@ class DashboardPageState extends State<DashboardPage> {
     // 🚀 DEEP CODING: 10s and 30s Alternating Logic 🚀
     int currentAdDuration = _isNextAd10Sec ? 10 : 30;
     _isNextAd10Sec = !_isNextAd10Sec; // Toggles for the next click
+    
+    // Check MBP Flag
+    bool isMbp = media['isMbpFallback'] == true;
 
     Navigator.push(
       context,
@@ -326,6 +406,7 @@ class DashboardPageState extends State<DashboardPage> {
                 overview: media['overview'] ?? '',
                 rating: media['rating'] ?? '9.0',
                 year: media['year'] ?? '2024',
+                mbpSignCookie: isMbp ? "urlprefix=aHR0cHM6Ly9zYmNkbjIuaGFrdW5heW1hdGF0YS5jb20=" : null, // 🚀 ADDED FOR BYPASS
               ),
             ),
       ),

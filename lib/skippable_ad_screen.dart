@@ -23,16 +23,15 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   bool _canSkip = false;
   Timer? _timer;
 
-  // 🚀 WORLD'S BEST HARDCODING: Sirf Full-Screen Direct Links 🚀
   final List<String> _fullScreenAdLinks = [
-    "https://omg10.com/4/11914245", // Industrious link
-    "https://omg10.com/4/11914244", // Lovey-dovey link
+    "https://omg10.com/4/11914245", 
+    "https://omg10.com/4/11914244", 
   ];
 
   @override
   void initState() {
     super.initState();
-    _timeLeft = widget.adDuration; // 🚀 Dashboard se 10s ya 30s aayega
+    _timeLeft = widget.adDuration; 
     
     final _random = Random();
     String selectedAd = _fullScreenAdLinks[_random.nextInt(_fullScreenAdLinks.length)];
@@ -40,7 +39,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF000000))
-      // Direct Link load kar rahe hain taaki 100% Full Screen Ad aaye
       ..loadRequest(Uri.parse(selectedAd));
 
     _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
@@ -73,10 +71,8 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
       body: SafeArea(
         child: Stack(
           children: [
-            // WebView jisme Full Screen Ad chalega
             WebViewWidget(controller: _controller),
             
-            // Skip Button Overlay
             Positioned(
               top: 15,
               right: 15,
@@ -113,5 +109,5 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
         ),
       ),
     );
-  }
+  } 
 }
