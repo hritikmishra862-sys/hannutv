@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
-import 'package:app_links/app_links.dart'; // 🚀 FIXED: AGP 9+ Compatible Package
+import 'package:app_links/app_links.dart'; // 🚀 ADDED FOR DEEP LINKING
 import 'dashboard.dart';
 import 'video_player_page.dart';
 
-// 🚀 DEEP LINKING NAVIGATOR KEY
+// 🚀 ADDED: Navigator Key for Deep Linking
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // 🚀 1. DEEP BACKGROUND HANDLER (Hardcoded System-Level Listener)
@@ -69,25 +69,22 @@ class HannuTvApp extends StatefulWidget {
 }
 
 class _HannuTvAppState extends State<HannuTvApp> {
-  late AppLinks _appLinks; // 🚀 NEW ENGINE INITIALIZED
+  late AppLinks _appLinks; // 🚀 ADDED
   StreamSubscription<Uri>? _sub;
 
   @override
   void initState() {
     super.initState();
-    _initDeepLinkListener();
+    _initDeepLinkListener(); // 🚀 ADDED
   }
 
-  // 🚀 CATCH DEEP LINKS (Share kiye hue links yahan aayenge)
+  // 🚀 ADDED: CATCH DEEP LINKS (Share kiye hue links yahan aayenge)
   void _initDeepLinkListener() async {
-    _appLinks = AppLinks(); // Setup AppLinks
-
+    _appLinks = AppLinks();
     try {
       final initialUri = await _appLinks.getInitialLink();
       if (initialUri != null) _handleDeepLink(initialUri);
-    } catch (e) { 
-      print(e); 
-    }
+    } catch (e) { print(e); }
 
     _sub = _appLinks.uriLinkStream.listen((Uri? uri) {
       if (uri != null) _handleDeepLink(uri);
@@ -95,20 +92,16 @@ class _HannuTvAppState extends State<HannuTvApp> {
   }
 
   void _handleDeepLink(Uri uri) {
-    // Format: https://hannutv.blogspot.com/watch?id=12345&type=movie
     if (uri.path.contains('/watch')) {
       String? idStr = uri.queryParameters['id'];
       String? type = uri.queryParameters['type'] ?? 'movie';
-      
       if (idStr != null) {
         int id = int.tryParse(idStr) ?? 0;
         if (id != 0) {
           navigatorKey.currentState?.push(
             MaterialPageRoute(
               builder: (context) => VideoPlayerPage(
-                tmdbId: id,
-                mediaType: type,
-                movieTitle: "Shared Stream", 
+                tmdbId: id, mediaType: type, movieTitle: "Shared Stream",
               )
             )
           );
@@ -126,7 +119,7 @@ class _HannuTvAppState extends State<HannuTvApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey,
+      navigatorKey: navigatorKey, // 🚀 ADDED
       title: 'HANNUTV',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
