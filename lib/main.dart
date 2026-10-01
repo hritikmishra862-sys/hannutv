@@ -3,9 +3,9 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
-import 'package:uni_links/uni_links.dart'; // 🚀 DEEP LINKING ADDED
+import 'package:app_links/app_links.dart'; // 🚀 FIXED: AGP 9+ Compatible Package
 import 'dashboard.dart';
-import 'video_player_page.dart'; // 🚀 ADDED FOR DEEP LINK ROUTING
+import 'video_player_page.dart';
 
 // 🚀 DEEP LINKING NAVIGATOR KEY
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -69,22 +69,27 @@ class HannuTvApp extends StatefulWidget {
 }
 
 class _HannuTvAppState extends State<HannuTvApp> {
-  StreamSubscription? _sub;
+  late AppLinks _appLinks; // 🚀 NEW ENGINE INITIALIZED
+  StreamSubscription<Uri>? _sub;
 
   @override
   void initState() {
     super.initState();
-    _initDeepLinkListener(); // 🚀 DEEP LINK INITIALIZER ADDED
+    _initDeepLinkListener();
   }
 
   // 🚀 CATCH DEEP LINKS (Share kiye hue links yahan aayenge)
   void _initDeepLinkListener() async {
-    try {
-      final initialUri = await getInitialUri();
-      if (initialUri != null) _handleDeepLink(initialUri);
-    } catch (e) { print(e); }
+    _appLinks = AppLinks(); // Setup AppLinks
 
-    _sub = uriLinkStream.listen((Uri? uri) {
+    try {
+      final initialUri = await _appLinks.getInitialLink();
+      if (initialUri != null) _handleDeepLink(initialUri);
+    } catch (e) { 
+      print(e); 
+    }
+
+    _sub = _appLinks.uriLinkStream.listen((Uri? uri) {
       if (uri != null) _handleDeepLink(uri);
     }, onError: (err) {});
   }
@@ -103,7 +108,7 @@ class _HannuTvAppState extends State<HannuTvApp> {
               builder: (context) => VideoPlayerPage(
                 tmdbId: id,
                 mediaType: type,
-                movieTitle: "Shared Movie", // TMDB se andar fetch hoga
+                movieTitle: "Shared Stream", 
               )
             )
           );
@@ -121,7 +126,7 @@ class _HannuTvAppState extends State<HannuTvApp> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // 🚀 KEY ADDED FOR DEEP ROUTING
+      navigatorKey: navigatorKey,
       title: 'HANNUTV',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
