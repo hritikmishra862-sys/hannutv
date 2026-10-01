@@ -1,11 +1,10 @@
+import 'dart:ui'; // 🚀 ADDED FOR PREMIUM GLASS BLUR
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:share_plus/share_plus.dart'; // 🚀 ADDED
-import 'package:shared_preferences/shared_preferences.dart'; // 🚀 ADDED
-import 'package:crypto/crypto.dart'; // 🚀 ADDED FOR MOVIEBOX
+import 'package:crypto/crypto.dart'; // 🚀 ADDED FOR MOVIEBOX API
 import 'video_player_page.dart';
 import 'skippable_ad_screen.dart'; 
 
@@ -38,10 +37,14 @@ class DashboardPageState extends State<DashboardPage> {
   List comedyList = [];
   List horrorList = [];
   List searchResults = [];
+  List pixelflixResults = []; // 🚀 ADDED FOR PIXELFLIX SEARCH
 
   bool isLoading = true;
   bool isSearching = false;
+  bool isPixelflixSearch = false; // 🚀 ADDED TOGGLE FOR 2ND SEARCH BAR
+
   final TextEditingController searchController = TextEditingController();
+  final TextEditingController pixelflixController = TextEditingController(); // 🚀 2ND SEARCH CONTROLLER
 
   Timer? _debounce;
   final PageController _pageController = PageController();
@@ -69,39 +72,6 @@ class DashboardPageState extends State<DashboardPage> {
     super.initState();
     loadAllDashboards();
     _startCarousel();
-    _checkFirstClickViral(); // 🚀 ADDED VIRAL SHARE POPUP
-  }
-
-  // 🚀 ADDED: FIRST CLICK VIRAL LOGIC
-  Future<void> _checkFirstClickViral() async {
-    SharedPreferences prefs = await SharedPreferences.getInstance();
-    bool isFirstTime = prefs.getBool('first_time_share') ?? true;
-    if (isFirstTime) {
-      Future.delayed(const Duration(seconds: 4), () {
-        if(mounted) {
-          showDialog(
-            context: context,
-            builder: (context) => AlertDialog(
-              backgroundColor: Colors.grey[900],
-              title: const Text("🔥 App Recomendation!", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-              content: const Text("If you like HANNUTV, please share it with your friends to support us!", style: TextStyle(color: Colors.white70)),
-              actions: [
-                TextButton(child: const Text("Later", style: TextStyle(color: Colors.grey)), onPressed: () => Navigator.pop(context)),
-                ElevatedButton(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
-                  onPressed: () { 
-                    Share.share("Watch Unlimited Free HD Movies on HANNUTV App! 🍿\nDownload now: https://hannutv.blogspot.com"); 
-                    Navigator.pop(context); 
-                  },
-                  child: const Text("Share Now", style: TextStyle(color: Colors.white)),
-                )
-              ],
-            )
-          );
-        }
-      });
-      prefs.setBool('first_time_share', false);
-    }
   }
 
   void _startCarousel() {
@@ -125,6 +95,7 @@ class DashboardPageState extends State<DashboardPage> {
     _carouselTimer?.cancel();
     _pageController.dispose();
     searchController.dispose();
+    pixelflixController.dispose(); // 🚀 ADDED
     _debounce?.cancel();
     super.dispose();
   }
@@ -234,7 +205,7 @@ class DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  // 🚀 ADDED: MOVIEBOX PRO FALLBACK LOGIC
+  // 🚀 ADDED: MOVIEBOX PRO BACKGROUND FETCH FOR DUAL PLAYER
   Future<Map?> _checkMovieBoxProAvailability(String title) async {
     try {
       String timestamp = DateTime.now().millisecondsSinceEpoch.toString();
@@ -258,6 +229,25 @@ class DashboardPageState extends State<DashboardPage> {
       }
     } catch (_) {}
     return null;
+  }
+
+  // 🚀 ADDED: PIXELFLIX SEARCH API INTEGRATION
+  Future<void> _searchPixelflix(String query) async {
+    setState(() => isLoading = true);
+    try {
+      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(query)}&language=en-US&include_adult=false'), headers: kApiHeaders);
+      final tmdbData = parseData(res);
+      // Format specifically for Pixelflix Server
+      setState(() {
+        pixelflixResults = tmdbData.map((m) => {
+          ...m,
+          'isPixelflix': true, // Custom flag for player to know it's Server 2
+        }).toList();
+        isLoading = false;
+      });
+    } catch (_) {
+      setState(() => isLoading = false);
+    }
   }
 
   void onSearchChanged(String value) {
@@ -289,88 +279,103 @@ class DashboardPageState extends State<DashboardPage> {
   void _showSupportOptions() {
     showModalBottomSheet(
       context: context,
-      backgroundColor: Colors.grey[900],
+      backgroundColor: Colors.transparent, // 🚀 CHANGED FOR GLASS UI
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
       builder: (context) {
-        return Container(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 20),
-              InkWell(
-                onTap: () async {
-                  Navigator.pop(context);
-                  if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication)) {}
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.send, color: Colors.blueAccent, size: 30),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text("Request for New Movie", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                          Text("Join Telegram", style: TextStyle(color: Colors.grey, fontSize: 12)),
+        return ClipRRect(
+          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
+          child: BackdropFilter(
+            filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15), // 🚀 PREMIUM GLASS BLUR
+            child: Container(
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Colors.black.withOpacity(0.65), // 🚀 PREMIUM GLASS BLUR
+                border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2))),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+                  const SizedBox(height: 20),
+                  InkWell(
+                    onTap: () async {
+                      Navigator.pop(context);
+                      if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication)) {}
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.send, color: Colors.blueAccent, size: 30),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text("Request for New Movie", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                              Text("Join Telegram", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(height: 12),
-              InkWell(
-                onTap: () async {
-                  Navigator.pop(context);
-                  if (!await launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication)) {}
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
-                  child: Row(
-                    children: [
-                      const Icon(Icons.chat, color: Colors.greenAccent, size: 30),
-                      const SizedBox(width: 16),
-                      Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: const [
-                          Text("New Movie Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
-                          Text("Join WhatsApp Channel", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                  const SizedBox(height: 12),
+                  InkWell(
+                    onTap: () async {
+                      Navigator.pop(context);
+                      if (!await launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication)) {}
+                    },
+                    borderRadius: BorderRadius.circular(12),
+                    child: Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.white.withOpacity(0.1), borderRadius: BorderRadius.circular(12)),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.chat, color: Colors.greenAccent, size: 30),
+                          const SizedBox(width: 16),
+                          Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: const [
+                              Text("New Movie Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                              Text("Join WhatsApp Channel", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                            ],
+                          ),
                         ],
                       ),
-                    ],
+                    ),
                   ),
-                ),
+                  const SizedBox(height: 24),
+                  const Center(
+                    child: Text("App Version: v1.0.0 VIP", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
+                  ),
+                ],
               ),
-              const SizedBox(height: 24),
-              const Center(
-                child: Text("App Version: v1.0.0", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold)),
-              ),
-            ],
+            ),
           ),
         );
       },
     );
   }
 
-  // 🚀 ADDED: DUAL OTT BOTTOM SHEET (HANNUTV 1 & HANNUTV 2)
+  // 🚀 ADDED: DUAL PLAYER BOTTOM SHEET (HANNUTV 1 & 2)
   void launchPlayerDirect(Map media) {
+    continueWatchingList.removeWhere((m) => m['id'] == media['id']);
+    continueWatchingList.insert(0, media);
+
+    // DUAL PLAYER GLASS MODAL[cite: 48, 49]
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      backgroundColor: Colors.transparent,
+      backgroundColor: Colors.transparent, // 🚀 GLASSMORPHISM
       builder: (context) {
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             bool isCheckingMbp = true;
             Map? mbpData;
 
+            // Fetch MovieBox in background
             if (isCheckingMbp) {
               _checkMovieBoxProAvailability(media['title'] ?? '').then((result) {
                 if (mounted) {
@@ -382,61 +387,69 @@ class DashboardPageState extends State<DashboardPage> {
               });
             }
 
-            return Container(
-              padding: const EdgeInsets.all(20),
-              decoration: const BoxDecoration(
-                color: Color(0xFF0F0F0F),
-                borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Container(
-                    height: 200, width: double.infinity,
-                    decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), image: DecorationImage(image: NetworkImage(media['backdropUrl'] != '' ? media['backdropUrl'] : media['posterUrl']), fit: BoxFit.cover)),
+            return ClipRRect(
+              borderRadius: const BorderRadius.vertical(top: Radius.circular(25)),
+              child: BackdropFilter(
+                filter: ImageFilter.blur(sigmaX: 15, sigmaY: 15), // 🚀 1000% PREMIUM BLUR
+                child: Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7), // Semi-transparent black
+                    border: Border(top: BorderSide(color: Colors.white.withOpacity(0.2), width: 1)),
                   ),
-                  const SizedBox(height: 20),
-                  Text("Watch ${media['title']}", style: const TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  const Text("Select Server to Watch", style: TextStyle(color: Colors.grey, fontSize: 14)),
-                  const SizedBox(height: 10),
-                  Row(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Expanded(
-                        child: ElevatedButton(
-                          style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                          onPressed: () {
-                            Navigator.pop(context);
-                            _playVideoWithAd(media, null); // Call your original push
-                          },
-                          child: const Text("HANNUTV 1\n(Fast)", textAlign: TextAlign.center, style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                        ),
+                      Container(
+                        height: 200, width: double.infinity,
+                        decoration: BoxDecoration(borderRadius: BorderRadius.circular(16), image: DecorationImage(image: NetworkImage(media['backdropUrl'] != '' ? media['backdropUrl'] : media['posterUrl']), fit: BoxFit.cover), boxShadow: [BoxShadow(color: Colors.black.withOpacity(0.5), blurRadius: 15, spreadRadius: 2)]),
                       ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: isCheckingMbp 
-                          ? const Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2)))
-                          : mbpData != null
-                            ? ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.transparent, padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8), side: const BorderSide(color: Colors.red))),
-                                onPressed: () {
-                                  Navigator.pop(context);
-                                  media['id'] = mbpData!['id']; 
-                                  _playVideoWithAd(media, mbpData!['mbpSignCookie']);
-                                },
-                                child: const Text("HANNUTV 2\n(VIP)", textAlign: TextAlign.center, style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold)),
-                              )
-                            : ElevatedButton(
-                                style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[900], padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8))),
-                                onPressed: null,
-                                child: const Text("HANNUTV 2\n(Offline)", textAlign: TextAlign.center, style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
-                              ),
+                      const SizedBox(height: 20),
+                      Text("Watch ${media['title']}", style: const TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 16),
+                      const Text("Select Server to Watch:", style: TextStyle(color: Colors.grey, fontSize: 14)),
+                      const SizedBox(height: 12),
+                      Row(
+                        children: [
+                          // HANNUTV 1 (Pantyflix)
+                          Expanded(
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.withOpacity(0.9), padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                              onPressed: () {
+                                Navigator.pop(context);
+                                _playVideo(media, null, media['isPixelflix'] == true);
+                              },
+                              child: const Text("HANNUTV 1", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                            ),
+                          ),
+                          const SizedBox(width: 12),
+                          // HANNUTV 2 (MovieBox Pro VIP)
+                          Expanded(
+                            child: isCheckingMbp 
+                              ? const Center(child: SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.red, strokeWidth: 2)))
+                              : mbpData != null
+                                ? ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.white.withOpacity(0.1), padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12), side: BorderSide(color: Colors.redAccent.withOpacity(0.5)))),
+                                    onPressed: () {
+                                      Navigator.pop(context);
+                                      media['id'] = mbpData!['id']; 
+                                      _playVideo(media, mbpData!['mbpSignCookie'], false);
+                                    },
+                                    child: const Text("HANNUTV 2", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                                  )
+                                : ElevatedButton(
+                                    style: ElevatedButton.styleFrom(backgroundColor: Colors.grey[900], padding: const EdgeInsets.symmetric(vertical: 16), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                                    onPressed: null,
+                                    child: const Text("Offline", style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                                  ),
+                          ),
+                        ],
                       ),
+                      const SizedBox(height: 20),
                     ],
                   ),
-                  const SizedBox(height: 20),
-                ],
+                ),
               ),
             );
           }
@@ -445,16 +458,18 @@ class DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // 🚀 YOUR ORIGINAL PUSH LOGIC (Saved inside this helper)
-  void _playVideoWithAd(Map media, String? mbpCookie) {
-    continueWatchingList.removeWhere((m) => m['id'] == media['id']);
-    continueWatchingList.insert(0, media);
-
+  // 🚀 ACTUAL VIDEO PLAYER LAUNCHER WITH YOUR 10s/30s LOGIC
+  void _playVideo(Map media, String? mbpCookie, bool isPixelflix) {
     final type = media['mediaType'] ?? 'movie';
     final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
-
     int currentAdDuration = _isNextAd10Sec ? 10 : 30;
     _isNextAd10Sec = !_isNextAd10Sec; 
+
+    // Custom Pixelflix URL formatting
+    String? customPixelflixUrl;
+    if (isPixelflix) {
+      customPixelflixUrl = type == 'tv' ? "https://pixelflix.cc/tv/$tId-1-1/" : "https://pixelflix.cc/movie/$tId/";
+    }
 
     Navigator.push(
       context,
@@ -470,7 +485,8 @@ class DashboardPageState extends State<DashboardPage> {
             overview: media['overview'] ?? '',
             rating: media['rating'] ?? '9.0',
             year: media['year'] ?? '2024',
-            mbpSignCookie: mbpCookie, // 🚀 Passed to player
+            mbpSignCookie: mbpCookie,
+            customUrl: customPixelflixUrl,
           ),
         ),
       ),
@@ -598,96 +614,41 @@ class DashboardPageState extends State<DashboardPage> {
                       trendingList.isEmpty
                           ? Container(color: Colors.black)
                           : PageView.builder(
-                              controller: _pageController,
-                              itemCount: trendingList.length > 5 ? 5 : trendingList.length,
-                              onPageChanged: (index) => _currentPage = index,
-                              itemBuilder: (context, index) {
-                                final movie = trendingList[index];
-                                // 🚀 ADDED: MOVIEBOX STYLE PREMIUM CAROUSEL (0% DELETION OF LOGIC)
-                                return Stack(
-                                  fit: StackFit.expand,
-                                  children: [
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        image: DecorationImage(
-                                          image: NetworkImage(
-                                            movie['backdropUrl'] != ''
-                                                ? movie['backdropUrl']
-                                                : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600',
-                                          ),
-                                          fit: BoxFit.cover,
-                                        ),
-                                      ),
+                            controller: _pageController,
+                            itemCount:
+                                trendingList.length > 5
+                                    ? 5
+                                    : trendingList.length,
+                            onPageChanged: (index) => _currentPage = index,
+                            itemBuilder: (context, index) {
+                              return Container(
+                                decoration: BoxDecoration(
+                                  image: DecorationImage(
+                                    image: NetworkImage(
+                                      trendingList[index]['backdropUrl'] != ''
+                                          ? trendingList[index]['backdropUrl']
+                                          : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600',
                                     ),
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        gradient: LinearGradient(
-                                          begin: Alignment.bottomCenter,
-                                          end: Alignment.topCenter,
-                                          colors: [
-                                            const Color(0xFF0F0F0F),
-                                            Colors.black.withOpacity(0.5),
-                                            Colors.transparent,
-                                          ],
-                                        ),
-                                      ),
-                                    ),
-                                    if (!isSearching)
-                                      Positioned(
-                                        bottom: 40,
-                                        left: 20,
-                                        right: 20,
-                                        child: Column(
-                                          crossAxisAlignment: CrossAxisAlignment.start,
-                                          children: [
-                                            Text(
-                                              movie['title'] ?? 'Title',
-                                              style: const TextStyle(
-                                                color: Colors.white,
-                                                fontSize: 28,
-                                                fontWeight: FontWeight.bold,
-                                                height: 1.2,
-                                              ),
-                                              maxLines: 2,
-                                              overflow: TextOverflow.ellipsis,
-                                            ),
-                                            const SizedBox(height: 8),
-                                            Row(
-                                              children: [
-                                                const Icon(Icons.star, color: Colors.amber, size: 18),
-                                                const SizedBox(width: 4),
-                                                Text(movie['rating'] ?? '9.0', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                                                const SizedBox(width: 14),
-                                                Text(movie['year'] ?? '2024', style: const TextStyle(color: Colors.grey, fontSize: 14)),
-                                                const SizedBox(width: 14),
-                                                Text(movie['mediaType'] == 'tv' ? "Series" : "Movie", style: const TextStyle(color: Colors.redAccent, fontSize: 14, fontWeight: FontWeight.bold)),
-                                              ],
-                                            ),
-                                            const SizedBox(height: 16),
-                                            _TvFocusButton(
-                                              onTap: () => launchPlayerDirect(movie),
-                                              borderRadius: BorderRadius.circular(8),
-                                              child: ElevatedButton.icon(
-                                                style: ElevatedButton.styleFrom(
-                                                  backgroundColor: Colors.white,
-                                                  foregroundColor: Colors.black,
-                                                  padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 24),
-                                                ),
-                                                onPressed: () => launchPlayerDirect(movie),
-                                                icon: const Icon(Icons.play_arrow, size: 24),
-                                                label: const Text(
-                                                  'Play Now',
-                                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-                                                ),
-                                              ),
-                                            ),
-                                          ],
-                                        ),
-                                      ),
-                                  ],
-                                );
-                              },
-                            ),
+                                    fit: BoxFit.cover,
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                ),
+                Container(
+                  height: 400,
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.bottomCenter,
+                      end: Alignment.topCenter,
+                      colors: [
+                        const Color(0xFF0F0F0F),
+                        Colors.transparent,
+                        Colors.black.withOpacity(0.9),
+                      ],
+                    ),
+                  ),
                 ),
                 SafeArea(
                   child: Padding(
@@ -697,44 +658,56 @@ class DashboardPageState extends State<DashboardPage> {
                     ),
                     child: Row(
                       children: [
-                        isSearching
+                        // 🚀 ADDED: DUAL SEARCH BAR LOGIC
+                        isSearching || isPixelflixSearch
                             ? Expanded(
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 12,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: Colors.black87,
-                                    borderRadius: BorderRadius.circular(25),
-                                    border: Border.all(color: Colors.redAccent),
-                                  ),
-                                  child: TextField(
-                                    controller: searchController,
-                                    style: const TextStyle(color: Colors.white),
-                                    autofocus: true,
-                                    decoration: InputDecoration(
-                                      hintText:
-                                          'Search Movies & Shows on HANNUTV...',
-                                      border: InputBorder.none,
-                                      prefixIcon: const Icon(
-                                        Icons.search,
-                                        color: Colors.redAccent,
+                                child: ClipRRect(
+                                  borderRadius: BorderRadius.circular(25),
+                                  child: BackdropFilter(
+                                    filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10), // 🚀 GLASS BLUR
+                                    child: Container(
+                                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.black.withOpacity(0.5),
+                                        borderRadius: BorderRadius.circular(25),
+                                        border: Border.all(color: Colors.redAccent),
                                       ),
-                                      suffixIcon: IconButton(
-                                        icon: const Icon(
-                                          Icons.close,
-                                          color: Colors.white,
+                                      child: TextField(
+                                        controller: isPixelflixSearch ? pixelflixController : searchController,
+                                        style: const TextStyle(color: Colors.white),
+                                        autofocus: true,
+                                        decoration: InputDecoration(
+                                          hintText: isPixelflixSearch ? 'Search Pixelflix...' : 'Search HANNUTV...',
+                                          hintStyle: const TextStyle(color: Colors.grey),
+                                          border: InputBorder.none,
+                                          prefixIcon: const Icon(
+                                            Icons.search,
+                                            color: Colors.redAccent,
+                                          ),
+                                          suffixIcon: IconButton(
+                                            icon: const Icon(
+                                              Icons.close,
+                                              color: Colors.white,
+                                            ),
+                                            onPressed: () {
+                                              setState(() {
+                                                isSearching = false;
+                                                isPixelflixSearch = false;
+                                                searchController.clear();
+                                                pixelflixController.clear();
+                                                searchResults.clear();
+                                                pixelflixResults.clear();
+                                              });
+                                            },
+                                          ),
                                         ),
-                                        onPressed: () {
-                                          setState(() {
-                                            isSearching = false;
-                                            searchController.clear();
-                                            searchResults.clear();
-                                          });
-                                        },
+                                        onChanged: isPixelflixSearch ? (v) {
+                                          if (v.isEmpty) { setState(() { pixelflixResults = []; }); return; }
+                                          if (_debounce?.isActive ?? false) _debounce!.cancel();
+                                          _debounce = Timer(const Duration(milliseconds: 500), () => _searchPixelflix(v));
+                                        } : onSearchChanged,
                                       ),
                                     ),
-                                    onChanged: onSearchChanged,
                                   ),
                                 ),
                               )
@@ -757,23 +730,79 @@ class DashboardPageState extends State<DashboardPage> {
                                   ),
                                 ),
                               ),
-                        if (!isSearching)
-                          _TvFocusButton(
-                            onTap: () => setState(() => isSearching = true),
-                            borderRadius: BorderRadius.circular(20),
-                            child: const Padding(
-                              padding: EdgeInsets.all(8.0),
-                              child: Icon(
-                                Icons.search,
-                                color: Colors.white,
-                                size: 28,
+                        if (!isSearching && !isPixelflixSearch)
+                          Row(
+                            children: [
+                              _TvFocusButton(
+                                onTap: () => setState(() => isPixelflixSearch = true),
+                                borderRadius: BorderRadius.circular(20),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Icon(Icons.explore, color: Colors.blueAccent, size: 26), // 🚀 PIXELFLIX SEARCH ICON
+                                ),
                               ),
-                            ),
+                              _TvFocusButton(
+                                onTap: () => setState(() => isSearching = true),
+                                borderRadius: BorderRadius.circular(20),
+                                child: const Padding(
+                                  padding: EdgeInsets.all(8.0),
+                                  child: Icon(Icons.search, color: Colors.white, size: 28),
+                                ),
+                              ),
+                            ],
                           ),
                       ],
                     ),
                   ),
                 ),
+                if (trendingList.isNotEmpty && !isSearching && !isPixelflixSearch)
+                  Positioned(
+                    bottom: 20,
+                    left: 16,
+                    right: 16,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          trendingList[_currentPage]['title'] ?? 'Title',
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 28,
+                            fontWeight: FontWeight.bold,
+                          ),
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        const SizedBox(height: 8),
+                        _TvFocusButton(
+                          onTap: () => launchPlayerDirect(trendingList[_currentPage]),
+                          borderRadius: BorderRadius.circular(8),
+                          child: ElevatedButton.icon(
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.white,
+                              foregroundColor: Colors.black,
+                              padding: const EdgeInsets.symmetric(
+                                vertical: 12,
+                                horizontal: 24,
+                              ),
+                            ),
+                            onPressed:
+                                () => launchPlayerDirect(
+                                  trendingList[_currentPage],
+                                ),
+                            icon: const Icon(Icons.play_arrow, size: 24),
+                            label: const Text(
+                              'Play Now',
+                              style: TextStyle(
+                                fontWeight: FontWeight.bold,
+                                fontSize: 16,
+                              ),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
               ],
             ),
             const Padding(
@@ -840,7 +869,7 @@ class DashboardPageState extends State<DashboardPage> {
                   child: CircularProgressIndicator(color: Colors.red),
                 ),
               )
-            else if (isSearching)
+            else if (isSearching || isPixelflixSearch)
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
@@ -854,9 +883,9 @@ class DashboardPageState extends State<DashboardPage> {
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
                 ),
-                itemCount: searchResults.length,
+                itemCount: isPixelflixSearch ? pixelflixResults.length : searchResults.length,
                 itemBuilder: (context, index) {
-                  final movie = searchResults[index];
+                  final movie = isPixelflixSearch ? pixelflixResults[index] : searchResults[index];
                   return _TvFocusButton(
                     onTap: () => launchPlayerDirect(movie),
                     borderRadius: BorderRadius.circular(8),
@@ -895,6 +924,7 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
+              _buildHorizontalList('🔥 HANNUTV Trending', trendingList),
               if (continueWatchingList.isNotEmpty)
                 _buildHorizontalList(
                   'Continue Watching',

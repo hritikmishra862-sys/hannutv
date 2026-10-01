@@ -3,11 +3,11 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
-import 'package:app_links/app_links.dart'; // 🚀 ADDED FOR DEEP LINKING
+import 'package:app_links/app_links.dart'; // 🚀 ADDED: Deep Linking
 import 'dashboard.dart';
 import 'video_player_page.dart';
 
-// 🚀 ADDED: Navigator Key for Deep Linking
+// 🚀 ADDED: Navigator Key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 // 🚀 1. DEEP BACKGROUND HANDLER (Hardcoded System-Level Listener)
@@ -61,24 +61,32 @@ void main() async {
   runApp(const HannuTvApp());
 }
 
-class HannuTvApp extends StatefulWidget {
+class HannuTvApp extends StatelessWidget {
   const HannuTvApp({Key? key}) : super(key: key);
 
   @override
-  State<HannuTvApp> createState() => _HannuTvAppState();
+  Widget build(BuildContext context) {
+    return const HannuTvAppWrapper();
+  }
 }
 
-class _HannuTvAppState extends State<HannuTvApp> {
-  late AppLinks _appLinks; // 🚀 ADDED
+class HannuTvAppWrapper extends StatefulWidget {
+  const HannuTvAppWrapper({Key? key}) : super(key: key);
+  @override
+  State<HannuTvAppWrapper> createState() => _HannuTvAppWrapperState();
+}
+
+class _HannuTvAppWrapperState extends State<HannuTvAppWrapper> {
+  late AppLinks _appLinks; 
   StreamSubscription<Uri>? _sub;
 
   @override
   void initState() {
     super.initState();
-    _initDeepLinkListener(); // 🚀 ADDED
+    _initDeepLinkListener(); 
   }
 
-  // 🚀 ADDED: CATCH DEEP LINKS (Share kiye hue links yahan aayenge)
+  // 🚀 ADDED: CATCH DEEP LINKS 
   void _initDeepLinkListener() async {
     _appLinks = AppLinks();
     try {
@@ -176,7 +184,7 @@ class _SplashScreenState extends State<SplashScreen> {
       Timer(const Duration(milliseconds: 2500), () {
         Navigator.pushReplacement(
           context,
-          MaterialPageRoute(builder: (context) => const DashboardPage()), 
+          MaterialPageRoute(builder: (context) => DashboardPage()), 
         );
       });
     } else {

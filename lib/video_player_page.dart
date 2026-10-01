@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:ui'; // 🚀 ADDED: Glass Blur
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
@@ -28,7 +29,7 @@ class VideoPlayerPage extends StatefulWidget {
   final String rating;
   final String year;
   final String? customUrl;
-  final String? mbpSignCookie; // 🚀 ADDED FOR BYPASS
+  final String? mbpSignCookie; // 🚀 ADDED FOR MOVIEBOX BYPASS
 
   const VideoPlayerPage({
     super.key,
@@ -41,7 +42,7 @@ class VideoPlayerPage extends StatefulWidget {
     this.rating = '9.0',
     this.year = '2024',
     this.customUrl,
-    this.mbpSignCookie, // 🚀 ADDED FOR BYPASS
+    this.mbpSignCookie, // 🚀 ADDED
   });
 
   @override
@@ -56,7 +57,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   bool isFullScreen = false;
   bool isPageLoading = true;
   String activeServer = 'vidrift';
-  int currentServerIndex = 0; // 🚀 ADDED FOR AI HEALER
+  int currentServerIndex = 0; // 🚀 ADDED
 
   String currentAspectRatio = 'contain';
 
@@ -117,7 +118,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     super.initState();
     currentSeason = widget.season;
     currentEpisode = widget.episode;
-    activeServer = servers[0]['key']!; 
+    activeServer = servers[0]['key']!;
 
     _introAnimController = AnimationController(
       vsync: this,
@@ -247,7 +248,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
-  // 🚀 ADDED: MBP BYPASS DECODER
+  // 🚀 ADDED: MOVIEBOX BYPASS DECODE
   String _decodeMbpBypassUrl() {
     if (widget.mbpSignCookie != null && widget.mbpSignCookie!.contains('urlprefix=')) {
       try {
@@ -301,7 +302,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               if (message.message == 'playing' && mounted) {
                 _triggerCinematicPlayAnimation();
               }
-              // 🚀 ADDED: AI LISTENER FOR ERRORS
+              // 🚀 ADDED: AI LISTENER FOR ERROR SWITCH
               if (message.message == 'server_failed' && mounted) {
                 _autoSwitchServer();
               }
@@ -366,7 +367,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               aiObserver.observe(document.body, { childList: true, subtree: true });
 
               setInterval(function() {
-                // 🚀 ADDED: AI DETECTS SERVER ERROR
+                // 🚀 ADDED: AI DETECTS SERVER ERROR & TRIGGERS FLUTTER Auto-Heal
                 let errorText = document.body.innerText.toLowerCase();
                 if (errorText.includes("failed to respond") || errorText.includes("can't play right now") || errorText.includes("usually temporary")) {
                   VideoState.postMessage('server_failed');
@@ -516,13 +517,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _initStream();
   }
 
-  // 🚀 ADDED: SHARE DEEP LINK LOGIC
+  // 🚀 ADDED: DEEP LINK SHARE
   void _shareDeepLink() {
     String deepLink = 'https://hannutv.blogspot.com/watch?id=${widget.tmdbId}&type=${widget.mediaType}';
     Share.share('Watch ${widget.movieTitle} on HANNUTV for free! 🍿\n\nDirect Play Link:\n$deepLink');
   }
 
-  // 🚀 ADDED: LIVE FIREBASE COMMENT UPLOAD
+  // 🚀 ADDED: LIVE FIREBASE COMMENTS UPLOAD
   void _addLiveComment() async {
     final text = commentInputController.text.trim();
     if (text.isNotEmpty) {
@@ -1001,9 +1002,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                   ),
                   if (showControls) ...[
+                    // 🚀 ADDED: PREMIUM BLUR TO CONTROLS
                     Positioned.fill(
                       child: IgnorePointer(
-                        child: Container(color: Colors.black38),
+                        child: ClipRect(
+                          child: BackdropFilter(
+                            filter: ImageFilter.blur(sigmaX: 5, sigmaY: 5),
+                            child: Container(color: Colors.black45),
+                          ),
+                        ),
                       ),
                     ),
                     Positioned(
@@ -1206,7 +1213,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           ),
                           const SizedBox(width: 8),
                           _buildFocusableItem(
-                            onTap: _shareDeepLink, // 🚀 ADDED ACTION
+                            onTap: _shareDeepLink, // 🚀 ADDED DEEP SHARE
                             borderRadius: BorderRadius.circular(20),
                             child: _buildActionButton(Icons.share, "Share"),
                           ),
@@ -1378,7 +1385,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             ],
                           ),
                           const SizedBox(height: 10),
-
+                          
                           // 🚀 ADDED: LIVE FIREBASE STREAM (Fallback me aapka list loop bhi hai)
                           StreamBuilder<QuerySnapshot>(
                             stream: FirebaseFirestore.instance.collection('comments_${widget.tmdbId}').orderBy('timestamp', descending: true).snapshots(),
@@ -1503,7 +1510,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                             width: 2,
                                           )
                                           : null,
-                                  color: isCurrent ? Colors.green : Colors.grey[900], // 🚀 ADDED: Green Color For Active
+                                  color: Colors.grey[900],
                                 ),
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
