@@ -26,7 +26,6 @@ class VideoPlayerPage extends StatefulWidget {
   final String rating;
   final String year;
   final String? customUrl;
-  final bool isPixelflix;
 
   const VideoPlayerPage({
     super.key,
@@ -39,7 +38,6 @@ class VideoPlayerPage extends StatefulWidget {
     this.rating = '9.0',
     this.year = '2024',
     this.customUrl,
-    this.isPixelflix = false,
   });
 
   @override
@@ -54,10 +52,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   bool isFullScreen = false;
   bool isPageLoading = true;
   
-  // 🔥 Default server and node states based on UI 🔥
   String activeServer = 'server1'; 
-  late bool isPixelflixNode;
-
   String currentAspectRatio = 'contain';
 
   late int currentSeason;
@@ -84,15 +79,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   List similarMovies = [];
   bool isLoadingSimilar = false;
-
   bool isTvDevice = false;
+
+  // 🔥 API DATA FOR REAL SEASONS & EPISODES 🔥
+  int totalSeasons = 1;
+  List episodesList = [];
 
   @override
   void initState() {
     super.initState();
     currentSeason = widget.season;
     currentEpisode = widget.episode;
-    isPixelflixNode = widget.isPixelflix;
 
     _introAnimController = AnimationController(
       vsync: this,
@@ -109,7 +106,41 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
 
     _fetchSimilarMovies();
+    _fetchTvDetails(); // 🔥 Fetches total seasons
     _checkDeviceType(); 
+  }
+
+  // 🔥 GET TV SHOW DETAILS (Number of Seasons) 🔥
+  Future<void> _fetchTvDetails() async {
+    if (widget.mediaType != 'tv' && widget.mediaType != 'series') return;
+    try {
+      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.tmdbId}?language=en-US'), headers: kApiHeaders);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (mounted) {
+          setState(() {
+            totalSeasons = data['number_of_seasons'] ?? 1;
+          });
+        }
+        _fetchEpisodes(currentSeason);
+      }
+    } catch (e) {}
+  }
+
+  // 🔥 GET EXACT EPISODES FOR SELECTED SEASON 🔥
+  Future<void> _fetchEpisodes(int seasonNum) async {
+    if (widget.mediaType != 'tv' && widget.mediaType != 'series') return;
+    try {
+      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.tmdbId}/season/$seasonNum?language=en-US'), headers: kApiHeaders);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        if (mounted) {
+          setState(() {
+            episodesList = data['episodes'] ?? [];
+          });
+        }
+      }
+    } catch (e) {}
   }
 
   void _checkDeviceType() {
@@ -191,7 +222,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
-  // 🔥 DEEP HARDCODING: 100% FIX FOR PANTYFLIX & PIXELFLIX.CC 404 ERROR 🔥
+  // 🔥 DEEP HARDCODING: 100% Pantyflix Only 🔥
   String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -202,23 +233,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // UI Servers to Backend Actual Servers matching
     String srvName = 'vidrift'; // Default
     if (activeServer == 'server1') srvName = 'vidrift';
     if (activeServer == 'server2') srvName = 'vidbolt';
     if (activeServer == 'server3') srvName = 'fast';
 
-    if (!isPixelflixNode) { 
-      // 🔥 Node 1: HANNUTV 1 -> pantyflix.com 🔥
-      return isTv 
-          ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$srvName' 
-          : 'https://pantyflix.com/watch/play/movie/$id?server=$srvName';
-    } else { 
-      // 🔥 Node 2: HANNUTV 2 -> pixelflix.cc (Fixed 404 Issue) 🔥
-      return isTv 
-          ? 'https://pixelflix.cc/watch/play/tv/$id?season=$s&episode=$e&server=$srvName' 
-          : 'https://pixelflix.cc/watch/play/movie/$id?server=$srvName';
-    }
+    return isTv 
+        ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$srvName' 
+        : 'https://pantyflix.com/watch/play/movie/$id?server=$srvName';
   }
 
   void _initStream() {
@@ -255,15 +277,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🔥 WORLD'S BEST DEEP AD-BLOCKER SCRIPT 🔥
-            // Blocks human verification popups, adult ads, and makes video fit perfect
+            // 🔥 PERFECT DEEP AD-BLOCKER SCRIPT 🔥
             String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
               
               window.open = function() { return null; };
-              window.alert = function() { return true; }; // Auto-bypass alerts
-              window.confirm = function() { return true; }; // Auto-bypass verification
+              window.alert = function() { return true; }; 
+              window.confirm = function() { return true; }; 
 
               var style = document.createElement('style');
               style.innerHTML = `
@@ -299,7 +320,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
             
-            // 🔥 ADULT ADS, CAPTCHA & REDIRECT KILLER 🔥
             if (url.contains('doubleclick') || url.contains('popads') || url.contains('1xbet') || 
                 url.contains('bet365') || url.contains('onclick') || url.contains('adult') || 
                 url.contains('telegram') || url.contains('t.me') || url.contains('adsterra') ||
@@ -307,8 +327,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               return NavigationDecision.prevent;
             }
             
-            // Allow only main sites & internal embeds
-            if (url.contains('pantyflix.com') || url.contains('pixelflix.cc') || url.contains('vidbolt') || 
+            if (url.contains('pantyflix.com') || url.contains('vidbolt') || 
                 url.contains('vidsrc') || url.contains('vidlink') || url.contains('multiembed') || 
                 url.contains('autoembed') || url.startsWith('about:blank') || url.startsWith('data:')) {
               return NavigationDecision.navigate;
@@ -366,15 +385,18 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _initStream();
   }
   
+  // 🔥 SWITCH SEASON & FETCH NEW EPISODES 🔥
   void _switchSeason(int seasonNum) {
     setState(() {
       currentSeason = seasonNum;
-      currentEpisode = 1; // Reset episode when changing season
+      currentEpisode = 1;
+      episodesList.clear(); // clear old episodes while loading
     });
+    _fetchEpisodes(seasonNum);
     _initStream();
   }
 
-  // 🔥 SEASON PICKER UI FROM VIDEO 🔥
+  // 🔥 ALL SEASONS LIST UI 🔥
   void _showSeasonPicker() {
     showModalBottomSheet(
       context: context,
@@ -390,19 +412,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               Row(
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
-                  const Text("1 Seasons Available", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                  Text("$totalSeasons Seasons Available", style: const TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
                   const Text("Full Catalog", style: TextStyle(color: Colors.redAccent, fontSize: 12)),
                 ],
               ),
               const SizedBox(height: 16),
               Expanded(
                 child: ListView.builder(
-                  itemCount: 10, // Max mock seasons
+                  itemCount: totalSeasons, // Dynamic seasons
                   itemBuilder: (context, index) {
                     int seasonNum = index + 1;
                     return ListTile(
                       title: Text("Season ${seasonNum.toString().padLeft(2, '0')}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
-                      trailing: const Text("15 Episodes", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                      trailing: const Icon(Icons.play_circle_outline, color: Colors.grey, size: 20),
                       onTap: () {
                         Navigator.pop(context);
                         _switchSeason(seasonNum);
@@ -480,7 +502,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       );
     }
 
-    // 🔥 DYNAMIC TITLE S1 - E1 FROM VIDEO 🔥
     bool isTvShow = widget.mediaType == 'tv' || widget.mediaType == 'series';
     String displayTitle = widget.movieTitle;
     if (isTvShow) {
@@ -503,7 +524,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   ),
                   Positioned(
                     top: 10, right: 14,
-                    // 🔥 LOGO CLICK TO ROTATE FULLSCREEN (FIXED HERE) 🔥
+                    // 🔥 LOGO CLICK TO ROTATE FULLSCREEN 🔥
                     child: GestureDetector(
                       onTap: _toggleFullScreen,
                       child: Opacity(opacity: 0.85, child: Image.asset('assets/logo.png', height: 34, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 15)))),
@@ -565,31 +586,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    // 🔥 AD-BLOCK BANNER FROM VIDEO 🔥
-                    Container(
-                      margin: const EdgeInsets.only(bottom: 16),
-                      padding: const EdgeInsets.symmetric(vertical: 8, horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF151515),
-                        border: Border.all(color: Colors.white12),
-                        borderRadius: BorderRadius.circular(8)
-                      ),
-                      child: Row(
-                        children: [
-                          const Icon(Icons.security, color: Colors.green, size: 20),
-                          const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: const [
-                              Text("7 AI Ad-Block & Sandbox Shield Active", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                              Text("Open in Sandbox free Player", style: TextStyle(color: Colors.grey, fontSize: 10)),
-                            ],
-                          )
-                        ],
-                      )
+                    
+                    // 🔥 AD BANNER IN EXACT BLUE MARKED AREA[cite: 12] 🔥
+                    const CustomBannerAd(
+                      htmlBannerCode: '''
+                        <script type="text/javascript">
+                          atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
+                        </script>
+                        <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
+                      ''',
                     ),
+                    const SizedBox(height: 16),
 
-                    // 🔥 DYNAMIC MOVIE/TV SHOW TITLE 🔥
+                    // 🔥 TITLE S1 - E1 🔥
                     Text(displayTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 6),
                     Row(
@@ -624,74 +633,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                     const SizedBox(height: 24),
 
-                    // 🔥 EXACT UI AS SEEN IN VIDEO: DUAL AI ANALYZER 🔥
-                    Container(
-                      padding: const EdgeInsets.all(16),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF151515),
-                        border: Border.all(color: Colors.white12),
-                        borderRadius: BorderRadius.circular(12)
-                      ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Text("Dual AI Analyzer", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)),
-                          const SizedBox(height: 12),
-                          
-                          InkWell(
-                            onTap: () {
-                              if(isPixelflixNode) {
-                                setState(() { isPixelflixNode = false; activeServer = 'server1'; });
-                                _initStream();
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: !isPixelflixNode ? Colors.green.withOpacity(0.1) : Colors.transparent,
-                                border: Border.all(color: !isPixelflixNode ? Colors.green : Colors.white24),
-                                borderRadius: BorderRadius.circular(8)
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text("HANNUTV 1 (Online HDP Node)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                  Icon(Icons.check_circle, color: !isPixelflixNode ? Colors.green : Colors.transparent, size: 18)
-                                ],
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 10),
-                          InkWell(
-                            onTap: () {
-                              if(!isPixelflixNode) {
-                                setState(() { isPixelflixNode = true; activeServer = 'server1'; });
-                                _initStream();
-                              }
-                            },
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 16),
-                              decoration: BoxDecoration(
-                                color: isPixelflixNode ? Colors.green.withOpacity(0.1) : Colors.transparent,
-                                border: Border.all(color: isPixelflixNode ? Colors.green : Colors.white24),
-                                borderRadius: BorderRadius.circular(8)
-                              ),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  const Text("HANNUTV 2 (Online Pixelflix Node)", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-                                  Icon(Icons.check_circle, color: isPixelflixNode ? Colors.green : Colors.transparent, size: 18)
-                                ],
-                              ),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                    
-                    const SizedBox(height: 16),
-
-                    // 🔥 HANNUTV PIXELFLIX/HDP STREAM SECTION FROM VIDEO 🔥
+                    // 🔥 PIXELFLIX (DUAL AI) REMOVED - ONLY PANTYFLIX SERVER LEFT 🔥
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -707,9 +649,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             children: [
                               Column(
                                 crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(isPixelflixNode ? "HANNUTV PIXELFLIX STREAM" : "HANNUTV LIVE STREAM", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                                  const Text("Ads-Free secure engine active", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                                children: const [
+                                  Text("HANNUTV LIVE STREAM", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                                  Text("Ads-Free secure engine active", style: TextStyle(color: Colors.grey, fontSize: 12)),
                                 ],
                               ),
                               const Icon(Icons.verified_user, color: Colors.green, size: 20)
@@ -732,7 +674,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     const SizedBox(height: 20),
                     
                     if (isTvShow) ...[
-                      // 🔥 SEASON & AUDIO DROPDOWN UI FROM VIDEO 🔥
+                      // 🔥 SEASON & AUDIO DROPDOWN 🔥
                       Row(
                         children: [
                           InkWell(
@@ -768,15 +710,25 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       const Text("Episodes", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 12),
                       
-                      // 🔥 EPISODES HORIZONTAL LIST WITH RED PLAY BUTTON (FROM VIDEO) 🔥
+                      // 🔥 DYNAMIC EPISODES: REAL NAMES & THUMBNAILS 🔥
                       SizedBox(
                         height: 140,
                         child: ListView.builder(
                           scrollDirection: Axis.horizontal,
-                          itemCount: 15,
+                          itemCount: episodesList.isNotEmpty ? episodesList.length : 15,
                           itemBuilder: (context, index) {
                             final epNum = index + 1;
                             final isCurrent = currentEpisode == epNum;
+                            
+                            // API data extraction
+                            String epName = "Episode $epNum";
+                            String imgUrl = '';
+                            if (episodesList.isNotEmpty) {
+                              epName = episodesList[index]['name'] ?? "Episode $epNum";
+                              if (episodesList[index]['still_path'] != null) {
+                                imgUrl = 'https://image.tmdb.org/t/p/w300${episodesList[index]['still_path']}';
+                              }
+                            }
 
                             return _buildFocusableItem(
                               onTap: () => _switchEpisode(epNum),
@@ -794,9 +746,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                   children: [
                                     Expanded(
                                       child: Container(
-                                        decoration: const BoxDecoration(
-                                          borderRadius: BorderRadius.vertical(top: Radius.circular(8)),
-                                          color: Colors.black54, // Placeholder for thumbnail
+                                        decoration: BoxDecoration(
+                                          borderRadius: const BorderRadius.vertical(top: Radius.circular(8)),
+                                          color: Colors.black54, 
+                                          image: imgUrl.isNotEmpty ? DecorationImage(
+                                            image: NetworkImage(imgUrl),
+                                            fit: BoxFit.cover,
+                                          ) : null,
                                         ),
                                         child: Center(
                                           child: Icon(
@@ -812,7 +768,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                       child: Column(
                                         crossAxisAlignment: CrossAxisAlignment.start,
                                         children: [
-                                          Text("Episode $epNum", style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold)),
+                                          Text(epName, style: const TextStyle(color: Colors.white, fontSize: 13, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
                                           const Text("Watch on HANNUTV", style: TextStyle(color: Colors.grey, fontSize: 10), maxLines: 1),
                                         ],
                                       ),
@@ -826,16 +782,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       ),
                       const SizedBox(height: 20),
                     ],
-                    
-                    const CustomBannerAd(
-                      htmlBannerCode: '''
-                        <script type="text/javascript">
-                          atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
-                        </script>
-                        <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
-                      ''',
-                    ),
-                    const SizedBox(height: 18),
 
                     // Comments Section
                     Container(
@@ -904,7 +850,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                     const SizedBox(height: 20),
                     
-                    // Suggested Movies
+                    // Suggested Movies (Deep TMDB logic retained)
                     if (similarMovies.isNotEmpty) ...[
                       const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
@@ -923,7 +869,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                     builder: (context) => SkippableAdScreen(
                                       adDuration: 30,
                                       nextScreen: VideoPlayerPage(
-                                        tmdbId: m['id'], mediaType: m['mediaType'], movieTitle: m['title'], rating: m['rating'], year: m['year'], isPixelflix: isPixelflixNode,
+                                        tmdbId: m['id'], mediaType: m['mediaType'], movieTitle: m['title'], rating: m['rating'], year: m['year'],
                                       ),
                                     ),
                                   ),

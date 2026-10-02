@@ -34,7 +34,7 @@ class DashboardPageState extends State<DashboardPage> {
   List comedyList = [];
   List horrorList = [];
   List searchResults = [];
-  List seriesRankings = []; // 🔥 Added Series Rankings
+  List seriesRankings = [];
 
   bool isLoading = true;
   bool isSearching = false;
@@ -130,7 +130,7 @@ class DashboardPageState extends State<DashboardPage> {
         http.get(Uri.parse('$base/discover/movie?language=hi-IN&with_original_language=hi&sort_by=popularity.desc'), headers: kApiHeaders),
         http.get(Uri.parse('$base/discover/movie?language=en-US&with_original_language=en&sort_by=popularity.desc'), headers: kApiHeaders),
         http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=16&sort_by=popularity.desc'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/trending/tv/week?language=en-US'), headers: kApiHeaders), // Series Rankings
+        http.get(Uri.parse('$base/trending/tv/week?language=en-US'), headers: kApiHeaders),
       ]);
 
       setState(() {
@@ -181,7 +181,7 @@ class DashboardPageState extends State<DashboardPage> {
       backgroundColor: Colors.transparent,
       builder: (context) => _ServerSelectionModal(
         media: media,
-        onSelect: (bool isServer2) {
+        onSelect: () {
           final type = media['mediaType'] ?? 'movie';
           final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
           int currentAdDuration = _isNextAd10Sec ? 10 : 30;
@@ -201,7 +201,6 @@ class DashboardPageState extends State<DashboardPage> {
                   overview: media['overview'] ?? '',
                   rating: media['rating'] ?? '9.0',
                   year: media['year'] ?? '2024',
-                  isPixelflix: isServer2,
                 ),
               ),
             ),
@@ -329,7 +328,6 @@ class DashboardPageState extends State<DashboardPage> {
                   child: Column(
                     children: [
                       const SizedBox(height: 10),
-                      // 🔥 Exact Top Menu from Video 🔥
                       SingleChildScrollView(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -405,7 +403,7 @@ class DashboardPageState extends State<DashboardPage> {
               const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
             else if (isSearching)
               searchResults.isEmpty && searchController.text.isNotEmpty && !isLoading
-                  ? _buildDeepResolverUI() // 🔥 EXACT VIDEO SEARCH UI 🔥
+                  ? _buildDeepResolverUI() 
                   : GridView.builder(
                       shrinkWrap: true,
                       physics: const NeverScrollableScrollPhysics(),
@@ -469,7 +467,6 @@ class DashboardPageState extends State<DashboardPage> {
                   },
                 ),
               ),
-              // 🔥 Series Rankings Section from Video 🔥
               if (seriesRankings.isNotEmpty)
                 _buildHorizontalList('Series Rankings', seriesRankings, isRanking: true),
 
@@ -500,7 +497,6 @@ class DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  // 🔥 DEEP RESOLVER UI FROM VIDEO (00:48) 🔥
   Widget _buildDeepResolverUI() {
     return Container(
       padding: const EdgeInsets.all(24),
@@ -528,10 +524,10 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// 🔥 SERVER ANALYZER MODAL (Dashboard Pe Show Hone Wala) 🔥
+// 🔥 SERVER ANALYZER MODAL (Only Pantyflix left) 🔥
 class _ServerSelectionModal extends StatefulWidget {
   final Map media;
-  final Function(bool) onSelect;
+  final VoidCallback onSelect;
   const _ServerSelectionModal({required this.media, required this.onSelect});
 
   @override
@@ -541,8 +537,6 @@ class _ServerSelectionModal extends StatefulWidget {
 class _ServerSelectionModalState extends State<_ServerSelectionModal> {
   bool isLoading1 = true;
   bool isAvailable1 = false;
-  bool isLoading2 = true;
-  bool isAvailable2 = false;
 
   @override
   void initState() {
@@ -554,19 +548,12 @@ class _ServerSelectionModalState extends State<_ServerSelectionModal> {
     final type = widget.media['mediaType'] ?? 'movie';
     final id = widget.media['id'];
     
-    // Deep logic pings
     final url1 = type == 'tv' ? 'https://vidlink.pro/tv/$id/1/1' : 'https://vidlink.pro/movie/$id';
-    final url2 = type == 'tv' ? 'https://vidsrc.pm/embed/tv?tmdb=$id&season=1&episode=1' : 'https://vidsrc.pm/embed/movie/$id';
 
     try {
       final res1 = await http.get(Uri.parse(url1)).timeout(const Duration(seconds: 4));
       if (mounted) setState(() { isAvailable1 = true; isLoading1 = false; });
     } catch (_) { if (mounted) setState(() { isAvailable1 = false; isLoading1 = false; }); }
-
-    try {
-      final res2 = await http.get(Uri.parse(url2)).timeout(const Duration(seconds: 4));
-      if (mounted) setState(() { isAvailable2 = true; isLoading2 = false; });
-    } catch (_) { if (mounted) setState(() { isAvailable2 = false; isLoading2 = false; }); }
   }
 
   @override
@@ -589,14 +576,12 @@ class _ServerSelectionModalState extends State<_ServerSelectionModal> {
                       children: [
                     Text("Watch ${widget.media['title']}", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold), maxLines: 2),
                     const SizedBox(height: 6),
-                    const Text("Deep Analyzing Servers...", style: TextStyle(color: Colors.grey, fontSize: 12))
+                    const Text("Deep Analyzing Server...", style: TextStyle(color: Colors.grey, fontSize: 12))
                   ])),
             ],
           ),
           const SizedBox(height: 24),
-          _buildServerBtn(title: "HANNUTV 1", subtitle: "Online HDP Node", isLoading: isLoading1, isAvailable: isAvailable1, onTap: () { Navigator.pop(context); widget.onSelect(false); }),
-          const SizedBox(height: 12),
-          _buildServerBtn(title: "HANNUTV 2", subtitle: "Online Pixelflix Node", isLoading: isLoading2, isAvailable: isAvailable2, onTap: () { Navigator.pop(context); widget.onSelect(true); }),
+          _buildServerBtn(title: "HANNUTV (Online HDP Node)", subtitle: "Pantyflix Server", isLoading: isLoading1, isAvailable: isAvailable1, onTap: () { Navigator.pop(context); widget.onSelect(); }),
         ],
       ),
     );
