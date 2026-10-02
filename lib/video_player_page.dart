@@ -1,10 +1,11 @@
-import 'dart:ui';
+import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
+import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'dart:async';
-import 'package:url_launcher/url_launcher.dart';
-import 'video_player_page.dart';
+import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
 
 const String kTmdbToken =
@@ -15,596 +16,560 @@ const Map<String, String> kApiHeaders = {
   'accept': 'application/json',
 };
 
-List<Map> continueWatchingList = [];
+class VideoPlayerPage extends StatefulWidget {
+  final int tmdbId;
+  final String mediaType;
+  final int season;
+  final int episode;
+  final String movieTitle;
+  final String overview; 
+  final String rating;
+  final String year;
+  final String? customUrl;
+  final bool isPixelflix; 
 
-class DashboardPage extends StatefulWidget {
-  const DashboardPage({super.key});
+  const VideoPlayerPage({
+    super.key,
+    required this.tmdbId,
+    required this.mediaType,
+    this.season = 1,
+    this.episode = 1,
+    required this.movieTitle,
+    this.overview = '',
+    this.rating = '9.0',
+    this.year = '2024',
+    this.customUrl,
+    this.isPixelflix = false, 
+  });
 
   @override
-  DashboardPageState createState() => DashboardPageState();
+  State<VideoPlayerPage> createState() => _VideoPlayerPageState();
 }
 
-class DashboardPageState extends State<DashboardPage> {
-  bool _isNextAd10Sec = true;
+class _VideoPlayerPageState extends State<VideoPlayerPage> {
+  late WebViewController _controller;
+  bool isPageLoading = true;
+  String currentAspectRatio = 'contain';
 
-  List trendingList = [];
-  List bollywoodList = [];
-  List hollywoodList = [];
-  List animeList = [];
-  List searchResults = [];
+  late int currentSeason;
+  late int currentEpisode;
+  int totalSeasons = 1;
+  
+  List<dynamic> episodesList = [];
+  bool isLoadingEpisodes = false;
 
-  bool isLoading = true;
-  bool isSearching = false;
-  final TextEditingController searchController = TextEditingController();
-
-  Timer? _debounce;
-  final PageController _pageController = PageController();
-  Timer? _carouselTimer;
-  int _currentPage = 0;
-  String selectedPlatform = 'all';
-  String activeCategory = 'Trending';
-
-  // 🚀 GOOGLE STUDIO CATEGORIES UI 🚀
-  final List<Map<String, dynamic>> categories = [
-    {'id': 'FightZone', 'label': 'FightZone', 'icon': '🥊'},
-    {'id': 'Trending', 'label': 'Trending', 'icon': '🔥'},
-    {'id': 'Movie', 'label': 'Movie', 'icon': '🎬'},
-    {'id': 'TV', 'label': 'TV', 'icon': '📺'},
-    {'id': 'Anime', 'label': 'Anime', 'icon': '⛩️'},
-  ];
-
-  final List<Map<String, dynamic>> ottPlatforms = const [
-    {"name": "🔥 ALL VIP", "color": Colors.red, "providerId": "all"},
-    {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
-    {"name": "PRIME VIDEO", "color": Colors.blueAccent, "providerId": "9"},
-    {"name": "APPLE TV+", "color": Colors.white70, "providerId": "350"},
-    {"name": "CRUNCHYROLL", "color": Colors.orangeAccent, "providerId": "283"},
-    {"name": "DISNEY+", "color": Colors.lightBlueAccent, "providerId": "337"},
+  final TextEditingController commentInputController = TextEditingController();
+  final List<Map<String, String>> publicComments = [
+    {'name': 'SHEEL', 'text': 'HARE KRISHNA 🦚', 'time': '9d', 'avatar': 'S'},
+    {'name': 'Rohit Sharma', 'text': 'Best quality on HANNUTV, loving this series! 🔥', 'time': '2d', 'avatar': 'R'},
   ];
 
   @override
   void initState() {
     super.initState();
-    loadAllDashboards();
-    _startCarousel();
+    currentSeason = widget.season;
+    currentEpisode = widget.episode;
+    
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    
+    if (widget.mediaType == 'tv' || widget.mediaType == 'series') {
+      _fetchTvDetails();
+      _fetchEpisodesForSeason(currentSeason);
+    }
+    
+    _initStream();
   }
 
-  void _startCarousel() {
-    _carouselTimer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
-      if (_pageController.hasClients && trendingList.isNotEmpty) {
-        _currentPage++;
-        if (_currentPage >= (trendingList.length > 5 ? 5 : trendingList.length)) {
-          _currentPage = 0;
-        }
-        _pageController.animateToPage(
-          _currentPage,
-          duration: const Duration(milliseconds: 800),
-          curve: Curves.easeInOut,
+  Future<void> _fetchTvDetails() async {
+    try {
+      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.tmdbId}?language=en-US'), headers: kApiHeaders);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() {
+          totalSeasons = data['number_of_seasons'] ?? 1;
+        });
+      }
+    } catch (_) {}
+  }
+
+  Future<void> _fetchEpisodesForSeason(int seasonNum) async {
+    setState(() { isLoadingEpisodes = true; episodesList = []; });
+    try {
+      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.tmdbId}/season/$seasonNum?language=en-US'), headers: kApiHeaders);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        setState(() {
+          episodesList = data['episodes'] ?? [];
+          isLoadingEpisodes = false;
+        });
+      }
+    } catch (_) {
+      setState(() { isLoadingEpisodes = false; });
+    }
+  }
+
+  String _buildStreamUrl() {
+    final id = widget.tmdbId;
+    final s = currentSeason;
+    final e = currentEpisode;
+    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+
+    if (widget.isPixelflix) {
+      return isTv ? 'https://pixelflix.cc/watch/tv/$id?season=$s&episode=$e' : 'https://pixelflix.cc/watch/movie/$id';
+    }
+    return isTv ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=vidrift' : 'https://pantyflix.com/watch/play/movie/$id?server=vidrift';
+  }
+
+  void _initStream() {
+    setState(() { isPageLoading = true; });
+    final targetUrl = _buildStreamUrl();
+    final targetUri = Uri.parse(targetUrl);
+
+    _controller = WebViewController()
+      ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setBackgroundColor(Colors.black)
+      ..setUserAgent("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/114.0.0.0 Safari/537.36")
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            if (mounted) setState(() => isPageLoading = true);
+          },
+          onPageFinished: (String url) {
+            if (mounted) setState(() => isPageLoading = false);
+
+            // 🚀 ADS BLOCKER SCRIPT 🚀
+            String jsCode = '''
+              const nukeAds = () => {
+                  document.body.style.backgroundColor = '#000000';
+                  document.documentElement.style.backgroundColor = '#000000';
+                  
+                  const adClasses = ['.ad', '.ads', '.popup', '#captcha', '.human-verify', '[id*="verify"]', '[class*="verify"]', 'iframe[src*="challenge"]', '.cf-turnstile'];
+                  document.querySelectorAll(adClasses.join(',')).forEach(el => el.style.display = 'none !important');
+                  
+                  document.body.style.pointerEvents = 'none';
+                  
+                  const video = document.querySelector('video');
+                  if(video) {
+                      video.style.position = 'fixed';
+                      video.style.top = '0';
+                      video.style.left = '0';
+                      video.style.width = '100vw';
+                      video.style.height = '100vh';
+                      video.style.zIndex = '2147483647';
+                      video.style.pointerEvents = 'auto'; 
+                      video.style.objectFit = '$currentAspectRatio';
+                      
+                      if (video.paused && !video.ended) {
+                          video.play().catch(function(){});
+                      }
+                  }
+              };
+              setInterval(nukeAds, 500);
+            ''';
+            _controller.runJavaScript(jsCode);
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            final url = request.url.toLowerCase();
+            if (url.contains('pixelflix') || url.contains('pantyflix') || url.contains('vidrift') || url.contains('googleapis') || url.startsWith('data:')) {
+                return NavigationDecision.navigate;
+            }
+            return NavigationDecision.prevent; 
+          },
+        ),
+      );
+
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
+    }
+
+    _controller.loadRequest(
+      targetUri,
+      headers: {
+        "Referer": "https://${targetUri.host}/",
+        "Origin": "https://${targetUri.host}"
+      }
+    );
+  }
+
+  void _cycleAspectRatio() {
+    setState(() {
+      if (currentAspectRatio == 'contain') { currentAspectRatio = 'cover'; } 
+      else if (currentAspectRatio == 'cover') { currentAspectRatio = 'fill'; } 
+      else { currentAspectRatio = 'contain'; }
+    });
+
+    _controller.runJavaScript("var vids = document.getElementsByTagName('video'); if (vids.length > 0) { vids[0].style.objectFit = '$currentAspectRatio'; }");
+  }
+
+  void _addComment() {
+    final text = commentInputController.text.trim();
+    if (text.isNotEmpty) {
+      setState(() {
+        publicComments.insert(0, {'name': 'You', 'text': text, 'time': 'Just now', 'avatar': 'Y'});
+        commentInputController.clear();
+      });
+    }
+  }
+
+  void _showSeasonPicker() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.symmetric(vertical: 20),
+          child: ListView.builder(
+            shrinkWrap: true,
+            itemCount: totalSeasons,
+            itemBuilder: (context, index) {
+              final seasonNum = index + 1;
+              return ListTile(
+                title: Text("Season $seasonNum", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                onTap: () {
+                  Navigator.pop(context);
+                  setState(() { currentSeason = seasonNum; currentEpisode = 1; });
+                  _fetchEpisodesForSeason(seasonNum);
+                  _initStream();
+                },
+              );
+            },
+          ),
         );
       }
-    });
+    );
   }
 
   @override
   void dispose() {
-    _carouselTimer?.cancel();
-    _pageController.dispose();
-    searchController.dispose();
-    _debounce?.cancel();
+    SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
-  }
-
-  List parseData(http.Response response, {String? forceMediaType}) {
-    if (response.statusCode != 200) return [];
-    final List rawData = json.decode(response.body)['results'] ?? [];
-    return rawData.where((m) => m['media_type'] != 'person').map((m) => {
-      'id': m['id'],
-      'title': m['title'] ?? m['name'] ?? 'Unknown',
-      'overview': m['overview'] ?? '',
-      'posterUrl': m['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}' : '',
-      'backdropUrl': m['backdrop_path'] != null ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}' : '',
-      'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
-      'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
-      'mediaType': forceMediaType ?? (m['media_type'] ?? 'movie'),
-    }).toList();
-  }
-
-  Future<void> loadAllDashboards({String? providerId}) async {
-    setState(() {
-      isLoading = true;
-      selectedPlatform = providerId ?? 'all';
-    });
-    try {
-      String base = 'https://api.themoviedb.org/3';
-      String prov = (providerId != null && providerId != 'all') ? '&with_watch_providers=$providerId&watch_region=US' : '';
-
-      var responses = await Future.wait([
-        http.get(Uri.parse('$base/trending/all/day?language=en-US$prov'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/movie?language=hi-IN&with_original_language=hi&sort_by=popularity.desc$prov'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/movie?language=en-US&with_original_language=en&sort_by=popularity.desc$prov'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=16&sort_by=popularity.desc$prov'), headers: kApiHeaders),
-      ]);
-
-      setState(() {
-        trendingList = parseData(responses[0]);
-        bollywoodList = parseData(responses[1], forceMediaType: 'movie');
-        hollywoodList = parseData(responses[2], forceMediaType: 'movie');
-        animeList = parseData(responses[3], forceMediaType: 'tv');
-        isLoading = false;
-      });
-    } catch (e) {
-      setState(() => isLoading = false);
-    }
-  }
-
-  void onSearchChanged(String value) {
-    if (value.isEmpty) {
-      setState(() { isSearching = false; searchResults = []; });
-      return;
-    }
-    setState(() => isSearching = true);
-    if (_debounce?.isActive ?? false) _debounce!.cancel();
-    _debounce = Timer(const Duration(milliseconds: 400), () async {
-      setState(() => isLoading = true);
-      try {
-        final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
-        final res = await http.get(Uri.parse(url), headers: kApiHeaders);
-        setState(() { searchResults = parseData(res); isLoading = false; });
-      } catch (_) {
-        setState(() => isLoading = false);
-      }
-    });
-  }
-
-  void launchPlayerDirect(Map media) {
-    continueWatchingList.removeWhere((m) => m['id'] == media['id']);
-    continueWatchingList.insert(0, media);
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _ServerSelectionModal(
-        media: media,
-        onSelect: (bool isServer2) {
-          final type = media['mediaType'] ?? 'movie';
-          final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
-
-          int currentAdDuration = _isNextAd10Sec ? 10 : 30;
-          _isNextAd10Sec = !_isNextAd10Sec;
-
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SkippableAdScreen(
-                adDuration: currentAdDuration,
-                nextScreen: VideoPlayerPage(
-                  tmdbId: tId,
-                  mediaType: type,
-                  season: 1,
-                  episode: 1,
-                  movieTitle: media['title'] ?? 'Title',
-                  overview: media['overview'] ?? '',
-                  rating: media['rating'] ?? '9.0',
-                  year: media['year'] ?? '2024',
-                  isPixelflix: isServer2, // 🚀 Server Selection Logic 🚀
-                ),
-              ),
-            ),
-          ).then((_) => setState(() {}));
-        },
-      ),
-    );
-  }
-
-  Widget _buildHorizontalList(String title, List moviesData) {
-    if (moviesData.isEmpty) return const SizedBox();
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(16, 20, 16, 10),
-          child: Row(
-            children: [
-              const Icon(Icons.local_fire_department, color: Colors.orange, size: 20),
-              const SizedBox(width: 8),
-              Text(title, style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-            ],
-          ),
-        ),
-        SizedBox(
-          height: 180,
-          child: ListView.builder(
-            scrollDirection: Axis.horizontal,
-            padding: const EdgeInsets.symmetric(horizontal: 12),
-            itemCount: moviesData.length,
-            itemBuilder: (context, index) {
-              final media = moviesData[index];
-              return InkWell(
-                onTap: () => launchPlayerDirect(media),
-                child: Container(
-                  width: 120,
-                  margin: const EdgeInsets.symmetric(horizontal: 6),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Container(
-                        height: 150,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          image: DecorationImage(
-                            image: NetworkImage(media['posterUrl'] != '' ? media['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'),
-                            fit: BoxFit.cover,
-                          ),
-                        ),
-                        child: Stack(
-                          children: [
-                            Positioned(
-                              bottom: 8, left: 8,
-                              child: Container(
-                                padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
-                                decoration: BoxDecoration(color: Colors.black87, borderRadius: BorderRadius.circular(4)),
-                                child: Row(
-                                  children: [
-                                    const Icon(Icons.star, color: Colors.amber, size: 10),
-                                    const SizedBox(width: 4),
-                                    Text(media['rating'], style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      Text(media['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    ],
-                  ),
-                ),
-              );
-            },
-          ),
-        ),
-      ],
-    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: const Color(0xFF0F0F0F),
+      backgroundColor: Colors.black,
       body: SafeArea(
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            // 🚀 GOOGLE STUDIO HEADER UI 🚀
-            Container(
-              padding: const EdgeInsets.all(16),
-              color: const Color(0xFF0F0F0F),
-              child: Column(
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Row(
+            Stack(
+              children: [
+                Container(
+                  width: double.infinity, height: 230, color: Colors.black,
+                  child: WebViewWidget(controller: _controller),
+                ),
+                Positioned(
+                  top: 10, left: 10,
+                  child: InkWell(
+                    onTap: () {
+                      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+                      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+                      Navigator.pop(context);
+                    },
+                    child: const CircleAvatar(backgroundColor: Colors.black54, child: Icon(Icons.arrow_back, color: Colors.white)),
+                  ),
+                ),
+                Positioned(
+                  bottom: 10, right: 10,
+                  child: InkWell(
+                    onTap: _cycleAspectRatio,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                      decoration: BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.circular(16)),
+                      child: Row(
                         children: [
-                          Image.asset('assets/logo.png', height: 28, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red)),
-                          const SizedBox(width: 8),
-                          const Text('HANNUTV', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1)),
+                          const Icon(Icons.aspect_ratio, color: Colors.white, size: 16),
+                          const SizedBox(width: 6),
+                          Text(currentAspectRatio.toUpperCase(), style: const TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold)),
                         ],
                       ),
-                      IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: () => setState(() => isSearching = true)),
-                    ],
-                  ),
-                  const SizedBox(height: 10),
-                  // Category Pills
-                  SingleChildScrollView(
-                    scrollDirection: Axis.horizontal,
-                    child: Row(
-                      children: categories.map((cat) {
-                        bool isSelected = activeCategory == cat['id'];
-                        return Padding(
-                          padding: const EdgeInsets.only(right: 8.0),
-                          child: InkWell(
-                            onTap: () => setState(() => activeCategory = cat['id']),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                              decoration: BoxDecoration(
-                                color: isSelected ? Colors.red.withOpacity(0.2) : Colors.transparent,
-                                border: Border.all(color: isSelected ? Colors.red : Colors.white24),
-                                borderRadius: BorderRadius.circular(20),
-                              ),
-                              child: Text("${cat['icon']} ${cat['label']}", style: TextStyle(color: isSelected ? Colors.red : Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                            ),
-                          ),
-                        );
-                      }).toList(),
                     ),
                   ),
-                ],
-              ),
+                ),
+                if (isPageLoading)
+                  Positioned.fill(
+                    child: Container(
+                      color: Colors.black87,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Image.asset('assets/logo.png', height: 50, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 50)),
+                            const SizedBox(height: 20),
+                            const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 3)),
+                            const SizedBox(height: 10),
+                            Text("Connecting to ${widget.isPixelflix ? 'HANNUTV 2' : 'HANNUTV 1'}...", style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
             
-            // MAIN CONTENT
             Expanded(
               child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (isSearching)
-                      Padding(
-                        padding: const EdgeInsets.all(16.0),
-                        child: TextField(
-                          controller: searchController, style: const TextStyle(color: Colors.white), autofocus: true,
-                          decoration: InputDecoration(
-                            hintText: 'Search Movies & Shows...',
-                            hintStyle: const TextStyle(color: Colors.grey),
-                            filled: true, fillColor: Colors.white10,
-                            border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                            prefixIcon: const Icon(Icons.search, color: Colors.grey),
-                            suffixIcon: IconButton(icon: const Icon(Icons.close, color: Colors.white), onPressed: () { setState(() { isSearching = false; searchController.clear(); searchResults.clear(); }); }),
-                          ),
-                          onChanged: onSearchChanged,
-                        ),
-                      ),
-                      
-                    if (!isSearching) ...[
-                      // 🚀 GOOGLE STUDIO CAROUSEL WITH BANNER 🚀
-                      Stack(
+                    Text(widget.movieTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
+                    const SizedBox(height: 6),
+                    Row(
+                      children: [
+                        const Icon(Icons.star, color: Colors.amber, size: 18), const SizedBox(width: 4),
+                        Text(widget.rating, style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                        const SizedBox(width: 12), Text(widget.year, style: const TextStyle(color: Colors.grey, fontSize: 14)),
+                      ],
+                    ),
+                    const SizedBox(height: 14),
+                    
+                    // 🚀 GOOGLE STUDIO UI: Dual AI Analysis (Green Status Boxes) 🚀
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(color: const Color(0xFF141619), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.06))),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          SizedBox(
-                            height: 250,
-                            child: trendingList.isEmpty ? Container() : PageView.builder(
-                              controller: _pageController,
-                              itemCount: trendingList.length > 5 ? 5 : trendingList.length,
-                              onPageChanged: (index) => _currentPage = index,
-                              itemBuilder: (context, index) {
-                                return Container(
-                                  decoration: BoxDecoration(
-                                    image: DecorationImage(image: NetworkImage(trendingList[index]['backdropUrl'] != '' ? trendingList[index]['backdropUrl'] : 'https://images.unsplash.com/photo-1616530940355-351fabd9524b?q=80&w=600'), fit: BoxFit.cover),
+                          const Text("Dual AI Analysis:", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(color: widget.isPixelflix ? Colors.transparent : Colors.green.withOpacity(0.1), borderRadius: BorderRadius.circular(20), border: Border.all(color: widget.isPixelflix ? Colors.white12 : Colors.green)),
+                            child: Row(
+                              children: [
+                                Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.greenAccent, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.greenAccent, blurRadius: 4)])),
+                                const SizedBox(width: 10),
+                                const Text("Hannutv1: Online (VIP Node)", style: TextStyle(color: Colors.greenAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(color: widget.isPixelflix ? Colors.cyan.withOpacity(0.1) : Colors.transparent, borderRadius: BorderRadius.circular(20), border: Border.all(color: widget.isPixelflix ? Colors.cyan : Colors.white12)),
+                            child: Row(
+                              children: [
+                                Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.cyanAccent, shape: BoxShape.circle, boxShadow: [BoxShadow(color: Colors.cyanAccent, blurRadius: 4)])),
+                                const SizedBox(width: 10),
+                                const Text("Hannutv2: Online (Pixelflix Node)", style: TextStyle(color: Colors.cyanAccent, fontSize: 12, fontWeight: FontWeight.bold)),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          const Align(
+                            alignment: Alignment.centerRight,
+                            child: Text("Tap node to instant switch", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 🚀 GOOGLE STUDIO UI: HANNUTV2 PIXELFLIX STREAMS 🚀
+                    Container(
+                      padding: const EdgeInsets.all(14),
+                      decoration: BoxDecoration(color: const Color(0xFF141619), borderRadius: BorderRadius.circular(16), border: Border.all(color: Colors.white.withOpacity(0.06))),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Text(widget.isPixelflix ? "HANNUTV2 PIXELFLIX STREAMS" : "HANNUTV1 VIP STREAMS", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
+                              const Text("2/2 Nodes Online", style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                            ],
+                          ),
+                          const SizedBox(height: 4),
+                          const Text("Dual-node engine active:", style: TextStyle(color: Colors.grey, fontSize: 10, fontStyle: FontStyle.italic)),
+                          const SizedBox(height: 10),
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: [
+                                const Text("Servers: ", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                                  child: Row(
+                                    children: [
+                                      Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+                                      const SizedBox(width: 6),
+                                      const Text("Server 1", style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    ],
                                   ),
-                                );
-                              },
+                                ),
+                                const SizedBox(width: 8),
+                                Container(
+                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                  decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20)),
+                                  child: Row(
+                                    children: [
+                                      Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
+                                      const SizedBox(width: 6),
+                                      const Text("Server 2", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                    const SizedBox(height: 14),
+
+                    // 🚀 GOOGLE STUDIO UI: Season & Audio Pills 🚀
+                    if (widget.mediaType == 'tv' || widget.mediaType == 'series') ...[
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          InkWell(
+                            onTap: _showSeasonPicker,
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                              decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
+                              child: Column(
+                                children: [
+                                  const Text("Season", style: TextStyle(color: Colors.black54, fontSize: 10, fontWeight: FontWeight.bold)),
+                                  Text(currentSeason.toString().padLeft(2, '0'), style: const TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 14)),
+                                ],
+                              ),
                             ),
                           ),
                           Container(
-                            height: 250,
-                            decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [const Color(0xFF0F0F0F), Colors.transparent])),
-                          ),
-                          // Update Required Banner
-                          Positioned(
-                            top: 16, left: 16, right: 16,
-                            child: Container(
-                              padding: const EdgeInsets.all(12),
-                              decoration: BoxDecoration(color: Colors.teal.withOpacity(0.3), borderRadius: BorderRadius.circular(8), border: Border.all(color: Colors.teal, width: 1.5)),
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: [
-                                  Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: const [
-                                      Text("Update Required!", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                                      Text("hannutv.blogspot.com", style: TextStyle(color: Colors.tealAccent, fontSize: 11)),
-                                    ],
-                                  ),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-                                    decoration: BoxDecoration(color: Colors.tealAccent, borderRadius: BorderRadius.circular(4)),
-                                    child: const Text("UPDATE NOW", style: TextStyle(color: Colors.black, fontWeight: FontWeight.w900, fontSize: 10)),
-                                  )
-                                ],
-                              ),
-                            ),
-                          ),
-                          if (trendingList.isNotEmpty)
-                            Positioned(
-                              bottom: 16, left: 16,
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Row(
-                                    children: [
-                                      Container(padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2), decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(4)), child: const Text("MOVIE", style: TextStyle(color: Colors.white, fontSize: 10, fontWeight: FontWeight.bold))),
-                                      const SizedBox(width: 8),
-                                      const Icon(Icons.star, color: Colors.amber, size: 14),
-                                      Text(" ${trendingList[_currentPage]['rating']}", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-                                    ],
-                                  ),
-                                  const SizedBox(height: 6),
-                                  Text(trendingList[_currentPage]['title'] ?? 'Title', style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 12),
-                                  InkWell(
-                                    onTap: () => launchPlayerDirect(trendingList[_currentPage]),
-                                    child: Container(
-                                      padding: const EdgeInsets.symmetric(vertical: 10, horizontal: 20),
-                                      decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(8)),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: const [
-                                          Icon(Icons.play_arrow, color: Colors.black, size: 20),
-                                          SizedBox(width: 8),
-                                          Text('Play Now', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 14)),
-                                        ],
-                                      ),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
-                        ],
-                      ),
-                      
-                      const Padding(padding: EdgeInsets.fromLTRB(16, 20, 16, 10), child: Text('Watch on OTT & Channels', style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-                      SizedBox(
-                        height: 40,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal, padding: const EdgeInsets.symmetric(horizontal: 12), itemCount: ottPlatforms.length,
-                          itemBuilder: (context, index) {
-                            final srv = ottPlatforms[index];
-                            final isSelected = selectedPlatform == srv['providerId'];
-                            return Container(
-                              margin: const EdgeInsets.symmetric(horizontal: 4),
-                              child: InkWell(
-                                onTap: () { searchController.clear(); setState(() => isSearching = false); loadAllDashboards(providerId: srv['providerId']); },
-                                child: Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16),
-                                  decoration: BoxDecoration(color: isSelected ? Colors.redAccent : Colors.transparent, borderRadius: BorderRadius.circular(8), border: Border.all(color: srv['color'], width: 1.5)),
-                                  child: Center(child: Text(srv['name'], style: TextStyle(color: isSelected ? Colors.white : srv['color'], fontWeight: FontWeight.bold, fontSize: 12))),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                      const SizedBox(height: 10),
-                    ],
-
-                    if (isLoading)
-                      const Center(child: Padding(padding: EdgeInsets.all(40.0), child: CircularProgressIndicator(color: Colors.red)))
-                    else if (isSearching)
-                      GridView.builder(
-                        shrinkWrap: true, physics: const NeverScrollableScrollPhysics(), padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, childAspectRatio: 0.65, crossAxisSpacing: 12, mainAxisSpacing: 12),
-                        itemCount: searchResults.length,
-                        itemBuilder: (context, index) {
-                          final movie = searchResults[index];
-                          return InkWell(
-                            onTap: () => launchPlayerDirect(movie),
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white12)),
                             child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Expanded(child: Container(decoration: BoxDecoration(borderRadius: BorderRadius.circular(8), image: DecorationImage(image: NetworkImage(movie['posterUrl'] != '' ? movie['posterUrl'] : 'https://via.placeholder.com/300x450/222222/888888'), fit: BoxFit.cover)))),
-                                const SizedBox(height: 6),
-                                Text(movie['title'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                              children: const [
+                                Icon(Icons.volume_up, color: Colors.white, size: 14),
+                                Text("Original Audio", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 10)),
                               ],
                             ),
-                          );
-                        },
-                      )
-                    else ...[
-                      _buildHorizontalList('HANNUTV Trending', trendingList),
-                      if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
-                      _buildHorizontalList('Bollywood Hindi Movies', bollywoodList),
-                      _buildHorizontalList('Hollywood English Movies', hollywoodList),
-                      _buildHorizontalList('Anime Hub', animeList),
+                          ),
+                          Container(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                            decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20), border: Border.all(color: Colors.white12)),
+                            child: Column(
+                              children: [
+                                Text(episodesList.length.toString(), style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.w900)),
+                                const Text("Episodes", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 20),
+                      
+                      if (isLoadingEpisodes) 
+                         const Center(child: CircularProgressIndicator(color: Colors.redAccent))
+                      else if (episodesList.isEmpty)
+                         const Text("No episodes found for this season.", style: TextStyle(color: Colors.grey))
+                      else
+                        SizedBox(
+                          height: 140,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal, 
+                            itemCount: episodesList.length,
+                            itemBuilder: (context, index) {
+                              final epData = episodesList[index];
+                              final epNum = epData['episode_number'] ?? (index + 1);
+                              final epName = epData['name'] ?? "Episode $epNum";
+                              final isCurrent = currentEpisode == epNum;
+                              
+                              return InkWell(
+                                onTap: () {
+                                  setState(() { currentEpisode = epNum; });
+                                  _initStream();
+                                },
+                                child: Container(
+                                  width: 170, margin: const EdgeInsets.only(right: 12),
+                                  decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: isCurrent ? Border.all(color: Colors.redAccent, width: 2) : null, color: Colors.grey[900]),
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Expanded(
+                                        child: Container(
+                                          decoration: BoxDecoration(
+                                            borderRadius: const BorderRadius.vertical(top: Radius.circular(8)), color: Colors.grey[850],
+                                            image: epData['still_path'] != null ? DecorationImage(image: NetworkImage('https://image.tmdb.org/t/p/w500${epData['still_path']}'), fit: BoxFit.cover) : null,
+                                          ), 
+                                          child: Center(child: Icon(isCurrent ? Icons.play_arrow : Icons.play_circle_outline, color: Colors.white, size: 32))
+                                        )
+                                      ),
+                                      Padding(
+                                        padding: const EdgeInsets.all(8.0), 
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Text("EP $epNum", style: const TextStyle(color: Colors.redAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                                            Text(epName, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      const SizedBox(height: 20),
                     ],
-                    const SizedBox(height: 40),
+
+                    // LIVE COMMENTS SECTION
+                    Container(
+                      padding: const EdgeInsets.all(12),
+                      decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(12)),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text("Live Comments", style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                          const SizedBox(height: 10),
+                          Row(
+                            children: [
+                              Expanded(
+                                child: TextField(
+                                  controller: commentInputController, style: const TextStyle(color: Colors.white, fontSize: 12),
+                                  decoration: InputDecoration(hintText: 'Add a comment...', hintStyle: const TextStyle(color: Colors.grey, fontSize: 12), filled: true, fillColor: Colors.black45, contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8), border: OutlineInputBorder(borderRadius: BorderRadius.circular(20), borderSide: BorderSide.none)),
+                                ),
+                              ),
+                              IconButton(icon: const Icon(Icons.send, color: Colors.redAccent), onPressed: _addComment),
+                            ],
+                          ),
+                          const SizedBox(height: 10),
+                          ...publicComments.map((c) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 8.0),
+                                  child: Row(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                                      const SizedBox(width: 10),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment: CrossAxisAlignment.start,
+                                          children: [
+                                            Row(children: [Text(c['name']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)), const SizedBox(width: 6), Text(c['time']!, style: const TextStyle(color: Colors.grey, fontSize: 10))]),
+                                            Text(c['text']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                        ],
+                      ),
+                    ),
                   ],
                 ),
               ),
             ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-// 🚀 SERVER ANALYZER MODAL (Deep Ping + Green/Red Status for HANNUTV 1 & 2) 🚀
-class _ServerSelectionModal extends StatefulWidget {
-  final Map media;
-  final Function(bool) onSelect;
-  const _ServerSelectionModal({required this.media, required this.onSelect});
-
-  @override
-  State<_ServerSelectionModal> createState() => _ServerSelectionModalState();
-}
-
-class _ServerSelectionModalState extends State<_ServerSelectionModal> {
-  bool isLoading1 = true;
-  bool isAvailable1 = false;
-  bool isLoading2 = true;
-  bool isAvailable2 = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkServers();
-  }
-
-  Future<void> _checkServers() async {
-    final type = widget.media['mediaType'] ?? 'movie';
-    final id = widget.media['id'];
-
-    final url1 = type == 'tv' ? 'https://pantyflix.com/watch/play/tv/$id?season=1&episode=1&server=vidrift' : 'https://pantyflix.com/watch/play/movie/$id?server=vidrift';
-    final url2 = type == 'tv' ? 'https://pixelflix.cc/watch/tv/$id?season=1&episode=1' : 'https://pixelflix.cc/watch/movie/$id';
-
-    try {
-      final res1 = await http.get(Uri.parse(url1)).timeout(const Duration(seconds: 4));
-      if (mounted) setState(() { isAvailable1 = true; isLoading1 = false; });
-    } catch (_) {
-      if (mounted) setState(() { isAvailable1 = false; isLoading1 = false; });
-    }
-
-    try {
-      final res2 = await http.get(Uri.parse(url2)).timeout(const Duration(seconds: 4));
-      if (mounted) setState(() { isAvailable2 = true; isLoading2 = false; });
-    } catch (_) {
-      if (mounted) setState(() { isAvailable2 = false; isLoading2 = false; });
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(
-        color: Color(0xFF121212),
-        borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
-      ),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10)), margin: const EdgeInsets.only(bottom: 20))),
-          Row(
-            children: [
-              ClipRRect(
-                  borderRadius: BorderRadius.circular(8),
-                  child: Image.network(widget.media['posterUrl'] ?? '', width: 60, height: 90, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.grey))),
-              const SizedBox(width: 16),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text("Watch ${widget.media['title']}", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold), maxLines: 2),
-                    const SizedBox(height: 6),
-                    const Text("Deep Analyzing Servers...", style: TextStyle(color: Colors.grey, fontSize: 12))
-                  ])),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _buildServerBtn(
-              title: "HANNUTV 1", subtitle: "Cinema HD Node", isLoading: isLoading1, isAvailable: isAvailable1,
-              onTap: () { Navigator.pop(context); widget.onSelect(false); }),
-          const SizedBox(height: 12),
-          _buildServerBtn(
-              title: "HANNUTV 2", subtitle: "Ultra HD Cloud", isLoading: isLoading2, isAvailable: isAvailable2,
-              onTap: () { Navigator.pop(context); widget.onSelect(true); }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServerBtn({required String title, required String subtitle, required bool isLoading, required bool isAvailable, required VoidCallback onTap}) {
-    Color statusColor = isLoading ? Colors.amber : (isAvailable ? Colors.greenAccent : Colors.redAccent);
-    String statusText = isLoading ? "Checking..." : (isAvailable ? "Online" : "Offline");
-        
-    return InkWell(
-      onTap: onTap, 
-      borderRadius: BorderRadius.circular(16),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(
-            color: Colors.white.withOpacity(0.05),
-            borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: statusColor.withOpacity(0.5), width: 1.5)),
-        child: Row(
-          children: [
-            Container(width: 40, height: 40, decoration: BoxDecoration(color: statusColor.withOpacity(0.1), shape: BoxShape.circle), child: Icon(Icons.dns_rounded, color: statusColor, size: 20)),
-            const SizedBox(width: 16),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12))])),
-            if (isLoading) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2))
-            else Row(children: [Container(width: 8, height: 8, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle, boxShadow: [BoxShadow(color: statusColor, blurRadius: 6)])), const SizedBox(width: 8), Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12))]),
           ],
         ),
       ),
