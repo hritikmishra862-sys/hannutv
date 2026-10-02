@@ -58,10 +58,31 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
   List<dynamic> episodesList = [];
   bool isLoadingEpisodes = false;
 
+  // 🚀 RESTORED MISSING VARIABLES TO FIX ERRORS 🚀
+  String activeServer = 'vidrift';
+  List similarMovies = [];
+  bool isLoadingSimilar = false;
+
   final TextEditingController commentInputController = TextEditingController();
   final List<Map<String, String>> publicComments = [
     {'name': 'SHEEL', 'text': 'HARE KRISHNA 🦚', 'time': '9d', 'avatar': 'S'},
     {'name': 'Rohit Sharma', 'text': 'Best quality on HANNUTV, loving this series! 🔥', 'time': '2d', 'avatar': 'R'},
+  ];
+
+  // 🚀 SERVER LIST RESTORED AS REQUESTED 🚀
+  final List<Map<String, String>> servers = const [
+    {'key': 'vidrift', 'name': 'Rift'},
+    {'key': 'fast', 'name': 'Fast'},
+    {'key': 'vidbolt', 'name': 'Bolt'},
+    {'key': 'cinezo', 'name': 'Cinezo'},
+    {'key': 'hindi-new', 'name': 'Hindi New'},
+    {'key': 'peach', 'name': 'Peach'},
+    {'key': 'mega', 'name': 'Mega'},
+    {'key': 'alpha', 'name': 'Alpha'},
+    {'key': 'orion', 'name': 'Orion'},
+    {'key': 'hindi', 'name': 'Hindi'},
+    {'key': 'vidgod', 'name': 'Vidgod'},
+    {'key': 'cinesrc', 'name': 'CineSrc'},
   ];
 
   @override
@@ -78,6 +99,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       _fetchEpisodesForSeason(currentSeason);
     }
     
+    _fetchSimilarMovies(); // 🚀 Fetching suggested movies
     _initStream();
   }
 
@@ -109,7 +131,34 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     }
   }
 
-  // 🚀 FIXED: Adult वेबसाइट और Server Change का 100% डीप लॉजिक 🚀
+  Future<void> _fetchSimilarMovies() async {
+    setState(() => isLoadingSimilar = true);
+    try {
+      final type = widget.mediaType == 'tv' || widget.mediaType == 'series' ? 'tv' : 'movie';
+      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/$type/${widget.tmdbId}/recommendations?language=en-US'), headers: kApiHeaders);
+      if (res.statusCode == 200) {
+        final data = json.decode(res.body);
+        final List results = data['results'] ?? [];
+        if (mounted) {
+          setState(() {
+            similarMovies = results.map((m) => {
+              'id': m['id'],
+              'title': m['title'] ?? m['name'] ?? 'Unknown',
+              'posterUrl': m['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}' : '',
+              'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
+              'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
+              'mediaType': type,
+            }).toList();
+            isLoadingSimilar = false;
+          });
+        }
+      }
+    } catch (_) {
+      if (mounted) setState(() => isLoadingSimilar = false);
+    }
+  }
+
+  // 🚀 DEEP LOGIC: CLEAN EMBED URLS (No Website/No Adult Ads) 🚀
   String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -120,12 +169,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // 1. Pixelflix के लिए Adult साइट की जगह सीधा Clean Embed
+    // Pixelflix Direct Clean Embed
     if (widget.isPixelflix) {
+      if (activeServer == 'vidbolt') return isTv ? 'https://vidbolt.xyz/tv/$id/$s/$e' : 'https://vidbolt.xyz/movie/$id';
       return isTv ? 'https://vidsrc.pm/embed/tv?tmdb=$id&season=$s&episode=$e' : 'https://vidsrc.pm/embed/movie/$id';
     }
 
-    // 2. Pantyflix के सारे Servers का डायरेक्ट लॉजिक (ताकि सर्वर चेंज काम करे)
+    // Pantyflix Direct Clean Embeds
     if (activeServer == 'fast' || activeServer == 'alpha') {
       return isTv ? 'https://vidsrc.net/embed/tv?tmdb=$id&season=$s&episode=$e' : 'https://vidsrc.net/embed/movie/$id';
     } else if (activeServer == 'vidbolt') {
@@ -136,7 +186,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       return isTv ? 'https://player.autoembed.cc/embed/tv/$id/$s/$e' : 'https://player.autoembed.cc/embed/movie/$id';
     }
     
-    // 3. Default Server (Rift)
     return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
   }
 
@@ -163,13 +212,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                   document.body.style.backgroundColor = '#000000';
                   document.documentElement.style.backgroundColor = '#000000';
                   
-                  // Hide ads and captchas
                   const adClasses = ['.ad', '.ads', '.popup', '#captcha', '.human-verify', '[id*="verify"]', '[class*="verify"]', 'iframe[src*="challenge"]', '.cf-turnstile', 'a[target="_blank"]'];
                   document.querySelectorAll(adClasses.join(',')).forEach(el => el.style.display = 'none !important');
                   
                   document.body.style.pointerEvents = 'none';
                   
-                  // Force video fullscreen and allow clicks ONLY on video
                   const video = document.querySelector('video') || document.querySelector('iframe');
                   if(video) {
                       video.style.position = 'fixed';
@@ -192,8 +239,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
           },
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
-            // 🚀 FIXED: Gande Redirects aur Ads yahan Block ho jayenge 🚀
-            if (url.contains('vidsrc') || url.contains('vidlink') || url.contains('vidbolt') || url.contains('multiembed') || url.contains('autoembed') || url.contains('googleapis') || url.startsWith('data:') || url.startsWith('blob:')) {
+            // 🚀 NO ADULT SITES OR REDIRECTS ALLOWED 🚀
+            if (url.contains('vidsrc') || url.contains('vidlink') || url.contains('vidbolt') || url.contains('multiembed') || url.contains('autoembed') || url.contains('pixelflix') || url.contains('pantyflix') || url.contains('googleapis') || url.startsWith('data:') || url.startsWith('blob:')) {
                 return NavigationDecision.navigate;
             }
             return NavigationDecision.prevent; 
@@ -205,7 +252,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
       (_controller.platform as AndroidWebViewController).setMediaPlaybackRequiresUserGesture(false);
     }
 
-    // 🚀 Sandbox bypass headers 🚀
+    // 🚀 Sandbox Fix 🚀
     _controller.loadRequest(
       targetUri,
       headers: {
@@ -223,6 +270,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
     });
 
     _controller.runJavaScript("var vids = document.getElementsByTagName('video'); if (vids.length > 0) { vids[0].style.objectFit = '$currentAspectRatio'; }");
+  }
+
+  // 🚀 FIXED: _switchEpisode METHOD RESTORED 🚀
+  void _switchEpisode(int ep) {
+    setState(() {
+      currentEpisode = ep;
+    });
+    _initStream();
   }
 
   void _addComment() {
@@ -404,41 +459,44 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
                               Text(widget.isPixelflix ? "HANNUTV2 PIXELFLIX STREAMS" : "HANNUTV1 VIP STREAMS", style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.w900)),
-                              const Text("2/2 Nodes Online", style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
+                              const Text("12/12 Nodes Online", style: TextStyle(color: Colors.greenAccent, fontSize: 10, fontWeight: FontWeight.bold)),
                             ],
                           ),
                           const SizedBox(height: 4),
                           const Text("Dual-node engine active:", style: TextStyle(color: Colors.grey, fontSize: 10, fontStyle: FontStyle.italic)),
                           const SizedBox(height: 10),
+                          
+                          // 🚀 SERVERS ADDED TO GOOGLE STUDIO UI 🚀
                           SingleChildScrollView(
                             scrollDirection: Axis.horizontal,
                             child: Row(
                               children: [
                                 const Text("Servers: ", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
                                 const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  decoration: BoxDecoration(color: Colors.white, borderRadius: BorderRadius.circular(20)),
-                                  child: Row(
-                                    children: [
-                                      Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
-                                      const SizedBox(width: 6),
-                                      const Text("Server 1", style: TextStyle(color: Colors.black, fontSize: 12, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(width: 8),
-                                Container(
-                                  padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
-                                  decoration: BoxDecoration(color: Colors.grey[900], borderRadius: BorderRadius.circular(20)),
-                                  child: Row(
-                                    children: [
-                                      Container(width: 6, height: 6, decoration: const BoxDecoration(color: Colors.green, shape: BoxShape.circle)),
-                                      const SizedBox(width: 6),
-                                      const Text("Server 2", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
-                                    ],
-                                  ),
-                                ),
+                                ...servers.map((srv) {
+                                  final isSelected = activeServer == srv['key'];
+                                  return InkWell(
+                                    onTap: () {
+                                      setState(() { activeServer = srv['key']!; });
+                                      _initStream();
+                                    },
+                                    child: Container(
+                                      margin: const EdgeInsets.only(right: 8),
+                                      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+                                      decoration: BoxDecoration(
+                                        color: isSelected ? Colors.white : Colors.grey[900], 
+                                        borderRadius: BorderRadius.circular(20)
+                                      ),
+                                      child: Row(
+                                        children: [
+                                          Container(width: 6, height: 6, decoration: BoxDecoration(color: isSelected ? Colors.green : Colors.grey, shape: BoxShape.circle)),
+                                          const SizedBox(width: 6),
+                                          Text(srv['name']!, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                                        ],
+                                      ),
+                                    ),
+                                  );
+                                }).toList(),
                               ],
                             ),
                           ),
@@ -506,10 +564,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                               final isCurrent = currentEpisode == epNum;
                               
                               return InkWell(
-                                onTap: () {
-                                  setState(() { currentEpisode = epNum; });
-                                  _initStream();
-                                },
+                                onTap: () => _switchEpisode(epNum), // 🚀 FIXED: Call to _switchEpisode 🚀
                                 child: Container(
                                   width: 170, margin: const EdgeInsets.only(right: 12),
                                   decoration: BoxDecoration(borderRadius: BorderRadius.circular(10), border: isCurrent ? Border.all(color: Colors.redAccent, width: 2) : null, color: Colors.grey[900]),
@@ -544,6 +599,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         ),
                       const SizedBox(height: 20),
                     ],
+                    
+                    // 🚀 BANNER AD ADDED 🚀
+                    const CustomBannerAd(
+                      htmlBannerCode: '''
+                        <script type="text/javascript">
+                          atOptions = {
+                            'key' : 'a39df283f6ad10c34e229e5715bceff5',
+                            'format' : 'iframe',
+                            'height' : 50,
+                            'width' : 320,
+                            'params' : {}
+                          };
+                        </script>
+                        <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
+                      ''',
+                    ),
+                    const SizedBox(height: 18),
 
                     // LIVE COMMENTS SECTION
                     Container(
@@ -589,6 +661,86 @@ class _VideoPlayerPageState extends State<VideoPlayerPage> {
                         ],
                       ),
                     ),
+                    const SizedBox(height: 20),
+
+                    // 🚀 SUGGESTED MOVIES ADDED 🚀
+                    if (similarMovies.isNotEmpty) ...[
+                      const Text(
+                        "Suggested Movies & Shows",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        height: 160,
+                        child: ListView.builder(
+                          scrollDirection: Axis.horizontal,
+                          itemCount: similarMovies.length,
+                          itemBuilder: (context, index) {
+                            final m = similarMovies[index];
+                            return InkWell(
+                              onTap: () {
+                                Navigator.pushReplacement(
+                                  context,
+                                  MaterialPageRoute(
+                                    builder:
+                                        (context) => SkippableAdScreen(
+                                          adDuration: 30,
+                                          nextScreen: VideoPlayerPage(
+                                            tmdbId: m['id'],
+                                            mediaType: m['mediaType'],
+                                            movieTitle: m['title'],
+                                            rating: m['rating'],
+                                            year: m['year'],
+                                            isPixelflix: widget.isPixelflix, 
+                                          ),
+                                        ),
+                                  ),
+                                );
+                              },
+                              child: Container(
+                                width: 110,
+                                margin: const EdgeInsets.only(right: 10),
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Expanded(
+                                      child: Container(
+                                        decoration: BoxDecoration(
+                                          borderRadius: BorderRadius.circular(8),
+                                          image: DecorationImage(
+                                            image: NetworkImage(
+                                              m['posterUrl'] != ''
+                                                  ? m['posterUrl']
+                                                  : 'https://via.placeholder.com/300x450/222222/888888',
+                                            ),
+                                            fit: BoxFit.cover,
+                                          ),
+                                        ),
+                                      ),
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      m['title'],
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
                   ],
                 ),
               ),
