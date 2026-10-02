@@ -5,6 +5,7 @@ import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'video_player_page.dart';
 import 'skippable_ad_screen.dart';
+import 'banner_ad_widget.dart'; 
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -52,6 +53,13 @@ class DashboardPageState extends State<DashboardPage> {
     {"name": "PRIME VIDEO", "color": Colors.blueAccent, "providerId": "9"},
     {"name": "APPLE TV+", "color": Colors.white70, "providerId": "350"},
     {"name": "CRUNCHYROLL", "color": Colors.orangeAccent, "providerId": "283"},
+    {"name": "DISNEY+", "color": Colors.lightBlueAccent, "providerId": "337"},
+    {"name": "HULU", "color": Colors.greenAccent, "providerId": "15"},
+    {"name": "HBO MAX", "color": Colors.deepPurpleAccent, "providerId": "1899"},
+    {"name": "MGM+", "color": Colors.amber, "providerId": "34"},
+    {"name": "PARAMOUNT+", "color": Colors.blue, "providerId": "2303"},
+    {"name": "PEACOCK", "color": Colors.tealAccent, "providerId": "387"},
+    {"name": "SHUDDER", "color": Colors.red, "providerId": "99"},
   ];
 
   @override
@@ -116,7 +124,7 @@ class DashboardPageState extends State<DashboardPage> {
         .toList();
   }
 
-  Future<void> loadAllDashboards({String? providerId}) async {
+  Future<void> loadAllDashboards({String? providerId, String? customFilter}) async {
     setState(() {
       isLoading = true;
       selectedPlatform = providerId ?? 'all';
@@ -125,11 +133,18 @@ class DashboardPageState extends State<DashboardPage> {
       String base = 'https://api.themoviedb.org/3';
       String prov = (providerId != null && providerId != 'all') ? '&with_watch_providers=$providerId&watch_region=US' : '';
 
+      String trendingUrl = '$base/trending/all/day?language=en-US$prov';
+      if (customFilter == 'anime') trendingUrl = '$base/discover/tv?language=en-US&with_genres=16,10764&sort_by=popularity.desc';
+      if (customFilter == 'sports') trendingUrl = '$base/search/multi?query=WWE&language=en-US';
+
       var responses = await Future.wait([
-        http.get(Uri.parse('$base/trending/all/day?language=en-US$prov'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/movie?language=hi-IN&with_original_language=hi&sort_by=popularity.desc'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/movie?language=en-US&with_original_language=en&sort_by=popularity.desc'), headers: kApiHeaders),
-        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=16&sort_by=popularity.desc'), headers: kApiHeaders),
+        http.get(Uri.parse(trendingUrl), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/movie?language=hi-IN&with_original_language=hi&sort_by=popularity.desc$prov'), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_original_language=en&sort_by=popularity.desc$prov'), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=16&sort_by=popularity.desc$prov'), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=28$prov&sort_by=popularity.desc'), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/tv?language=en-US&with_genres=35$prov&sort_by=popularity.desc'), headers: kApiHeaders),
+        http.get(Uri.parse('$base/discover/movie?language=en-US&with_genres=27$prov&sort_by=popularity.desc'), headers: kApiHeaders),
         http.get(Uri.parse('$base/trending/tv/week?language=en-US'), headers: kApiHeaders),
       ]);
 
@@ -138,7 +153,10 @@ class DashboardPageState extends State<DashboardPage> {
         bollywoodList = parseData(responses[1], forceMediaType: 'movie');
         hollywoodList = parseData(responses[2], forceMediaType: 'movie');
         animeList = parseData(responses[3], forceMediaType: 'tv');
-        seriesRankings = parseData(responses[4], forceMediaType: 'tv');
+        actionList = parseData(responses[4], forceMediaType: 'movie');
+        comedyList = parseData(responses[5], forceMediaType: 'tv');
+        horrorList = parseData(responses[6], forceMediaType: 'movie');
+        seriesRankings = parseData(responses[7], forceMediaType: 'tv');
         isLoading = false;
       });
     } catch (e) {
@@ -171,7 +189,6 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // 🔥 DEEP HARDCODING: DIRECT PLAY, NO POPUP[cite: 15] 🔥
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
@@ -199,6 +216,104 @@ class DashboardPageState extends State<DashboardPage> {
         ),
       ),
     ).then((_) => setState(() {}));
+  }
+
+  void _showAdminDashboard() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: const Color(0xFF151515),
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+      builder: (context) {
+        return SizedBox(
+          height: MediaQuery.of(context).size.height * 0.85,
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: const EdgeInsets.all(24),
+                decoration: const BoxDecoration(color: Color(0xFF202020), borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                child: Row(
+                  children: [
+                    const CircleAvatar(radius: 30, backgroundColor: Colors.redAccent, child: Icon(Icons.person, color: Colors.white, size: 35)),
+                    const SizedBox(width: 16),
+                    Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: const [
+                        Text("Welcome to HANNUTV", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+                        Text("Login to sync your data", style: TextStyle(color: Colors.grey, fontSize: 13)),
+                      ],
+                    )
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: ElevatedButton.icon(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                  onPressed: () {},
+                  icon: const Icon(Icons.g_mobiledata, color: Colors.black, size: 32),
+                  label: const Text("Sign in with Google", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text("Support & Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+              const SizedBox(height: 12),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Row(
+                  children: [
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), border: Border.all(color: Colors.blueAccent), borderRadius: BorderRadius.circular(12)),
+                          child: Column(children: const [Icon(Icons.telegram, color: Colors.blueAccent, size: 30), SizedBox(height: 8), Text("Telegram", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: InkWell(
+                        onTap: () => launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication),
+                        child: Container(
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), border: Border.all(color: Colors.green), borderRadius: BorderRadius.circular(12)),
+                          child: Column(children: const [Icon(Icons.chat, color: Colors.green, size: 30), SizedBox(height: 8), Text("WhatsApp", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text("Your Watch History", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+              const SizedBox(height: 12),
+              Expanded(
+                child: continueWatchingList.isEmpty 
+                  ? const Center(child: Text("No movies watched yet.", style: TextStyle(color: Colors.grey))) 
+                  : ListView.builder(
+                      padding: const EdgeInsets.symmetric(horizontal: 24),
+                      itemCount: continueWatchingList.length,
+                      itemBuilder: (context, index) {
+                        final media = continueWatchingList[index];
+                        return ListTile(
+                          contentPadding: const EdgeInsets.only(bottom: 12),
+                          leading: ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.network(media['posterUrl'], width: 40, height: 60, fit: BoxFit.cover)),
+                          title: Text(media['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                          subtitle: Text(media['year'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                          trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent), onPressed: () { Navigator.pop(context); launchPlayerDirect(media); }),
+                        );
+                      }
+                    )
+              )
+            ],
+          ),
+        );
+      },
+    );
   }
 
   Widget _buildHorizontalList(String title, List moviesData, {bool isRanking = false}) {
@@ -271,18 +386,12 @@ class DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: const Icon(Icons.menu, color: Colors.white),
-        title: Row(
-          children: [
-            Image.asset('assets/logo.png', height: 24, errorBuilder: (_,__,___) => const Icon(Icons.movie, color: Colors.red)),
-            const SizedBox(width: 8),
-            const Text('HANNUTV', style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.w900)),
-          ],
-        ),
+        automaticallyImplyLeading: false,
         actions: [
-          IconButton(icon: const Icon(Icons.folder_zip, color: Colors.white), onPressed: () {}),
-          IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: () => setState(() => isSearching = true)),
-          IconButton(icon: const Icon(Icons.person, color: Colors.white), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.folder_zip, color: Colors.white, size: 28), onPressed: () {}),
+          IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 28), onPressed: () => setState(() => isSearching = true)),
+          IconButton(icon: const Icon(Icons.person, color: Colors.white, size: 28), onPressed: _showAdminDashboard),
+          const SizedBox(width: 8),
         ],
       ),
       body: SingleChildScrollView(
@@ -324,13 +433,28 @@ class DashboardPageState extends State<DashboardPage> {
                         padding: const EdgeInsets.symmetric(horizontal: 16),
                         child: Row(
                           children: [
-                            _buildTopMenuButton(Icons.tv, "TV"),
+                            InkWell(
+                              onTap: () {
+                                Navigator.push(context, MaterialPageRoute(builder: (_) => const LiveTvChannelsPage()));
+                              },
+                              child: Container(
+                                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                decoration: BoxDecoration(color: Colors.black54, border: Border.all(color: Colors.white24), borderRadius: BorderRadius.circular(20)),
+                                child: Row(
+                                  children: [
+                                    const Icon(Icons.tv, color: Colors.white, size: 16),
+                                    const SizedBox(width: 6),
+                                    const Text("TV", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+                                    const SizedBox(width: 6),
+                                    Container(width: 8, height: 8, decoration: const BoxDecoration(color: Colors.redAccent, shape: BoxShape.circle)),
+                                  ],
+                                ),
+                              ),
+                            ),
                             const SizedBox(width: 12),
-                            _buildTopMenuButton(Icons.animation, "Anime"),
+                            _buildTopMenuButton(Icons.animation, "Anime", onTap: () => loadAllDashboards(customFilter: 'anime')),
                             const SizedBox(width: 12),
-                            _buildTopMenuButton(Icons.bolt, "ShortTV"),
-                            const SizedBox(width: 12),
-                            _buildTopMenuButton(Icons.sports_soccer, "Sports"),
+                            _buildTopMenuButton(Icons.sports_soccer, "Sports", onTap: () => loadAllDashboards(customFilter: 'sports')),
                           ],
                         ),
                       ),
@@ -458,6 +582,19 @@ class DashboardPageState extends State<DashboardPage> {
                   },
                 ),
               ),
+              
+              const Padding(
+                padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
+                child: CustomBannerAd(
+                  htmlBannerCode: '''
+                    <script type="text/javascript">
+                      atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
+                    </script>
+                    <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
+                  ''',
+                ),
+              ),
+
               if (seriesRankings.isNotEmpty)
                 _buildHorizontalList('Series Rankings', seriesRankings, isRanking: true),
 
@@ -466,6 +603,9 @@ class DashboardPageState extends State<DashboardPage> {
               _buildHorizontalList('Bollywood Hindi Movies', bollywoodList),
               _buildHorizontalList('Hollywood English Movies', hollywoodList),
               _buildHorizontalList('Anime Hub ⛩️', animeList),
+              _buildHorizontalList('Action Movies', actionList),
+              _buildHorizontalList('Comedy Shows', comedyList),
+              _buildHorizontalList('Horror Movies', horrorList),
             ],
             const SizedBox(height: 40),
           ],
@@ -474,16 +614,19 @@ class DashboardPageState extends State<DashboardPage> {
     );
   }
 
-  Widget _buildTopMenuButton(IconData icon, String title) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-      decoration: BoxDecoration(color: Colors.black54, border: Border.all(color: Colors.white24), borderRadius: BorderRadius.circular(20)),
-      child: Row(
-        children: [
-          Icon(icon, color: Colors.white, size: 16),
-          const SizedBox(width: 6),
-          Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
-        ],
+  Widget _buildTopMenuButton(IconData icon, String title, {VoidCallback? onTap}) {
+    return InkWell(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(color: Colors.black54, border: Border.all(color: Colors.white24), borderRadius: BorderRadius.circular(20)),
+        child: Row(
+          children: [
+            Icon(icon, color: Colors.white, size: 16),
+            const SizedBox(width: 6),
+            Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 13)),
+          ],
+        ),
       ),
     );
   }
@@ -541,6 +684,135 @@ class _TvFocusButtonState extends State<_TvFocusButton> {
           ),
           child: widget.child,
         ),
+      ),
+    );
+  }
+}
+
+class LiveTvChannelsPage extends StatefulWidget {
+  const LiveTvChannelsPage({super.key});
+
+  @override
+  State<LiveTvChannelsPage> createState() => _LiveTvChannelsPageState();
+}
+
+class _LiveTvChannelsPageState extends State<LiveTvChannelsPage> {
+  List<Map<String, String>> allChannels = [];
+  List<Map<String, String>> filteredChannels = [];
+  bool isLoading = true;
+  final TextEditingController tvSearchController = TextEditingController();
+
+  @override
+  void initState() {
+    super.initState();
+    _fetchIptvData();
+  }
+
+  Future<void> _fetchIptvData() async {
+    try {
+      final response = await http.get(Uri.parse('https://iptv-org.github.io/iptv/index.m3u'));
+      if (response.statusCode == 200) {
+        List<String> lines = response.body.split('\n');
+        List<Map<String, String>> parsed = [];
+        String currentName = '';
+        String currentLogo = '';
+
+        for (String line in lines) {
+          if (line.startsWith('#EXTINF')) {
+            RegExp logoRegex = RegExp(r'tvg-logo="(.*?)"');
+            var match = logoRegex.firstMatch(line);
+            currentLogo = match != null ? match.group(1)! : '';
+
+            List<String> splitComma = line.split(',');
+            if (splitComma.length > 1) currentName = splitComma.last.trim();
+          } else if (line.startsWith('http')) {
+            if (currentName.isNotEmpty) {
+              parsed.add({'name': currentName, 'logo': currentLogo, 'url': line.trim()});
+              if (parsed.length >= 300) break;
+            }
+          }
+        }
+        setState(() {
+          allChannels = parsed;
+          filteredChannels = parsed;
+          isLoading = false;
+        });
+      }
+    } catch (e) {
+      setState(() => isLoading = false);
+    }
+  }
+
+  void _filterChannels(String query) {
+    setState(() {
+      filteredChannels = allChannels.where((c) => c['name']!.toLowerCase().contains(query.toLowerCase())).toList();
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF151515),
+        title: const Text("Live TV Channels", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: Column(
+        children: [
+          Padding(
+            padding: const EdgeInsets.all(16.0),
+            child: TextField(
+              controller: tvSearchController,
+              style: const TextStyle(color: Colors.white),
+              decoration: InputDecoration(
+                hintText: 'Search Live Channels...', hintStyle: const TextStyle(color: Colors.grey), filled: true, fillColor: Colors.black87,
+                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
+              ),
+              onChanged: _filterChannels,
+            ),
+          ),
+          Expanded(
+            child: isLoading 
+              ? const Center(child: CircularProgressIndicator(color: Colors.redAccent))
+              : GridView.builder(
+                  padding: const EdgeInsets.all(16),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(crossAxisCount: 3, crossAxisSpacing: 16, mainAxisSpacing: 16, childAspectRatio: 0.8),
+                  itemCount: filteredChannels.length,
+                  itemBuilder: (context, index) {
+                    final ch = filteredChannels[index];
+                    return InkWell(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SkippableAdScreen(
+                              adDuration: 30,
+                              nextScreen: VideoPlayerPage(
+                                tmdbId: 0, mediaType: 'tv', season: 1, episode: 1,
+                                movieTitle: ch['name']!, overview: 'Live TV Broadcast',
+                                rating: 'Live', year: 'Now', customUrl: ch['url'], 
+                              ),
+                            ),
+                          ),
+                        );
+                      },
+                      child: Container(
+                        decoration: BoxDecoration(color: const Color(0xFF1A1A1A), borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.white12)),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Expanded(child: Padding(padding: const EdgeInsets.all(8.0), child: ch['logo']!.isNotEmpty ? Image.network(ch['logo']!, errorBuilder: (_,__,___)=>const Icon(Icons.tv, color: Colors.white54, size: 40)) : const Icon(Icons.tv, color: Colors.white54, size: 40))),
+                            Container(padding: const EdgeInsets.all(8), width: double.infinity, decoration: const BoxDecoration(color: Colors.black54, borderRadius: BorderRadius.vertical(bottom: Radius.circular(12))), child: Text(ch['name']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis, textAlign: TextAlign.center)),
+                          ],
+                        ),
+                      ),
+                    );
+                  },
+                ),
+          )
+        ],
       ),
     );
   }
