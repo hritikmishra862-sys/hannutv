@@ -4,7 +4,7 @@ import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
 import 'video_player_page.dart';
-import 'skippable_ad_screen.dart';
+import 'skippable_ad_screen.dart'; 
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -223,7 +223,6 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // 🚀 SUPPORT OPTION RESTORED 🚀
   void _showSupportOptions() {
     showModalBottomSheet(
       context: context,
@@ -240,7 +239,7 @@ class DashboardPageState extends State<DashboardPage> {
               InkWell(
                 onTap: () async {
                   Navigator.pop(context);
-                  launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication);
+                  if (!await launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication)) {}
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
@@ -265,7 +264,7 @@ class DashboardPageState extends State<DashboardPage> {
               InkWell(
                 onTap: () async {
                   Navigator.pop(context);
-                  launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication);
+                  if (!await launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication)) {}
                 },
                 borderRadius: BorderRadius.circular(12),
                 child: Container(
@@ -431,7 +430,7 @@ class DashboardPageState extends State<DashboardPage> {
             ),
           ),
           _TvFocusButton(
-            onTap: _showSupportOptions, // 🚀 SUPPORT BUTTON FIXED 🚀
+            onTap: _showSupportOptions,
             borderRadius: BorderRadius.circular(20),
             child: const Padding(
               padding: EdgeInsets.all(8.0),
@@ -457,8 +456,8 @@ class DashboardPageState extends State<DashboardPage> {
                                 trendingList.length > 5
                                     ? 5
                                     : trendingList.length,
+                            // 🚀 SLIDER MOVIE NAME FIX 🚀
                             onPageChanged: (index) {
-                              // 🚀 BUG FIXED: Slide karne par Movie ka name change hoga 🚀
                               setState(() {
                                 _currentPage = index;
                               });
@@ -747,16 +746,15 @@ class DashboardPageState extends State<DashboardPage> {
                 },
               )
             else ...[
-              // 🚀 CONTINUE WATCHING SECTION RESTORED 🚀
+              _buildHorizontalList('🔥 HANNUTV Trending', trendingList),
               if (continueWatchingList.isNotEmpty)
                 _buildHorizontalList(
                   'Continue Watching',
                   continueWatchingList,
                 ),
-              _buildHorizontalList('🔥 HANNUTV Trending', trendingList),
               _buildHorizontalList('Bollywood Hindi Movies', bollywoodList),
               _buildHorizontalList('Hollywood English Movies', hollywoodList),
-              _buildHorizontalList('Anime Hub ⛩️', animeList),
+              _buildHorizontalList('Anime Hub ⛩️️', animeList),
               _buildHorizontalList('Action Movies', actionList),
               _buildHorizontalList('Comedy Shows', comedyList),
               _buildHorizontalList('Horror Movies', horrorList),
