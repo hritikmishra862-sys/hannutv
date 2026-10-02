@@ -238,12 +238,15 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  // 🔥 DIRECT PLAYER START (WITH PROPER AD TIMINGS) 🔥
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
 
     final type = media['mediaType'] ?? 'movie';
     final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
+    
+    // Switch between 10 sec and 30 sec ad per click
     int currentAdDuration = _isNextAd10Sec ? 10 : 30;
     _isNextAd10Sec = !_isNextAd10Sec;
 
@@ -262,7 +265,6 @@ class DashboardPageState extends State<DashboardPage> {
     ).then((_) => setState(() {}));
   }
 
-  // 🔥 GOOGLE SIGN IN LOGIC (FIXED CONSTRUCTOR ERROR) 🔥
   Future<void> _signInWithGoogle(StateSetter setModalState) async {
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn();
@@ -818,7 +820,6 @@ class _TvFocusButtonState extends State<_TvFocusButton> {
   }
 }
 
-// 🔥 DEEP LIVE TV IPTV PARSER PAGE 🔥
 class LiveTvChannelsPage extends StatefulWidget {
   const LiveTvChannelsPage({super.key});
 

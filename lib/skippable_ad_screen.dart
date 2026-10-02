@@ -32,7 +32,9 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
       if (timeLeft > 0) {
         setState(() {
           timeLeft--;
-          if (timeLeft <= widget.adDuration - 5) {
+          // 🔥 FIXED: Skip button will only appear in the LAST 2 seconds 🔥
+          // For a 10s ad, it appears at 2s. For a 30s ad, it appears at 2s.
+          if (timeLeft <= 2) {
             canSkip = true;
           }
         });
@@ -75,7 +77,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
         body: SafeArea(
           child: Stack(
             children: [
-              // Yaha tumhara actual Ad Network ka widget aayega
+              // 🔥 Yaha tera ad widget aayega (Tum apni script/image yaha daal sakte ho) 🔥
               const Center(
                 child: Text(
                   "Sponsor Ad Playing...\n\nPlease wait.",
