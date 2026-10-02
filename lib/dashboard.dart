@@ -117,6 +117,7 @@ class DashboardPageState extends State<DashboardPage> {
           barrierDismissible: false, 
           builder: (context) => PopScope(
             canPop: false, 
+            onPopInvoked: (didPop) {},
             child: AlertDialog(
               backgroundColor: const Color(0xFF151515),
               title: const Text("Update Required!", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
@@ -261,9 +262,11 @@ class DashboardPageState extends State<DashboardPage> {
     ).then((_) => setState(() {}));
   }
 
+  // 🔥 GOOGLE SIGN IN LOGIC (FIXED CONSTRUCTOR ERROR) 🔥
   Future<void> _signInWithGoogle(StateSetter setModalState) async {
     try {
-      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      final GoogleSignIn googleSignIn = GoogleSignIn();
+      final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
       if (googleUser == null) return; 
       
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
@@ -298,7 +301,8 @@ class DashboardPageState extends State<DashboardPage> {
 
   Future<void> _signOut(StateSetter setModalState) async {
     await FirebaseAuth.instance.signOut();
-    await GoogleSignIn().signOut();
+    final GoogleSignIn googleSignIn = GoogleSignIn();
+    await googleSignIn.signOut();
     _initPresenceTracking(); 
     setModalState(() {});
     setState(() {});

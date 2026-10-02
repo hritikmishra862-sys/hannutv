@@ -13,19 +13,21 @@ dependencies:
   http: ^1.2.2
   webview_flutter: ^4.10.0
   webview_flutter_android: ^4.7.0
-  firebase_core: ^4.15.0
-  firebase_messaging: ^16.7.0
-  firebase_remote_config: ^6.7.0
-  # 🔥 Naye Deep Logic Packages Added Below 🔥
-  firebase_auth: ^6.7.0
-  google_sign_in: ^7.2.0
-  cloud_firestore: ^6.10.0
-  firebase_database: ^12.6.0
+  app_links: ^6.1.1
+  
+  # 🔥 Firebase Packages (Versions removed for auto-resolve) 🔥
+  firebase_core: 
+  firebase_messaging: 
+  firebase_remote_config: 
+  firebase_auth: 
+  google_sign_in: 
+  cloud_firestore: 
+  firebase_database: 
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
-  flutter_lints: ^6.0.0
+  flutter_lints: ^4.0.0
 
 flutter:
   uses-material-design: true
