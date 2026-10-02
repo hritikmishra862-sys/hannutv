@@ -52,7 +52,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   bool isFullScreen = false;
   bool isPageLoading = true;
   
-  String activeServer = 'server1'; 
+  String activeServer = 'vidrift'; 
   String currentAspectRatio = 'contain';
 
   late int currentSeason;
@@ -70,6 +70,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   late Animation<double> _introOpacityAnimation;
 
   final TextEditingController commentInputController = TextEditingController();
+
+  // 🔥 DIRECT ACCESS TO ALL SERVERS RESTORED[cite: 16] 🔥
+  final List<Map<String, String>> servers = const [
+    {'key': 'vidrift', 'name': 'Rift'},
+    {'key': 'fast', 'name': 'Fast'},
+    {'key': 'vidbolt', 'name': 'Bolt'},
+    {'key': 'cinezo', 'name': 'Cinezo'},
+    {'key': 'hindi-new', 'name': 'Hindi New'},
+    {'key': 'peach', 'name': 'Peach'},
+    {'key': 'mega', 'name': 'Mega'},
+    {'key': 'alpha', 'name': 'Alpha'},
+    {'key': 'orion', 'name': 'Orion'},
+    {'key': 'hindi', 'name': 'Hindi'},
+    {'key': 'vidgod', 'name': 'Vidgod'},
+    {'key': 'cinesrc', 'name': 'CineSrc'},
+  ];
 
   final List<Map<String, String>> publicComments = const [
     {'name': 'SHEEL', 'text': 'HARE KRISHNA 🦚', 'time': '9d', 'avatar': 'S'},
@@ -106,11 +122,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
 
     _fetchSimilarMovies();
-    _fetchTvDetails(); // 🔥 Fetches total seasons
+    _fetchTvDetails(); // Fetch total seasons
     _checkDeviceType(); 
   }
 
-  // 🔥 GET TV SHOW DETAILS (Number of Seasons) 🔥
+  // 🔥 FETCH TV SHOW DETAILS 🔥
   Future<void> _fetchTvDetails() async {
     if (widget.mediaType != 'tv' && widget.mediaType != 'series') return;
     try {
@@ -127,7 +143,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     } catch (e) {}
   }
 
-  // 🔥 GET EXACT EPISODES FOR SELECTED SEASON 🔥
+  // 🔥 GET EXACT EPISODES (NAME & THUMBNAILS) 🔥
   Future<void> _fetchEpisodes(int seasonNum) async {
     if (widget.mediaType != 'tv' && widget.mediaType != 'series') return;
     try {
@@ -227,20 +243,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
     }
-
     final id = widget.tmdbId;
     final s = currentSeason;
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    String srvName = 'vidrift'; // Default
-    if (activeServer == 'server1') srvName = 'vidrift';
-    if (activeServer == 'server2') srvName = 'vidbolt';
-    if (activeServer == 'server3') srvName = 'fast';
-
     return isTv 
-        ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$srvName' 
-        : 'https://pantyflix.com/watch/play/movie/$id?server=$srvName';
+        ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer' 
+        : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
   }
 
   void _initStream() {
@@ -277,7 +287,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // 🔥 PERFECT DEEP AD-BLOCKER SCRIPT 🔥
+            // 🔥 WORLD'S BEST DEEP AD-BLOCKER SCRIPT 🔥
             String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
@@ -419,7 +429,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               const SizedBox(height: 16),
               Expanded(
                 child: ListView.builder(
-                  itemCount: totalSeasons, // Dynamic seasons
+                  itemCount: totalSeasons, 
                   itemBuilder: (context, index) {
                     int seasonNum = index + 1;
                     return ListTile(
@@ -633,7 +643,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                     const SizedBox(height: 24),
 
-                    // 🔥 PIXELFLIX (DUAL AI) REMOVED - ONLY PANTYFLIX SERVER LEFT 🔥
+                    // 🔥 PANTYFLIX SERVER (ALL SERVERS RESTORED HORIZONTALLY)[cite: 16] 🔥
                     Container(
                       padding: const EdgeInsets.all(16),
                       decoration: BoxDecoration(
@@ -658,14 +668,38 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             ],
                           ),
                           const SizedBox(height: 16),
-                          Row(
-                            children: [
-                              _buildServerOption("Server 1", "server1"),
-                              const SizedBox(width: 8),
-                              _buildServerOption("Server 2", "server2"),
-                              const SizedBox(width: 8),
-                              _buildServerOption("Server 3", "server3"),
-                            ],
+                          SingleChildScrollView(
+                            scrollDirection: Axis.horizontal,
+                            child: Row(
+                              children: servers.map((srv) {
+                                final isSelected = activeServer == srv['key'];
+                                return _buildFocusableItem(
+                                  onTap: () {
+                                    if (activeServer != srv['key']) {
+                                      setState(() => activeServer = srv['key']!);
+                                      _initStream(); 
+                                    }
+                                  },
+                                  borderRadius: BorderRadius.circular(20),
+                                  child: Container(
+                                    margin: const EdgeInsets.only(right: 8),
+                                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                                    decoration: BoxDecoration(
+                                      color: isSelected ? Colors.white : Colors.grey[900],
+                                      borderRadius: BorderRadius.circular(20),
+                                    ),
+                                    child: Text(
+                                      srv['name']!,
+                                      style: TextStyle(
+                                        color: isSelected ? Colors.black : Colors.white,
+                                        fontWeight: FontWeight.bold,
+                                        fontSize: 13,
+                                      ),
+                                    ),
+                                  ),
+                                );
+                              }).toList(),
+                            ),
                           )
                         ],
                       ),
@@ -723,10 +757,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             // API data extraction
                             String epName = "Episode $epNum";
                             String imgUrl = '';
-                            if (episodesList.isNotEmpty) {
+                            if (episodesList.isNotEmpty && index < episodesList.length) {
                               epName = episodesList[index]['name'] ?? "Episode $epNum";
                               if (episodesList[index]['still_path'] != null) {
-                                imgUrl = 'https://image.tmdb.org/t/p/w300${episodesList[index]['still_path']}';
+                                imgUrl = 'https://image.tmdb.org/t/p/w500${episodesList[index]['still_path']}';
                               }
                             }
 
@@ -850,7 +884,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                     const SizedBox(height: 20),
                     
-                    // Suggested Movies (Deep TMDB logic retained)
+                    // Suggested Movies
                     if (similarMovies.isNotEmpty) ...[
                       const Text("Suggested Movies & Shows", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
@@ -897,31 +931,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               ),
             ),
           ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildServerOption(String title, String serverKey) {
-    bool isSelected = activeServer == serverKey;
-    return Expanded(
-      child: InkWell(
-        onTap: () {
-          if (activeServer != serverKey) {
-            setState(() => activeServer = serverKey);
-            _initStream();
-          }
-        },
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          decoration: BoxDecoration(
-            color: isSelected ? Colors.white : Colors.black,
-            border: Border.all(color: Colors.white30),
-            borderRadius: BorderRadius.circular(6)
-          ),
-          child: Center(
-            child: Text(title, style: TextStyle(color: isSelected ? Colors.black : Colors.white, fontWeight: FontWeight.bold, fontSize: 12)),
-          ),
         ),
       ),
     );

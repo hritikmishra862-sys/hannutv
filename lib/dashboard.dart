@@ -171,43 +171,34 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  // 🔥 DEEP HARDCODING: DIRECT PLAY, NO POPUP[cite: 15] 🔥
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
 
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      backgroundColor: Colors.transparent,
-      builder: (context) => _ServerSelectionModal(
-        media: media,
-        onSelect: () {
-          final type = media['mediaType'] ?? 'movie';
-          final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
-          int currentAdDuration = _isNextAd10Sec ? 10 : 30;
-          _isNextAd10Sec = !_isNextAd10Sec;
+    final type = media['mediaType'] ?? 'movie';
+    final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
+    int currentAdDuration = _isNextAd10Sec ? 10 : 30;
+    _isNextAd10Sec = !_isNextAd10Sec;
 
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (context) => SkippableAdScreen(
-                adDuration: currentAdDuration,
-                nextScreen: VideoPlayerPage(
-                  tmdbId: tId,
-                  mediaType: type,
-                  season: 1,
-                  episode: 1,
-                  movieTitle: media['title'] ?? 'Title',
-                  overview: media['overview'] ?? '',
-                  rating: media['rating'] ?? '9.0',
-                  year: media['year'] ?? '2024',
-                ),
-              ),
-            ),
-          ).then((_) => setState(() {}));
-        },
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SkippableAdScreen(
+          adDuration: currentAdDuration,
+          nextScreen: VideoPlayerPage(
+            tmdbId: tId,
+            mediaType: type,
+            season: 1,
+            episode: 1,
+            movieTitle: media['title'] ?? 'Title',
+            overview: media['overview'] ?? '',
+            rating: media['rating'] ?? '9.0',
+            year: media['year'] ?? '2024',
+          ),
+        ),
       ),
-    );
+    ).then((_) => setState(() {}));
   }
 
   Widget _buildHorizontalList(String title, List moviesData, {bool isRanking = false}) {
@@ -519,93 +510,6 @@ class DashboardPageState extends State<DashboardPage> {
             label: const Text("Search with Hannu AI Deep Resolver", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
           )
         ],
-      ),
-    );
-  }
-}
-
-// 🔥 SERVER ANALYZER MODAL (Only Pantyflix left) 🔥
-class _ServerSelectionModal extends StatefulWidget {
-  final Map media;
-  final VoidCallback onSelect;
-  const _ServerSelectionModal({required this.media, required this.onSelect});
-
-  @override
-  State<_ServerSelectionModal> createState() => _ServerSelectionModalState();
-}
-
-class _ServerSelectionModalState extends State<_ServerSelectionModal> {
-  bool isLoading1 = true;
-  bool isAvailable1 = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _checkServers();
-  }
-
-  Future<void> _checkServers() async {
-    final type = widget.media['mediaType'] ?? 'movie';
-    final id = widget.media['id'];
-    
-    final url1 = type == 'tv' ? 'https://vidlink.pro/tv/$id/1/1' : 'https://vidlink.pro/movie/$id';
-
-    try {
-      final res1 = await http.get(Uri.parse(url1)).timeout(const Duration(seconds: 4));
-      if (mounted) setState(() { isAvailable1 = true; isLoading1 = false; });
-    } catch (_) { if (mounted) setState(() { isAvailable1 = false; isLoading1 = false; }); }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Container(
-      decoration: const BoxDecoration(color: Color(0xFF151515), borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-      padding: const EdgeInsets.all(24),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Center(child: Container(width: 40, height: 4, decoration: BoxDecoration(color: Colors.white24, borderRadius: BorderRadius.circular(10)), margin: const EdgeInsets.only(bottom: 20))),
-          Row(
-            children: [
-              ClipRRect(borderRadius: BorderRadius.circular(8), child: Image.network(widget.media['posterUrl'] ?? '', width: 60, height: 90, fit: BoxFit.cover, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.grey))),
-              const SizedBox(width: 16),
-              Expanded(
-                  child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                    Text("Watch ${widget.media['title']}", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold), maxLines: 2),
-                    const SizedBox(height: 6),
-                    const Text("Deep Analyzing Server...", style: TextStyle(color: Colors.grey, fontSize: 12))
-                  ])),
-            ],
-          ),
-          const SizedBox(height: 24),
-          _buildServerBtn(title: "HANNUTV (Online HDP Node)", subtitle: "Pantyflix Server", isLoading: isLoading1, isAvailable: isAvailable1, onTap: () { Navigator.pop(context); widget.onSelect(); }),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildServerBtn({required String title, required String subtitle, required bool isLoading, required bool isAvailable, required VoidCallback onTap}) {
-    Color statusColor = isLoading ? Colors.amber : (isAvailable ? Colors.greenAccent : Colors.redAccent);
-    String statusText = isLoading ? "Checking..." : (isAvailable ? "Online" : "Offline");
-        
-    return InkWell(
-      onTap: onTap, 
-      borderRadius: BorderRadius.circular(12),
-      child: Container(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-        decoration: BoxDecoration(color: Colors.white.withOpacity(0.05), borderRadius: BorderRadius.circular(12), border: Border.all(color: statusColor.withOpacity(0.5), width: 1)),
-        child: Row(
-          children: [
-            Container(width: 40, height: 40, decoration: BoxDecoration(color: statusColor.withOpacity(0.1), shape: BoxShape.circle), child: Icon(Icons.dns_rounded, color: statusColor, size: 20)),
-            const SizedBox(width: 16),
-            Expanded(child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [Text(title, style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16)), Text(subtitle, style: const TextStyle(color: Colors.white54, fontSize: 12))])),
-            if (isLoading) const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(color: Colors.amber, strokeWidth: 2))
-            else Row(children: [Container(width: 8, height: 8, decoration: BoxDecoration(color: statusColor, shape: BoxShape.circle)), const SizedBox(width: 8), Text(statusText, style: TextStyle(color: statusColor, fontWeight: FontWeight.bold, fontSize: 12))]),
-          ],
-        ),
       ),
     );
   }
