@@ -70,12 +70,12 @@ class DashboardPageState extends State<DashboardPage> {
   void _startCarousel() {
     _carouselTimer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
       if (_pageController.hasClients && trendingList.isNotEmpty) {
-        int next = _currentPage + 1;
-        if (next >= (trendingList.length > 5 ? 5 : trendingList.length)) {
-          next = 0;
+        _currentPage++;
+        if (_currentPage >= (trendingList.length > 5 ? 5 : trendingList.length)) {
+          _currentPage = 0;
         }
         _pageController.animateToPage(
-          next,
+          _currentPage,
           duration: const Duration(milliseconds: 800),
           curve: Curves.easeInOut,
         );
@@ -297,7 +297,6 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   void launchPlayerDirect(Map media) {
-    // 🔥 Continue Watching Logic Updated 🔥
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
 
@@ -453,12 +452,7 @@ class DashboardPageState extends State<DashboardPage> {
                                 trendingList.length > 5
                                     ? 5
                                     : trendingList.length,
-                            onPageChanged: (index) {
-                              // 🔥 Slider Name Bug Fixed Here 🔥
-                              setState(() {
-                                _currentPage = index;
-                              });
-                            },
+                            onPageChanged: (index) => _currentPage = index,
                             itemBuilder: (context, index) {
                               return Container(
                                 decoration: BoxDecoration(
@@ -739,9 +733,11 @@ class DashboardPageState extends State<DashboardPage> {
               )
             else ...[
               _buildHorizontalList('🔥 HANNUTV Trending', trendingList),
-              // 🔥 Continue Watching List is Back 🔥
               if (continueWatchingList.isNotEmpty)
-                _buildHorizontalList('Continue Watching', continueWatchingList),
+                _buildHorizontalList(
+                  'Continue Watching',
+                  continueWatchingList,
+                ),
               _buildHorizontalList('Bollywood Hindi Movies', bollywoodList),
               _buildHorizontalList('Hollywood English Movies', hollywoodList),
               _buildHorizontalList('Anime Hub ⛩️', animeList),

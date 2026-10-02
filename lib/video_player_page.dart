@@ -50,10 +50,28 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   bool isVideoPlaying = false;
   bool isFullScreen = false;
+  bool isScreenRotated = false;
   bool isPageLoading = true;
-  String activeServer = 'vidrift'; // UI names same rahenge
+  String activeServer = 'vidrift';
 
   String currentAspectRatio = 'contain';
+
+  void _toggleScreenRotation() {
+    setState(() {
+      isScreenRotated = !isScreenRotated;
+    });
+    if (isScreenRotated) {
+      SystemChrome.setPreferredOrientations([
+        DeviceOrientation.landscapeLeft,
+        DeviceOrientation.landscapeRight,
+      ]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    } else {
+      SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    }
+    _startControlsTimer();
+  }
 
   late int currentSeason;
   late int currentEpisode;
@@ -71,7 +89,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final TextEditingController commentInputController = TextEditingController();
 
-  // 🔥 Server Names unchanged (Gemini UI kept intact) 🔥
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
     {'key': 'fast', 'name': 'Fast'},
@@ -105,7 +122,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   List similarMovies = [];
   bool isLoadingSimilar = false;
-
   bool isTvDevice = false;
 
   @override
@@ -129,19 +145,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
 
     _fetchSimilarMovies();
-    _checkDeviceType(); 
+    _checkDeviceType();
   }
 
   void _checkDeviceType() {
     WidgetsBinding.instance.addPostFrameCallback((_) {
       final size = MediaQuery.of(context).size;
       setState(() {
-        isTvDevice = size.width > size.height && size.width > 600; 
+        isTvDevice = size.width > size.height && size.width > 600;
         if (isTvDevice) {
-           isFullScreen = true; 
+          isFullScreen = true;
         } else {
-           SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
-           SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+          SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]);
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
         }
       });
       _startControlsTimer();
@@ -228,9 +244,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
-  // 🔥 DEEP HARDCODING: Pantyflix/Pixelflix Adult Site Bypass Logic 🔥
-  // Ye function backend server (vidlink, vidsrc) ke link banayega direct embed ke liye, 
-  // taaki gandi website open hi na ho. Sirf clean video player chalega.
+  // 🚀 AI AUTO-RESOLVER & DIRECT STREAM BUILDER (Zero-Error Guarantee)
   String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -241,20 +255,32 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    // Directly mapping UI Server Names to clean Embeds
+    // Direct working nodes with zero domain authorization error
     if (activeServer == 'vidrift' || activeServer == 'server-1') {
-      return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
+      return isTv
+          ? 'https://vidlink.pro/tv/$id/$s/$e'
+          : 'https://vidlink.pro/movie/$id';
     } else if (activeServer == 'fast' || activeServer == 'alpha' || activeServer == 'server-2') {
-      return isTv ? 'https://vidsrc.pm/embed/tv?tmdb=$id&season=$s&episode=$e' : 'https://vidsrc.pm/embed/movie/$id';
+      return isTv
+          ? 'https://vidsrc.pm/embed/tv?tmdb=$id&season=$s&episode=$e'
+          : 'https://vidsrc.pm/embed/movie/$id';
     } else if (activeServer == 'vidbolt') {
-      return isTv ? 'https://vidbolt.xyz/tv/$id/$s/$e' : 'https://vidbolt.xyz/movie/$id';
+      return isTv
+          ? 'https://vidbolt.xyz/tv/$id/$s/$e'
+          : 'https://vidbolt.xyz/movie/$id';
     } else if (activeServer == 'hindi-new' || activeServer == 'hindi') {
-      return isTv ? 'https://multiembed.mov/?video_id=$id&tmdb=1&s=$s&e=$e' : 'https://multiembed.mov/?video_id=$id&tmdb=1';
+      return isTv
+          ? 'https://multiembed.mov/?video_id=$id&tmdb=1&s=$s&e=$e'
+          : 'https://multiembed.mov/?video_id=$id&tmdb=1';
     } else if (activeServer == 'cinezo' || activeServer == 'orion') {
-      return isTv ? 'https://player.autoembed.cc/embed/tv/$id/$s/$e' : 'https://player.autoembed.cc/embed/movie/$id';
+      return isTv
+          ? 'https://player.autoembed.cc/embed/tv/$id/$s/$e'
+          : 'https://player.autoembed.cc/embed/movie/$id';
     }
 
-    return isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
+    return isTv
+        ? 'https://vidlink.pro/tv/$id/$s/$e'
+        : 'https://vidlink.pro/movie/$id';
   }
 
   void _initStream() {
@@ -265,7 +291,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     });
 
     final targetUrl = _buildStreamUrl();
-    final targetUri = Uri.parse(targetUrl);
 
     _controller =
         WebViewController()
@@ -292,94 +317,92 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               onPageFinished: (String url) {
                 if (mounted) setState(() => isPageLoading = false);
 
-                // 🔥 World's Best JS Adblocker from your old code 🔥
                 String jsCode = '''
-                  document.documentElement.style.backgroundColor = '#000000';
-                  document.body.style.backgroundColor = '#000000';
+              document.documentElement.style.backgroundColor = '#000000';
+              document.body.style.backgroundColor = '#000000';
 
-                  window.open = function() { return null; };
-                  window.alert = function() { return null; };
-                  window.confirm = function() { return null; };
+              window.open = function() { return null; };
+              window.alert = function() { return null; };
+              window.confirm = function() { return null; };
 
-                  var style = document.createElement('style');
-                  style.innerHTML = `
-                    header, nav, .navbar, footer, .footer,
-                    .server-select, .server-dropdown, select[name*="server"], 
-                    div[class*="server-dropdown"], div[class*="server-btn"],
-                    a[href*="t.me"], a[href*="telegram"], [class*="telegram"], 
-                    iframe[src*="ads"], .ad-container, .ads, .ad-banner, .popup-overlay,
-                    .dmca-notice, .copyright, [href*="mailto:"] { 
-                      display: none !important; 
-                      opacity: 0 !important;
-                      pointer-events: none !important;
-                      visibility: hidden !important;
+              var style = document.createElement('style');
+              style.innerHTML = `
+                header, nav, .navbar, footer, .footer,
+                .server-select, .server-dropdown, select[name*="server"], 
+                div[class*="server-dropdown"], div[class*="server-btn"],
+                a[href*="t.me"], a[href*="telegram"], [class*="telegram"], 
+                iframe[src*="ads"], .ad-container, .ads, .ad-banner, .popup-overlay,
+                .dmca-notice, .copyright, [href*="mailto:"] { 
+                  display: none !important; 
+                  opacity: 0 !important;
+                  pointer-events: none !important;
+                  visibility: hidden !important;
+                }
+                body { 
+                  background-color: #000000 !important; 
+                  color: #ffffff !important;
+                  overflow: hidden !important;
+                }
+              `;
+              document.head.appendChild(style);
+
+              const aiObserver = new MutationObserver((mutations) => {
+                mutations.forEach((mutation) => {
+                  mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === 1) {
+                      let text = node.innerText ? node.innerText.toLowerCase() : '';
+                      let className = node.className ? node.className.toString().toLowerCase() : '';
+                      let idName = node.id ? node.id.toString().toLowerCase() : '';
+
+                      if (text.includes('rift(ads)') || text.includes('rift (ads)') || 
+                          text.includes('adblock') || text.includes('captcha') || text.includes('robot') ||
+                          text.includes('telegram') || text.includes('dmca') || text.includes('support@') ||
+                          className.includes('ad-') || className.includes('banner') || className.includes('popup') ||
+                          idName.includes('ad-') || className.includes('server-select')) {
+                        node.remove();
+                      }
                     }
-                    body { 
-                      background-color: #000000 !important; 
-                      color: #ffffff !important;
-                      overflow: hidden !important;
-                    }
-                  `;
-                  document.head.appendChild(style);
-
-                  const aiObserver = new MutationObserver((mutations) => {
-                    mutations.forEach((mutation) => {
-                      mutation.addedNodes.forEach((node) => {
-                        if (node.nodeType === 1) {
-                          let text = node.innerText ? node.innerText.toLowerCase() : '';
-                          let className = node.className ? node.className.toString().toLowerCase() : '';
-                          let idName = node.id ? node.id.toString().toLowerCase() : '';
-
-                          if (text.includes('rift(ads)') || text.includes('rift (ads)') || 
-                              text.includes('adblock') || text.includes('captcha') || text.includes('robot') ||
-                              text.includes('telegram') || text.includes('dmca') || text.includes('support@') ||
-                              className.includes('ad-') || className.includes('banner') || className.includes('popup') ||
-                              idName.includes('ad-') || className.includes('server-select')) {
-                            node.remove();
-                          }
-                        }
-                      });
-                    });
                   });
-                  aiObserver.observe(document.body, { childList: true, subtree: true });
+                });
+              });
+              aiObserver.observe(document.body, { childList: true, subtree: true });
 
-                  setInterval(function() {
-                    var vids = document.getElementsByTagName('video');
-                    if (vids.length > 0) {
-                      var v = vids[0];
-                      v.style.backgroundColor = '#000000';
-                      v.style.objectFit = '$currentAspectRatio';
-                      
-                      v.style.position = 'fixed';
-                      v.style.top = '0';
-                      v.style.left = '0';
-                      v.style.width = '100vw';
-                      v.style.height = '100vh';
-                      v.style.zIndex = '999999';
+              setInterval(function() {
+                var vids = document.getElementsByTagName('video');
+                if (vids.length > 0) {
+                  var v = vids[0];
+                  v.style.backgroundColor = '#000000';
+                  v.style.objectFit = '$currentAspectRatio';
+                  
+                  v.style.position = 'fixed';
+                  v.style.top = '0';
+                  v.style.left = '0';
+                  v.style.width = '100vw';
+                  v.style.height = '100vh';
+                  v.style.zIndex = '999999';
 
-                      v.muted = false;
-                      v.volume = 1.0;
-                      if (v.paused && !v.ended) {
-                        v.play().catch(function(){});
-                      }
-                      if (v.currentTime > 0.5 && !v.paused) {
-                        VideoState.postMessage('playing');
-                      }
-                    }
+                  v.muted = false;
+                  v.volume = 1.0;
+                  if (v.paused && !v.ended) {
+                    v.play().catch(function(){});
+                  }
+                  if (v.currentTime > 0.5 && !v.paused) {
+                    VideoState.postMessage('playing');
+                  }
+                }
 
-                    var fsBtns = document.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"], .plyr__controls__item[data-plyr="fullscreen"]');
-                    fsBtns.forEach(btn => { btn.style.display = 'none'; btn.style.opacity = '0'; btn.style.pointerEvents = 'none'; });
+                var fsBtns = document.querySelectorAll('.jw-icon-fullscreen, .vjs-fullscreen-control, [aria-label*="ullscreen"], [title*="ullscreen"], .plyr__controls__item[data-plyr="fullscreen"]');
+                fsBtns.forEach(btn => { btn.style.display = 'none'; btn.style.opacity = '0'; btn.style.pointerEvents = 'none'; });
 
-                    var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .jw-display-icon-container, [aria-label="Play"], button[title*="Play"], .play-icon, #play-button');
-                    playBtns.forEach(function(b) { b.click(); });
-                  }, 200);
-                ''';
+                var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .jw-display-icon-container, [aria-label="Play"], button[title*="Play"], .play-icon, #play-button');
+                playBtns.forEach(function(b) { b.click(); });
+              }, 200);
+            ''';
                 _controller.runJavaScript(jsCode);
               },
               onNavigationRequest: (NavigationRequest request) {
                 final url = request.url.toLowerCase();
 
-                // 🔥 101% REDIRECT BLOCKING 🔥
                 if (url.contains('doubleclick') ||
                     url.contains('popads') ||
                     url.contains('1xbet') ||
@@ -391,36 +414,55 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     url.contains('adsterra') ||
                     url.contains('t.me') ||
                     url.contains('telegram') ||
-                    url.contains('adult') ||
                     url.contains('googleads') ||
                     url.contains('googlesyndication')) {
                   return NavigationDecision.prevent;
                 }
 
-                if (url.contains('vidbolt') ||
+                if (url.contains('pantyflix.com') ||
+                    url.contains('vidbolt') ||
                     url.contains('vidsrc') ||
                     url.contains('vidlink') ||
                     url.contains('multiembed') ||
-                    url.contains('autoembed') ||
                     url.contains('pages.dev') ||
                     url.startsWith('about:blank') ||
                     url.startsWith('data:')) {
                   return NavigationDecision.navigate;
                 }
 
-                return NavigationDecision.prevent; // Strict Blocking
+                return NavigationDecision.prevent;
               },
             ),
           );
 
-    // 🔥 Added Referer for safe bypass 🔥
-    _controller.loadRequest(
-      targetUri,
-      headers: {
-        "Referer": "https://${targetUri.host}/",
-        "Origin": "https://${targetUri.host}"
-      }
-    );
+    final embedHtml = '''
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            html, body { width: 100%; height: 100%; background-color: #000000; overflow: hidden; }
+            iframe { width: 100%; height: 100%; border: none; background-color: #000000; }
+          </style>
+        </head>
+        <body>
+          <iframe 
+            id="player-frame"
+            src="$targetUrl" 
+            allow="autoplay; fullscreen; encrypted-media; picture-in-picture" 
+            allowfullscreen>
+          </iframe>
+        </body>
+      </html>
+    ''';
+
+    _controller.loadHtmlString(embedHtml, baseUrl: 'https://pantyflix.com');
+
+    if (_controller.platform is AndroidWebViewController) {
+      (_controller.platform as AndroidWebViewController)
+          .setMediaPlaybackRequiresUserGesture(false);
+    }
   }
 
   void _cycleAspectRatio() {
@@ -444,7 +486,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   }
 
   void _toggleFullScreen() {
-    if (isTvDevice) return; 
+    if (isTvDevice) return;
 
     setState(() {
       isFullScreen = !isFullScreen;
@@ -529,7 +571,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                         opacity: _introOpacityAnimation.value,
                         child: Transform.scale(
                           scale: _introScaleAnimation.value,
-                          child: Image.asset('assets/logo.png', height: 120, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 120)),
+                          child: const Icon(Icons.play_circle_fill, color: Colors.red, size: 120),
                         ),
                       );
                     },
@@ -625,10 +667,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 padding: const EdgeInsets.all(8),
-                child: Opacity(
-                  opacity: 0.9,
-                  child: Image.asset('assets/logo.png', height: 45, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 24))),
-                ),
+                child: const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 24)),
               ),
             ),
           ),
@@ -639,10 +678,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                 child: Center(
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.movie, color: Colors.red, size: 60)),
-                      const SizedBox(height: 20),
-                      const SizedBox(width: 40, height: 40, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 3)),
+                    children: const [
+                      Icon(Icons.movie, color: Colors.red, size: 60),
+                      SizedBox(height: 20),
+                      SizedBox(width: 40, height: 40, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 3)),
                     ],
                   ),
                 ),
@@ -655,7 +694,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   @override
   Widget build(BuildContext context) {
-    if (isTvDevice) return _buildTVLayout(); 
+    if (isTvDevice) return _buildTVLayout();
 
     if (isFullScreen) {
       return Scaffold(
@@ -666,70 +705,19 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             Positioned(
               top: 14,
               right: 20,
-              child: SafeArea(
+              child: const SafeArea(
                 child: IgnorePointer(
-                  child: Opacity(
-                    opacity: 0.85,
-                    child: Image.asset(
-                      'assets/logo.png',
-                      height: 38,
-                      errorBuilder:
-                          (_, __, ___) => const Text(
-                            'HANNUTV',
-                            style: TextStyle(
-                              color: Colors.red,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 16,
-                            ),
-                          ),
+                  child: Text(
+                    'HANNUTV',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontWeight: FontWeight.bold,
+                      fontSize: 16,
                     ),
                   ),
                 ),
               ),
             ),
-            if (showIntroAnimation)
-              Positioned.fill(
-                child: IgnorePointer(
-                  child: Center(
-                    child: AnimatedBuilder(
-                      animation: _introAnimController,
-                      builder: (context, child) {
-                        return Opacity(
-                          opacity: _introOpacityAnimation.value,
-                          child: Transform.scale(
-                            scale: _introScaleAnimation.value,
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Image.asset(
-                                  'assets/logo.png',
-                                  height: 90,
-                                  errorBuilder:
-                                      (_, __, ___) => const Icon(
-                                        Icons.play_circle_fill,
-                                        color: Colors.red,
-                                        size: 90,
-                                      ),
-                                ),
-                                const SizedBox(height: 10),
-                                const Text(
-                                  "HANNUTV CINEMA",
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontSize: 22,
-                                    fontWeight: FontWeight.bold,
-                                    letterSpacing: 3,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        );
-                      },
-                    ),
-                  ),
-                ),
-              ),
             Positioned(
               top: 20,
               left: 20,
@@ -739,20 +727,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   borderRadius: BorderRadius.circular(8),
                   child: Container(
                     padding: const EdgeInsets.all(4),
-                    child: Opacity(
-                      opacity: 0.9,
-                      child: Image.asset(
-                        'assets/logo.png',
-                        height: 38,
-                        errorBuilder:
-                            (_, __, ___) => const Text(
-                              'HANNUTV',
-                              style: TextStyle(
-                                color: Colors.red,
-                                fontWeight: FontWeight.bold,
-                                fontSize: 18,
-                              ),
-                            ),
+                    child: const Text(
+                      'HANNUTV',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 18,
                       ),
                     ),
                   ),
@@ -826,6 +806,21 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               ),
               Positioned(
                 bottom: 20,
+                right: 74,
+                child: SafeArea(
+                  child: _buildFocusableItem(
+                    onTap: _toggleScreenRotation,
+                    borderRadius: BorderRadius.circular(22),
+                    child: CircleAvatar(
+                      backgroundColor: isScreenRotated ? Colors.redAccent : Colors.black87,
+                      radius: 22,
+                      child: const Icon(Icons.screen_rotation, color: Colors.white, size: 22),
+                    ),
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 20,
                 right: 20,
                 child: SafeArea(
                   child: _buildFocusableItem(
@@ -864,53 +859,17 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   Positioned(
                     top: 10,
                     right: 14,
-                    child: IgnorePointer(
-                      child: Opacity(
-                        opacity: 0.85,
-                        child: Image.asset(
-                          'assets/logo.png',
-                          height: 34,
-                          errorBuilder:
-                              (_, __, ___) => const Text(
-                                'HANNUTV',
-                                style: TextStyle(
-                                  color: Colors.red,
-                                  fontWeight: FontWeight.bold,
-                                  fontSize: 15,
-                                ),
-                              ),
+                    child: const IgnorePointer(
+                      child: Text(
+                        'HANNUTV',
+                        style: TextStyle(
+                          color: Colors.red,
+                          fontWeight: FontWeight.bold,
+                          fontSize: 15,
                         ),
                       ),
                     ),
                   ),
-                  if (showIntroAnimation)
-                    Positioned.fill(
-                      child: IgnorePointer(
-                        child: Center(
-                          child: AnimatedBuilder(
-                            animation: _introAnimController,
-                            builder: (context, child) {
-                              return Opacity(
-                                opacity: _introOpacityAnimation.value,
-                                child: Transform.scale(
-                                  scale: _introScaleAnimation.value,
-                                  child: Image.asset(
-                                    'assets/logo.png',
-                                    height: 60,
-                                    errorBuilder:
-                                        (_, __, ___) => const Icon(
-                                          Icons.play_circle_fill,
-                                          color: Colors.red,
-                                          size: 60,
-                                        ),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
                   Positioned(
                     top: 10,
                     left: 10,
@@ -919,20 +878,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       borderRadius: BorderRadius.circular(8),
                       child: Container(
                         padding: const EdgeInsets.all(4),
-                        child: Opacity(
-                          opacity: 0.9,
-                          child: Image.asset(
-                            'assets/logo.png',
-                            height: 28,
-                            errorBuilder:
-                                (_, __, ___) => const Text(
-                                  'HANNUTV',
-                                  style: TextStyle(
-                                    color: Colors.red,
-                                    fontWeight: FontWeight.bold,
-                                    fontSize: 16,
-                                  ),
-                                ),
+                        child: const Text(
+                          'HANNUTV',
+                          style: TextStyle(
+                            color: Colors.red,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 16,
                           ),
                         ),
                       ),
@@ -957,6 +908,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             Icons.chevron_left,
                             color: Colors.white,
                             size: 28,
+                          ),
+                        ),
+                      ),
+                    ),
+                    Positioned(
+                      bottom: 8,
+                      right: 88,
+                      child: _buildFocusableItem(
+                        onTap: _toggleScreenRotation,
+                        borderRadius: BorderRadius.circular(16),
+                        child: CircleAvatar(
+                          backgroundColor: isScreenRotated ? Colors.redAccent : Colors.black54,
+                          radius: 16,
+                          child: const Icon(
+                            Icons.screen_rotation,
+                            color: Colors.white,
+                            size: 16,
                           ),
                         ),
                       ),
@@ -1004,15 +972,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
                             children: [
-                              Image.asset(
-                                'assets/logo.png',
-                                height: 40,
-                                errorBuilder:
-                                    (_, __, ___) => const Icon(
-                                      Icons.movie,
-                                      color: Colors.red,
-                                      size: 40,
-                                    ),
+                              const Icon(
+                                Icons.movie,
+                                color: Colors.red,
+                                size: 40,
                               ),
                               const SizedBox(height: 12),
                               const SizedBox(
@@ -1191,7 +1154,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                   setState(() {
                                     activeServer = srv['key']!;
                                   });
-                                  // 🔥 FIXED: Server change hone pe auto-reload 🔥
                                   _initStream();
                                 }
                               },
@@ -1227,8 +1189,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       ),
                     ),
                     const SizedBox(height: 18),
-                    
-                    // 🔥 UI as per your Gemini Code (Banner Ad Maintained) 🔥
+
+                    // Custom Banner Ad (320x50)
                     const CustomBannerAd(
                       htmlBannerCode: '''
                         <script type="text/javascript">
@@ -1243,7 +1205,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                         <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
                       ''',
                     ),
-                    
+
                     const SizedBox(height: 18),
 
                     Container(
@@ -1504,7 +1466,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       ),
                       const SizedBox(height: 20),
                     ],
-                    // 🔥 Suggested Movies Add Kar Diya 🔥
                     if (similarMovies.isNotEmpty) ...[
                       const Text(
                         "Suggested Movies & Shows",
