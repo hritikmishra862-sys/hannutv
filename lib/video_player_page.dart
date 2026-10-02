@@ -18,6 +18,14 @@ const Map<String, String> kApiHeaders = {
   'accept': 'application/json',
 };
 
+// 🔥 TERA ADSTERRA BANNER SCRIPT 🔥
+const String _adsterraBannerSnippet = '''
+  <script type="text/javascript">
+    atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
+  </script>
+  <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
+''';
+
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
   final String mediaType;
@@ -65,6 +73,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   bool showControls = true;
   Timer? _hideControlsTimer;
+  Timer? _liveTvAdTimer; // 🔥 10 MINUTE AUTO AD TIMER 🔥
 
   bool showIntroAnimation = false;
   late AnimationController _introAnimController;
@@ -108,7 +117,28 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     if (widget.customUrl == null) {
       _fetchSimilarMovies();
       _fetchTvDetails(); 
+    } else {
+      // 🔥 LIVE TV: HAR 10 MINUTE ME AUTO MONETAG AD LOOP 🔥
+      _liveTvAdTimer = Timer.periodic(const Duration(minutes: 10), (timer) {
+        if (mounted) {
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => SkippableAdScreen(
+                adDuration: 15, 
+                nextScreen: VideoPlayerPage(
+                  tmdbId: widget.tmdbId, mediaType: widget.mediaType,
+                  season: widget.season, episode: widget.episode,
+                  movieTitle: widget.movieTitle, overview: widget.overview,
+                  rating: widget.rating, year: widget.year, customUrl: widget.customUrl,
+                ),
+              ),
+            ),
+          );
+        }
+      });
     }
+
     _checkDeviceType(); 
   }
 
@@ -348,7 +378,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🔥 FIREBASE REALTIME PUBLIC COMMENTS 🔥
   void _addComment() async {
     final text = commentInputController.text.trim();
     User? user = FirebaseAuth.instance.currentUser;
@@ -376,7 +405,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   @override
   void dispose() {
-    _hideControlsTimer?.cancel(); _introAnimController.dispose(); commentInputController.dispose();
+    _hideControlsTimer?.cancel(); 
+    _liveTvAdTimer?.cancel(); 
+    _introAnimController.dispose(); 
+    commentInputController.dispose();
     SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]); SystemChrome.setEnabledSystemUIMode(SystemUiMode.manual, overlays: SystemUiOverlay.values);
     super.dispose();
   }
@@ -447,18 +479,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    if (widget.customUrl == null) ...[
-                      const CustomBannerAd(
-                        htmlBannerCode: '''
-                          <script type="text/javascript">
-                            atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
-                          </script>
-                          <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
-                        ''',
-                      ),
-                      const SizedBox(height: 16),
-                    ],
-
                     Text(displayTitle, style: const TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)),
                     const SizedBox(height: 6),
                     Row(
@@ -493,10 +513,43 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       ),
                     ),
                     const SizedBox(height: 16),
-                    const Text("If current server is not working, try a different one:", style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic)),
-                    const SizedBox(height: 10),
+
+                    // 🔥 EXACTLY 2 BANNER ADS FOR NORMAL MOVIES/SERIES 🔥
+                    if (widget.customUrl == null) ...[
+                      const Text("Sponsored Ads", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 20),
+                    ],
+
+                    // 🔥 EXACTLY 8 BANNER ADS ONLY FOR LIVE TV (IPTV) 🔥
+                    if (widget.customUrl != null) ...[
+                      const SizedBox(height: 10),
+                      const Text("Sponsored Ads", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
+                      const SizedBox(height: 10),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 20),
+                    ],
 
                     if (widget.customUrl == null) ...[
+                      const Text("If current server is not working, try a different one:", style: TextStyle(color: Colors.grey, fontSize: 13, fontStyle: FontStyle.italic)),
+                      const SizedBox(height: 10),
                       Container(
                         padding: const EdgeInsets.all(16),
                         decoration: BoxDecoration(color: const Color(0xFF151515), border: Border.all(color: Colors.white12), borderRadius: BorderRadius.circular(12)),

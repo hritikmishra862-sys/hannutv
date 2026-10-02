@@ -20,6 +20,14 @@ const Map<String, String> kApiHeaders = {
   'accept': 'application/json',
 };
 
+// 🔥 TERA ADSTERRA BANNER SCRIPT 🔥
+const String _adsterraBannerSnippet = '''
+  <script type="text/javascript">
+    atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
+  </script>
+  <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
+''';
+
 List<Map> continueWatchingList = [];
 
 class DashboardPage extends StatefulWidget {
@@ -238,15 +246,12 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // 🔥 DIRECT PLAYER START (WITH PROPER AD TIMINGS) 🔥
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
 
     final type = media['mediaType'] ?? 'movie';
     final tId = media['id'] is int ? media['id'] : int.tryParse(media['id'].toString()) ?? 0;
-    
-    // Switch between 10 sec and 30 sec ad per click
     int currentAdDuration = _isNextAd10Sec ? 10 : 30;
     _isNextAd10Sec = !_isNextAd10Sec;
 
@@ -716,14 +721,7 @@ class DashboardPageState extends State<DashboardPage> {
               
               const Padding(
                 padding: EdgeInsets.symmetric(horizontal: 16.0, vertical: 20.0),
-                child: CustomBannerAd(
-                  htmlBannerCode: '''
-                    <script type="text/javascript">
-                      atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
-                    </script>
-                    <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
-                  ''',
-                ),
+                child: CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
               ),
 
               if (seriesRankings.isNotEmpty)

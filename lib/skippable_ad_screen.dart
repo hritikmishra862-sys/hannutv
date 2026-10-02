@@ -25,9 +25,9 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   late WebViewController _adController;
   
   bool isAdLoading = true;
-  bool isTimerStarted = false; // 🔥 Timer Start Control Flag
+  bool isTimerStarted = false; 
 
-  // 🔥 TERE DONO NAYE MONETAG LINKS 🔥
+  // 🔥 TERE DONO MONETAG LINKS 🔥
   final List<String> monetagLinks = [
     'https://omg10.com/4/11914244',
     'https://omg10.com/4/11914245'
@@ -38,10 +38,8 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     super.initState();
     timeLeft = widget.adDuration;
     
-    // Randomly select between the two links to maximize revenue
     String selectedAdUrl = monetagLinks[Random().nextInt(monetagLinks.length)];
 
-    // Initialize Ad WebView
     _adController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
@@ -55,7 +53,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
               setState(() { 
                 isAdLoading = false; 
               });
-              // 🔥 JAISE HI AD POORA LOAD HOGA, TIMER START HOGA 🔥
               if (!isTimerStarted) {
                 isTimerStarted = true;
                 startTimer();
@@ -81,7 +78,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
         if(mounted){
           setState(() {
             timeLeft--;
-            // 🔥 Skip button appear at last 2 seconds 🔥
             if (timeLeft <= 2) {
               canSkip = true;
             }
@@ -112,7 +108,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 PopScope: Deep hardware Back Button lock 🔥
     return PopScope(
       canPop: false, 
       onPopInvoked: (didPop) {
@@ -130,18 +125,15 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
         body: SafeArea(
           child: Stack(
             children: [
-              // 🔥 Monetag Ad Full Screen WebView 🔥
               Positioned.fill(
                 child: WebViewWidget(controller: _adController),
               ),
               
-              // Loading Indicator jab tak website load na ho
               if(isAdLoading)
                 const Center(
                   child: CircularProgressIndicator(color: Colors.redAccent),
                 ),
 
-              // Top Right Timer / Skip Button
               Positioned(
                 top: 20,
                 right: 20,
@@ -156,8 +148,8 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                   onPressed: canSkip ? goToNext : null,
                   child: Text(
                     !isTimerStarted 
-                        ? "Loading Ad..."  // Ad load hone se pehle ka text
-                        : (canSkip ? "Skip Ad >>" : "Skip in $timeLeft s"), // Load hone ke baad ka text
+                        ? "Loading Ad..."  
+                        : (canSkip ? "Skip Ad >>" : "Skip in $timeLeft s"), 
                     style: const TextStyle(
                       color: Colors.white, 
                       fontWeight: FontWeight.bold
@@ -166,7 +158,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 ),
               ),
 
-              // "Ad" badge Bottom Left
               Positioned(
                 bottom: 20,
                 left: 20,
