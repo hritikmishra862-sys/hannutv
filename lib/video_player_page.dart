@@ -5,6 +5,8 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
 
@@ -84,12 +86,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     {'key': 'hindi', 'name': 'Hindi'},
     {'key': 'vidgod', 'name': 'Vidgod'},
     {'key': 'cinesrc', 'name': 'CineSrc'},
-  ];
-
-  final List<Map<String, String>> publicComments = const [
-    {'name': 'SHEEL', 'text': 'HARE KRISHNA 🦚', 'time': '9d', 'avatar': 'S'},
-    {'name': 'Rohit Sharma', 'text': 'Best quality on HANNUTV, loving this series! 🔥', 'time': '2d', 'avatar': 'R'},
-    {'name': 'Ananya Verma', 'text': 'Full HD stream with no buffering ❤️', 'time': '5h', 'avatar': 'A'},
   ];
 
   List similarMovies = [];
@@ -352,10 +348,29 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  void _addComment() {
+  // 🔥 FIREBASE REALTIME PUBLIC COMMENTS 🔥
+  void _addComment() async {
     final text = commentInputController.text.trim();
+    User? user = FirebaseAuth.instance.currentUser;
+
     if (text.isNotEmpty) {
-      setState(() { publicComments.insert(0, {'name': 'You', 'text': text, 'time': 'Just now', 'avatar': 'Y'}); commentInputController.clear(); });
+      if (user == null || user.isAnonymous) {
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Please login from Dashboard to comment!'), backgroundColor: Colors.redAccent));
+        return;
+      }
+      
+      String movieId = widget.customUrl == null ? widget.tmdbId.toString() : 'live_${widget.movieTitle.replaceAll(" ", "_")}';
+      
+      await FirebaseFirestore.instance.collection('movies').doc(movieId).collection('comments').add({
+        'name': user.displayName ?? 'HANNUTV User',
+        'text': text,
+        'time': DateTime.now().toIso8601String(),
+        'timestamp': FieldValue.serverTimestamp(),
+        'avatar': (user.displayName != null && user.displayName!.isNotEmpty) ? user.displayName![0].toUpperCase() : 'H',
+      });
+      
+      commentInputController.clear();
+      FocusScope.of(context).unfocus();
     }
   }
 
@@ -580,7 +595,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           Row(
                             mainAxisAlignment: MainAxisAlignment.spaceBetween,
                             children: [
-                              Text("Comments ${publicComments.length}", style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
+                              Text("Public Comments", style: const TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold)),
                               const Icon(Icons.comment, color: Colors.grey, size: 16),
                             ],
                           ),
@@ -592,7 +607,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                   controller: commentInputController,
                                   style: const TextStyle(color: Colors.white, fontSize: 12),
                                   decoration: InputDecoration(
-                                    hintText: 'Add a comment...',
+                                    hintText: 'Add a public comment...',
                                     hintStyle: const TextStyle(color: Colors.grey, fontSize: 12),
                                     filled: true, fillColor: Colors.black45,
                                     contentPadding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -607,31 +622,47 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             ],
                           ),
                           const SizedBox(height: 10),
-                          ...publicComments.map((c) => Padding(
-                            padding: const EdgeInsets.only(bottom: 8.0),
-                            child: Row(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(c['avatar']!, style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
-                                const SizedBox(width: 10),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Row(
-                                        children: [
-                                          Text(c['name']!, style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
-                                          const SizedBox(width: 6),
-                                          Text(c['time']!, style: const TextStyle(color: Colors.grey, fontSize: 10)),
-                                        ],
-                                      ),
-                                      Text(c['text']!, style: const TextStyle(color: Colors.white, fontSize: 12)),
-                                    ],
-                                  ),
-                                ),
-                              ],
-                            ),
-                          )),
+                          
+                          StreamBuilder<QuerySnapshot>(
+                            stream: FirebaseFirestore.instance.collection('movies').doc(widget.customUrl == null ? widget.tmdbId.toString() : 'live_${widget.movieTitle.replaceAll(" ", "_")}').collection('comments').orderBy('timestamp', descending: true).snapshots(),
+                            builder: (context, snapshot) {
+                              if (!snapshot.hasData) return const Center(child: CircularProgressIndicator(color: Colors.redAccent));
+                              final comments = snapshot.data!.docs;
+                              
+                              if (comments.isEmpty) return const Padding(padding: EdgeInsets.all(8.0), child: Text("Be the first to comment!", style: TextStyle(color: Colors.grey, fontSize: 12)));
+
+                              return Column(
+                                children: comments.map((doc) {
+                                  var data = doc.data() as Map<String, dynamic>;
+                                  return Padding(
+                                    padding: const EdgeInsets.only(bottom: 8.0),
+                                    child: Row(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        CircleAvatar(radius: 14, backgroundColor: Colors.redAccent, child: Text(data['avatar'] ?? 'U', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))),
+                                        const SizedBox(width: 10),
+                                        Expanded(
+                                          child: Column(
+                                            crossAxisAlignment: CrossAxisAlignment.start,
+                                            children: [
+                                              Row(
+                                                children: [
+                                                  Text(data['name'] ?? 'User', style: const TextStyle(color: Colors.white70, fontSize: 12, fontWeight: FontWeight.bold)),
+                                                  const SizedBox(width: 6),
+                                                  const Text("Just now", style: TextStyle(color: Colors.grey, fontSize: 10)),
+                                                ],
+                                              ),
+                                              Text(data['text'] ?? '', style: const TextStyle(color: Colors.white, fontSize: 12)),
+                                            ],
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  );
+                                }).toList(),
+                              );
+                            },
+                          ),
                         ],
                       ),
                     ),

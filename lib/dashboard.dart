@@ -3,9 +3,14 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'dart:async';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'package:google_sign_in/google_sign_in.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:firebase_database/firebase_database.dart'; 
 import 'video_player_page.dart';
 import 'skippable_ad_screen.dart';
-import 'banner_ad_widget.dart'; 
+import 'banner_ad_widget.dart';
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -65,8 +70,69 @@ class DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
+    _checkForUpdates(); 
+    _initPresenceTracking(); 
     loadAllDashboards();
     _startCarousel();
+  }
+
+  Future<void> _initPresenceTracking() async {
+    User? user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      await FirebaseAuth.instance.signInAnonymously();
+      user = FirebaseAuth.instance.currentUser;
+    }
+
+    if (user != null) {
+      DatabaseReference presenceRef = FirebaseDatabase.instance.ref('active_users/${user.uid}');
+      FirebaseDatabase.instance.ref('.info/connected').onValue.listen((event) {
+        if (event.snapshot.value == false) return;
+        presenceRef.onDisconnect().remove();
+        presenceRef.set({
+          'online': true,
+          'is_logged_in': !user!.isAnonymous, 
+          'last_active': ServerValue.timestamp,
+        });
+      });
+    }
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      final remoteConfig = FirebaseRemoteConfig.instance;
+      await remoteConfig.setConfigSettings(RemoteConfigSettings(
+        fetchTimeout: const Duration(minutes: 1),
+        minimumFetchInterval: const Duration(minutes: 5),
+      ));
+      await remoteConfig.fetchAndActivate();
+
+      bool forceUpdate = remoteConfig.getBool('force_update');
+      String latestVersion = remoteConfig.getString('latest_version');
+      String updateLink = remoteConfig.getString('update_link');
+      String currentVersion = "1.0.0"; 
+
+      if (forceUpdate && currentVersion != latestVersion && latestVersion.isNotEmpty) {
+        showDialog(
+          context: context,
+          barrierDismissible: false, 
+          builder: (context) => PopScope(
+            canPop: false, 
+            child: AlertDialog(
+              backgroundColor: const Color(0xFF151515),
+              title: const Text("Update Required!", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+              content: Text("A new version ($latestVersion) is available. Please update your app to continue watching securely.", style: const TextStyle(color: Colors.white)),
+              actions: [
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent),
+                  onPressed: () => launchUrl(Uri.parse(updateLink.isEmpty ? 'https://t.me/HANNUTV' : updateLink), mode: LaunchMode.externalApplication),
+                  child: const Text("Update Now", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                )
+              ],
+            ),
+          ),
+        );
+      }
+    } catch (e) {}
   }
 
   void _startCarousel() {
@@ -104,20 +170,10 @@ class DashboardPageState extends State<DashboardPage> {
             'id': m['id'],
             'title': m['title'] ?? m['name'] ?? 'Unknown',
             'overview': m['overview'] ?? '',
-            'posterUrl':
-                m['poster_path'] != null
-                    ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}'
-                    : '',
-            'backdropUrl':
-                m['backdrop_path'] != null
-                    ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}'
-                    : '',
+            'posterUrl': m['poster_path'] != null ? 'https://image.tmdb.org/t/p/w500${m['poster_path']}' : '',
+            'backdropUrl': m['backdrop_path'] != null ? 'https://image.tmdb.org/t/p/original${m['backdrop_path']}' : '',
             'rating': (m['vote_average'] ?? 0).toStringAsFixed(1),
-            'year':
-                (m['release_date'] ?? m['first_air_date'] ?? '')
-                    .toString()
-                    .split('-')
-                    .first,
+            'year': (m['release_date'] ?? m['first_air_date'] ?? '').toString().split('-').first,
             'mediaType': forceMediaType ?? (m['media_type'] ?? 'movie'),
           },
         )
@@ -166,10 +222,7 @@ class DashboardPageState extends State<DashboardPage> {
 
   void onSearchChanged(String value) {
     if (value.isEmpty) {
-      setState(() {
-        isSearching = false;
-        searchResults = [];
-      });
+      setState(() { isSearching = false; searchResults = []; });
       return;
     }
     setState(() => isSearching = true);
@@ -179,13 +232,8 @@ class DashboardPageState extends State<DashboardPage> {
       try {
         final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
         final res = await http.get(Uri.parse(url), headers: kApiHeaders);
-        setState(() {
-          searchResults = parseData(res);
-          isLoading = false;
-        });
-      } catch (_) {
-        setState(() => isLoading = false);
-      }
+        setState(() { searchResults = parseData(res); isLoading = false; });
+      } catch (_) { setState(() => isLoading = false); }
     });
   }
 
@@ -204,18 +252,56 @@ class DashboardPageState extends State<DashboardPage> {
         builder: (context) => SkippableAdScreen(
           adDuration: currentAdDuration,
           nextScreen: VideoPlayerPage(
-            tmdbId: tId,
-            mediaType: type,
-            season: 1,
-            episode: 1,
-            movieTitle: media['title'] ?? 'Title',
-            overview: media['overview'] ?? '',
-            rating: media['rating'] ?? '9.0',
-            year: media['year'] ?? '2024',
+            tmdbId: tId, mediaType: type, season: 1, episode: 1,
+            movieTitle: media['title'] ?? 'Title', overview: media['overview'] ?? '',
+            rating: media['rating'] ?? '9.0', year: media['year'] ?? '2024',
           ),
         ),
       ),
     ).then((_) => setState(() {}));
+  }
+
+  Future<void> _signInWithGoogle(StateSetter setModalState) async {
+    try {
+      final GoogleSignInAccount? googleUser = await GoogleSignIn().signIn();
+      if (googleUser == null) return; 
+      
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      final AuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      if (FirebaseAuth.instance.currentUser?.isAnonymous == true) {
+        await FirebaseAuth.instance.signOut();
+      }
+
+      UserCredential userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+      
+      if (userCred.user != null) {
+        await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).set({
+          'name': userCred.user!.displayName,
+          'email': userCred.user!.email,
+          'photoUrl': userCred.user!.photoURL,
+          'last_login': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        
+        _initPresenceTracking(); 
+        setModalState(() {}); 
+        setState(() {}); 
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login Successful!'), backgroundColor: Colors.green));
+      }
+    } catch (e) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Login Failed'), backgroundColor: Colors.red));
+    }
+  }
+
+  Future<void> _signOut(StateSetter setModalState) async {
+    await FirebaseAuth.instance.signOut();
+    await GoogleSignIn().signOut();
+    _initPresenceTracking(); 
+    setModalState(() {});
+    setState(() {});
   }
 
   void _showAdminDashboard() {
@@ -225,93 +311,132 @@ class DashboardPageState extends State<DashboardPage> {
       isScrollControlled: true,
       shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
       builder: (context) {
-        return SizedBox(
-          height: MediaQuery.of(context).size.height * 0.85,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Container(
-                padding: const EdgeInsets.all(24),
-                decoration: const BoxDecoration(color: Color(0xFF202020), borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
-                child: Row(
-                  children: [
-                    const CircleAvatar(radius: 30, backgroundColor: Colors.redAccent, child: Icon(Icons.person, color: Colors.white, size: 35)),
-                    const SizedBox(width: 16),
-                    Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: const [
-                        Text("Welcome to HANNUTV", style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
-                        Text("Login to sync your data", style: TextStyle(color: Colors.grey, fontSize: 13)),
-                      ],
-                    )
-                  ],
+        return StatefulBuilder(builder: (BuildContext context, StateSetter setModalState) {
+          User? currentUser = FirebaseAuth.instance.currentUser;
+          bool isGuest = currentUser == null || currentUser.isAnonymous;
+
+          return SizedBox(
+            height: MediaQuery.of(context).size.height * 0.85,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Container(
+                  padding: const EdgeInsets.all(24),
+                  decoration: const BoxDecoration(color: Color(0xFF202020), borderRadius: BorderRadius.vertical(top: Radius.circular(24))),
+                  child: Row(
+                    children: [
+                      Stack(
+                        children: [
+                          CircleAvatar(
+                            radius: 30, backgroundColor: Colors.redAccent, 
+                            backgroundImage: !isGuest && currentUser.photoURL != null ? NetworkImage(currentUser.photoURL!) : null,
+                            child: isGuest || currentUser!.photoURL == null ? const Icon(Icons.person, color: Colors.white, size: 35) : null,
+                          ),
+                          Positioned(
+                            bottom: 0, right: 0,
+                            child: Container(
+                              width: 14, height: 14,
+                              decoration: BoxDecoration(
+                                color: isGuest ? Colors.orange : Colors.green,
+                                shape: BoxShape.circle,
+                                border: Border.all(color: const Color(0xFF202020), width: 2)
+                              ),
+                            ),
+                          )
+                        ],
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(!isGuest ? currentUser.displayName ?? 'HANNUTV User' : "Welcome to HANNUTV", style: const TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold), overflow: TextOverflow.ellipsis),
+                            Text(!isGuest ? currentUser.email ?? 'Synced' : "Login to sync your data", style: const TextStyle(color: Colors.grey, fontSize: 13), overflow: TextOverflow.ellipsis),
+                          ],
+                        ),
+                      )
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 20),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: ElevatedButton.icon(
-                  style: ElevatedButton.styleFrom(backgroundColor: Colors.white, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  onPressed: () {},
-                  icon: const Icon(Icons.g_mobiledata, color: Colors.black, size: 32),
-                  label: const Text("Sign in with Google", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
-                ),
-              ),
-              const SizedBox(height: 24),
-              const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text("Support & Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-              const SizedBox(height: 12),
-              Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 24),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), border: Border.all(color: Colors.blueAccent), borderRadius: BorderRadius.circular(12)),
-                          child: Column(children: const [Icon(Icons.telegram, color: Colors.blueAccent, size: 30), SizedBox(height: 8), Text("Telegram", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+                const SizedBox(height: 20),
+                
+                if (isGuest)
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.white, minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+                      onPressed: () async => await _signInWithGoogle(setModalState),
+                      icon: const Icon(Icons.g_mobiledata, color: Colors.black, size: 32),
+                      label: const Text("Sign in with Google", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  )
+                else
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 24),
+                    child: ElevatedButton.icon(
+                      style: ElevatedButton.styleFrom(backgroundColor: Colors.redAccent.withOpacity(0.2), minimumSize: const Size(double.infinity, 50), shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)), side: const BorderSide(color: Colors.redAccent)),
+                      onPressed: () async => await _signOut(setModalState),
+                      icon: const Icon(Icons.logout, color: Colors.redAccent),
+                      label: const Text("Logout", style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold, fontSize: 16)),
+                    ),
+                  ),
+
+                const SizedBox(height: 24),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text("Support & Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+                const SizedBox(height: 12),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 24),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: Colors.blueAccent.withOpacity(0.1), border: Border.all(color: Colors.blueAccent), borderRadius: BorderRadius.circular(12)),
+                            child: Column(children: const [Icon(Icons.telegram, color: Colors.blueAccent, size: 30), SizedBox(height: 8), Text("Telegram", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+                          ),
                         ),
                       ),
-                    ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: InkWell(
-                        onTap: () => launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication),
-                        child: Container(
-                          padding: const EdgeInsets.all(12),
-                          decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), border: Border.all(color: Colors.green), borderRadius: BorderRadius.circular(12)),
-                          child: Column(children: const [Icon(Icons.chat, color: Colors.green, size: 30), SizedBox(height: 8), Text("WhatsApp", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: InkWell(
+                          onTap: () => launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication),
+                          child: Container(
+                            padding: const EdgeInsets.all(12),
+                            decoration: BoxDecoration(color: Colors.green.withOpacity(0.1), border: Border.all(color: Colors.green), borderRadius: BorderRadius.circular(12)),
+                            child: Column(children: const [Icon(Icons.chat, color: Colors.green, size: 30), SizedBox(height: 8), Text("WhatsApp", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))]),
+                          ),
                         ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
-              ),
-              const SizedBox(height: 24),
-              const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text("Your Watch History", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
-              const SizedBox(height: 12),
-              Expanded(
-                child: continueWatchingList.isEmpty 
-                  ? const Center(child: Text("No movies watched yet.", style: TextStyle(color: Colors.grey))) 
-                  : ListView.builder(
-                      padding: const EdgeInsets.symmetric(horizontal: 24),
-                      itemCount: continueWatchingList.length,
-                      itemBuilder: (context, index) {
-                        final media = continueWatchingList[index];
-                        return ListTile(
-                          contentPadding: const EdgeInsets.only(bottom: 12),
-                          leading: ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.network(media['posterUrl'], width: 40, height: 60, fit: BoxFit.cover)),
-                          title: Text(media['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
-                          subtitle: Text(media['year'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
-                          trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent), onPressed: () { Navigator.pop(context); launchPlayerDirect(media); }),
-                        );
-                      }
-                    )
-              )
-            ],
-          ),
-        );
+                const SizedBox(height: 24),
+                const Padding(padding: EdgeInsets.symmetric(horizontal: 24), child: Text("Your Watch History", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold))),
+                const SizedBox(height: 12),
+                Expanded(
+                  child: continueWatchingList.isEmpty 
+                    ? const Center(child: Text("No movies watched yet.", style: TextStyle(color: Colors.grey))) 
+                    : ListView.builder(
+                        padding: const EdgeInsets.symmetric(horizontal: 24),
+                        itemCount: continueWatchingList.length,
+                        itemBuilder: (context, index) {
+                          final media = continueWatchingList[index];
+                          return ListTile(
+                            contentPadding: const EdgeInsets.only(bottom: 12),
+                            leading: ClipRRect(borderRadius: BorderRadius.circular(6), child: Image.network(media['posterUrl'], width: 40, height: 60, fit: BoxFit.cover)),
+                            title: Text(media['title'], style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 14)),
+                            subtitle: Text(media['year'], style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                            trailing: IconButton(icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent), onPressed: () { Navigator.pop(context); launchPlayerDirect(media); }),
+                          );
+                        }
+                      )
+                )
+              ],
+            ),
+          );
+        });
       },
     );
   }
@@ -386,11 +511,11 @@ class DashboardPageState extends State<DashboardPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        automaticallyImplyLeading: false,
+        automaticallyImplyLeading: false, 
         actions: [
           IconButton(icon: const Icon(Icons.folder_zip, color: Colors.white, size: 28), onPressed: () {}),
           IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 28), onPressed: () => setState(() => isSearching = true)),
-          IconButton(icon: const Icon(Icons.person, color: Colors.white, size: 28), onPressed: _showAdminDashboard),
+          IconButton(icon: const Icon(Icons.person, color: Colors.white, size: 28), onPressed: _showAdminDashboard), 
           const SizedBox(width: 8),
         ],
       ),
@@ -689,6 +814,7 @@ class _TvFocusButtonState extends State<_TvFocusButton> {
   }
 }
 
+// 🔥 DEEP LIVE TV IPTV PARSER PAGE 🔥
 class LiveTvChannelsPage extends StatefulWidget {
   const LiveTvChannelsPage({super.key});
 
@@ -728,13 +854,12 @@ class _LiveTvChannelsPageState extends State<LiveTvChannelsPage> {
           } else if (line.startsWith('http')) {
             if (currentName.isNotEmpty) {
               parsed.add({'name': currentName, 'logo': currentLogo, 'url': line.trim()});
-              if (parsed.length >= 300) break;
             }
           }
         }
         setState(() {
           allChannels = parsed;
-          filteredChannels = parsed;
+          filteredChannels = parsed; 
           isLoading = false;
         });
       }
@@ -766,7 +891,7 @@ class _LiveTvChannelsPageState extends State<LiveTvChannelsPage> {
               controller: tvSearchController,
               style: const TextStyle(color: Colors.white),
               decoration: InputDecoration(
-                hintText: 'Search Live Channels...', hintStyle: const TextStyle(color: Colors.grey), filled: true, fillColor: Colors.black87,
+                hintText: 'Search Live Channels (e.g. Star, Zee, Sony)...', hintStyle: const TextStyle(color: Colors.grey), filled: true, fillColor: Colors.black87,
                 border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
                 prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
               ),

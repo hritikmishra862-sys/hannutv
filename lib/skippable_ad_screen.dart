@@ -1,113 +1,127 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math';
-import 'package:webview_flutter/webview_flutter.dart';
 
 class SkippableAdScreen extends StatefulWidget {
-  final Widget nextScreen; 
-  final int adDuration; 
+  final int adDuration;
+  final Widget nextScreen;
 
   const SkippableAdScreen({
-    Key? key, 
+    super.key,
+    required this.adDuration,
     required this.nextScreen,
-    this.adDuration = 30, 
-  }) : super(key: key);
+  });
 
   @override
   State<SkippableAdScreen> createState() => _SkippableAdScreenState();
 }
 
 class _SkippableAdScreenState extends State<SkippableAdScreen> {
-  late final WebViewController _controller;
-  late int _timeLeft; 
-  bool _canSkip = false;
-  Timer? _timer;
-
-  final List<String> _fullScreenAdLinks = [
-    "https://omg10.com/4/11914245", 
-    "https://omg10.com/4/11914244", 
-  ];
+  late int timeLeft;
+  Timer? timer;
+  bool canSkip = false;
 
   @override
   void initState() {
     super.initState();
-    _timeLeft = widget.adDuration; 
-    
-    final _random = Random();
-    String selectedAd = _fullScreenAdLinks[_random.nextInt(_fullScreenAdLinks.length)];
+    timeLeft = widget.adDuration;
+    startTimer();
+  }
 
-    _controller = WebViewController()
-      ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF000000))
-      ..loadRequest(Uri.parse(selectedAd));
-
-    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      if (_timeLeft > 0) {
-        if (mounted) setState(() => _timeLeft--);
+  void startTimer() {
+    timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (timeLeft > 0) {
+        setState(() {
+          timeLeft--;
+          if (timeLeft <= widget.adDuration - 5) {
+            canSkip = true;
+          }
+        });
       } else {
-        if (mounted) setState(() => _canSkip = true);
-        _timer?.cancel();
+        t.cancel();
+        goToNext();
       }
     });
   }
 
-  @override
-  void dispose() {
-    _timer?.cancel();
-    super.dispose();
+  void goToNext() {
+    timer?.cancel();
+    Navigator.pushReplacement(
+        context, MaterialPageRoute(builder: (context) => widget.nextScreen));
   }
 
-  void _skipAd() {
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => widget.nextScreen),
-    );
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.black,
-      body: SafeArea(
-        child: Stack(
-          children: [
-            WebViewWidget(controller: _controller),
-            
-            Positioned(
-              top: 15,
-              right: 15,
-              child: GestureDetector(
-                onTap: _canSkip ? _skipAd : null,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: _canSkip ? Colors.white : Colors.black.withOpacity(0.8),
-                    borderRadius: BorderRadius.circular(30),
-                    border: Border.all(color: _canSkip ? Colors.white : Colors.grey),
+    // 🔥 PopScope completely blocks the mobile Back Button 🔥
+    return PopScope(
+      canPop: false, 
+      onPopInvoked: (didPop) {
+        if (didPop) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Please watch or skip the ad to continue!'),
+            backgroundColor: Colors.redAccent,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      },
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: SafeArea(
+          child: Stack(
+            children: [
+              // Yaha tumhara actual Ad Network ka widget aayega
+              const Center(
+                child: Text(
+                  "Sponsor Ad Playing...\n\nPlease wait.",
+                  textAlign: TextAlign.center,
+                  style: TextStyle(color: Colors.white54, fontSize: 18),
+                ),
+              ),
+              Positioned(
+                top: 20,
+                right: 20,
+                child: ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: canSkip ? Colors.redAccent : Colors.grey[800],
+                    shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(30)),
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _canSkip ? "Skip Ad" : "Skip in $_timeLeft",
-                        style: TextStyle(
-                          color: _canSkip ? Colors.black : Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 14,
-                        ),
-                      ),
-                      if (_canSkip) ...[
-                        const SizedBox(width: 8),
-                        const Icon(Icons.skip_next, color: Colors.black, size: 20),
-                      ]
-                    ],
+                  onPressed: canSkip ? goToNext : null,
+                  child: Text(
+                    canSkip ? "Skip Ad >>" : "Skip in $timeLeft s",
+                    style: const TextStyle(
+                        color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
-            ),
-          ],
+              Positioned(
+                bottom: 20,
+                left: 20,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.amber,
+                    borderRadius: BorderRadius.circular(4),
+                  ),
+                  child: const Text(
+                    "Ad",
+                    style: TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 12),
+                  ),
+                ),
+              )
+            ],
+          ),
         ),
       ),
     );
-  } 
+  }
 }
