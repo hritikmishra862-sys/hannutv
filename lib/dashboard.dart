@@ -44,7 +44,6 @@ class DashboardPageState extends State<DashboardPage> {
   String selectedPlatform = 'all';
   String activeCategory = 'Trending';
 
-  // 🚀 GOOGLE STUDIO CATEGORIES UI 🚀
   final List<Map<String, dynamic>> categories = [
     {'id': 'FightZone', 'label': 'FightZone', 'icon': '🥊'},
     {'id': 'Trending', 'label': 'Trending', 'icon': '🔥'},
@@ -72,12 +71,12 @@ class DashboardPageState extends State<DashboardPage> {
   void _startCarousel() {
     _carouselTimer = Timer.periodic(const Duration(seconds: 4), (Timer timer) {
       if (_pageController.hasClients && trendingList.isNotEmpty) {
-        _currentPage++;
-        if (_currentPage >= (trendingList.length > 5 ? 5 : trendingList.length)) {
-          _currentPage = 0;
+        int next = _currentPage + 1;
+        if (next >= (trendingList.length > 5 ? 5 : trendingList.length)) {
+          next = 0;
         }
         _pageController.animateToPage(
-          _currentPage,
+          next,
           duration: const Duration(milliseconds: 800),
           curve: Curves.easeInOut,
         );
@@ -156,6 +155,78 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
+  // 🚀 SUPPORT OPTION (Telegram / WhatsApp) 🚀
+  void _showSupportOptions() {
+    showModalBottomSheet(
+      context: context,
+      backgroundColor: Colors.grey[900],
+      shape: const RoundedRectangleBorder(borderRadius: BorderRadius.vertical(top: Radius.circular(16))),
+      builder: (context) {
+        return Container(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Text("HANNUTV Support", style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 20),
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(context);
+                  launchUrl(Uri.parse('https://t.me/HANNUTV'), mode: LaunchMode.externalApplication);
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.send, color: Colors.blueAccent, size: 30),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text("Request for New Movie", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text("Join Telegram", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+              InkWell(
+                onTap: () async {
+                  Navigator.pop(context);
+                  launchUrl(Uri.parse('https://whatsapp.com/channel/0029VbE2Pb17z4kmfjF04P0v'), mode: LaunchMode.externalApplication);
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(color: Colors.black45, borderRadius: BorderRadius.circular(12)),
+                  child: Row(
+                    children: [
+                      const Icon(Icons.chat, color: Colors.greenAccent, size: 30),
+                      const SizedBox(width: 16),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: const [
+                          Text("New Movie Updates", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+                          Text("Join WhatsApp Channel", style: TextStyle(color: Colors.grey, fontSize: 12)),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              const Center(child: Text("App Version: v2.0.1", style: TextStyle(color: Colors.grey, fontSize: 12, fontWeight: FontWeight.bold))),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
@@ -187,7 +258,7 @@ class DashboardPageState extends State<DashboardPage> {
                   overview: media['overview'] ?? '',
                   rating: media['rating'] ?? '9.0',
                   year: media['year'] ?? '2024',
-                  isPixelflix: isServer2, // 🚀 Server Selection Logic 🚀
+                  isPixelflix: isServer2, 
                 ),
               ),
             ),
@@ -276,7 +347,6 @@ class DashboardPageState extends State<DashboardPage> {
       body: SafeArea(
         child: Column(
           children: [
-            // 🚀 GOOGLE STUDIO HEADER UI 🚀
             Container(
               padding: const EdgeInsets.all(16),
               color: const Color(0xFF0F0F0F),
@@ -292,11 +362,15 @@ class DashboardPageState extends State<DashboardPage> {
                           const Text('HANNUTV', style: TextStyle(color: Colors.white, fontSize: 20, fontWeight: FontWeight.w900, letterSpacing: 1)),
                         ],
                       ),
-                      IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: () => setState(() => isSearching = true)),
+                      Row(
+                        children: [
+                          IconButton(icon: const Icon(Icons.search, color: Colors.white), onPressed: () => setState(() => isSearching = true)),
+                          IconButton(icon: const Icon(Icons.headset_mic, color: Colors.redAccent), onPressed: _showSupportOptions),
+                        ],
+                      ),
                     ],
                   ),
                   const SizedBox(height: 10),
-                  // Category Pills
                   SingleChildScrollView(
                     scrollDirection: Axis.horizontal,
                     child: Row(
@@ -324,7 +398,6 @@ class DashboardPageState extends State<DashboardPage> {
               ),
             ),
             
-            // MAIN CONTENT
             Expanded(
               child: SingleChildScrollView(
                 child: Column(
@@ -348,7 +421,6 @@ class DashboardPageState extends State<DashboardPage> {
                       ),
                       
                     if (!isSearching) ...[
-                      // 🚀 GOOGLE STUDIO CAROUSEL WITH BANNER 🚀
                       Stack(
                         children: [
                           SizedBox(
@@ -356,7 +428,12 @@ class DashboardPageState extends State<DashboardPage> {
                             child: trendingList.isEmpty ? Container() : PageView.builder(
                               controller: _pageController,
                               itemCount: trendingList.length > 5 ? 5 : trendingList.length,
-                              onPageChanged: (index) => _currentPage = index,
+                              onPageChanged: (index) {
+                                // 🚀 FIXED MOVIE TITLE SLIDER BUG 🚀
+                                setState(() {
+                                  _currentPage = index;
+                                });
+                              },
                               itemBuilder: (context, index) {
                                 return Container(
                                   decoration: BoxDecoration(
@@ -370,7 +447,6 @@ class DashboardPageState extends State<DashboardPage> {
                             height: 250,
                             decoration: BoxDecoration(gradient: LinearGradient(begin: Alignment.bottomCenter, end: Alignment.topCenter, colors: [const Color(0xFF0F0F0F), Colors.transparent])),
                           ),
-                          // Update Required Banner
                           Positioned(
                             top: 16, left: 16, right: 16,
                             child: Container(
@@ -481,8 +557,9 @@ class DashboardPageState extends State<DashboardPage> {
                         },
                       )
                     else ...[
-                      _buildHorizontalList('HANNUTV Trending', trendingList),
+                      // 🚀 CONTINUE WATCHING SECTION RESTORED 🚀
                       if (continueWatchingList.isNotEmpty) _buildHorizontalList('Continue Watching', continueWatchingList),
+                      _buildHorizontalList('HANNUTV Trending', trendingList),
                       _buildHorizontalList('Bollywood Hindi Movies', bollywoodList),
                       _buildHorizontalList('Hollywood English Movies', hollywoodList),
                       _buildHorizontalList('Anime Hub', animeList),
@@ -499,7 +576,7 @@ class DashboardPageState extends State<DashboardPage> {
   }
 }
 
-// 🚀 SERVER ANALYZER MODAL (Deep Ping + Green/Red Status for HANNUTV 1 & 2) 🚀
+// 🚀 SERVER ANALYZER MODAL (Green/Red Status NO NAMES) 🚀
 class _ServerSelectionModal extends StatefulWidget {
   final Map media;
   final Function(bool) onSelect;
@@ -525,8 +602,9 @@ class _ServerSelectionModalState extends State<_ServerSelectionModal> {
     final type = widget.media['mediaType'] ?? 'movie';
     final id = widget.media['id'];
 
-    final url1 = type == 'tv' ? 'https://pantyflix.com/watch/play/tv/$id?season=1&episode=1&server=vidrift' : 'https://pantyflix.com/watch/play/movie/$id?server=vidrift';
-    final url2 = type == 'tv' ? 'https://pixelflix.cc/watch/tv/$id?season=1&episode=1' : 'https://pixelflix.cc/watch/movie/$id';
+    // Direct Embed Ping (Not Full Website)
+    final url1 = type == 'tv' ? 'https://vidlink.pro/tv/$id/1/1' : 'https://vidlink.pro/movie/$id';
+    final url2 = type == 'tv' ? 'https://vidsrc.pm/embed/tv?tmdb=$id&season=1&episode=1' : 'https://vidsrc.pm/embed/movie/$id';
 
     try {
       final res1 = await http.get(Uri.parse(url1)).timeout(const Duration(seconds: 4));
