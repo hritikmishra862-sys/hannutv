@@ -54,7 +54,7 @@ class DashboardPageState extends State<DashboardPage> {
   ];
 
   final List<Map<String, dynamic>> ottPlatforms = const [
-    {"name": "🔥 HANNUTV VIP", "color": Colors.red, "providerId": "all"},
+    {"name": "🔥 ALL VIP", "color": Colors.red, "providerId": "all"},
     {"name": "NETFLIX", "color": Colors.redAccent, "providerId": "8"},
     {"name": "PRIME VIDEO", "color": Colors.blueAccent, "providerId": "9"},
     {"name": "APPLE TV+", "color": Colors.white70, "providerId": "350"},
@@ -109,7 +109,6 @@ class DashboardPageState extends State<DashboardPage> {
     }).toList();
   }
 
-  // 🚀 DEEP OTT LOGIC: Fetching data based on selected OTT Platform 🚀
   Future<void> loadAllDashboards({String? providerId}) async {
     setState(() {
       isLoading = true;
@@ -157,7 +156,6 @@ class DashboardPageState extends State<DashboardPage> {
     });
   }
 
-  // 🚀 DEEP SERVER ANALYZER MODAL (Green/Red) 🚀
   void launchPlayerDirect(Map media) {
     continueWatchingList.removeWhere((m) => m['id'] == media['id']);
     continueWatchingList.insert(0, media);
@@ -186,9 +184,10 @@ class DashboardPageState extends State<DashboardPage> {
                   season: 1,
                   episode: 1,
                   movieTitle: media['title'] ?? 'Title',
+                  overview: media['overview'] ?? '',
                   rating: media['rating'] ?? '9.0',
                   year: media['year'] ?? '2024',
-                  isPixelflix: isServer2, // 🚀 TRUE = HANNUTV 2 (Pixelflix), FALSE = HANNUTV 1 (Pantyflix)
+                  isPixelflix: isServer2, // 🚀 Server Selection Logic 🚀
                 ),
               ),
             ),
@@ -526,11 +525,9 @@ class _ServerSelectionModalState extends State<_ServerSelectionModal> {
     final type = widget.media['mediaType'] ?? 'movie';
     final id = widget.media['id'];
 
-    // Deep Links format
     final url1 = type == 'tv' ? 'https://pantyflix.com/watch/play/tv/$id?season=1&episode=1&server=vidrift' : 'https://pantyflix.com/watch/play/movie/$id?server=vidrift';
     final url2 = type == 'tv' ? 'https://pixelflix.cc/watch/tv/$id?season=1&episode=1' : 'https://pixelflix.cc/watch/movie/$id';
 
-    // Ping Server 1
     try {
       final res1 = await http.get(Uri.parse(url1)).timeout(const Duration(seconds: 4));
       if (mounted) setState(() { isAvailable1 = true; isLoading1 = false; });
@@ -538,7 +535,6 @@ class _ServerSelectionModalState extends State<_ServerSelectionModal> {
       if (mounted) setState(() { isAvailable1 = false; isLoading1 = false; });
     }
 
-    // Ping Server 2
     try {
       final res2 = await http.get(Uri.parse(url2)).timeout(const Duration(seconds: 4));
       if (mounted) setState(() { isAvailable2 = true; isLoading2 = false; });
@@ -577,14 +573,10 @@ class _ServerSelectionModalState extends State<_ServerSelectionModal> {
             ],
           ),
           const SizedBox(height: 24),
-          
-          // 🚀 HANNUTV 1 Button (Pantyflix)
           _buildServerBtn(
               title: "HANNUTV 1", subtitle: "Cinema HD Node", isLoading: isLoading1, isAvailable: isAvailable1,
               onTap: () { Navigator.pop(context); widget.onSelect(false); }),
           const SizedBox(height: 12),
-          
-          // 🚀 HANNUTV 2 Button (Pixelflix)
           _buildServerBtn(
               title: "HANNUTV 2", subtitle: "Ultra HD Cloud", isLoading: isLoading2, isAvailable: isAvailable2,
               onTap: () { Navigator.pop(context); widget.onSelect(true); }),
@@ -598,7 +590,7 @@ class _ServerSelectionModalState extends State<_ServerSelectionModal> {
     String statusText = isLoading ? "Checking..." : (isAvailable ? "Online" : "Offline");
         
     return InkWell(
-      onTap: onTap, // 🚀 CAN CLICK EVEN IF OFFLINE 🚀
+      onTap: onTap, 
       borderRadius: BorderRadius.circular(16),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
