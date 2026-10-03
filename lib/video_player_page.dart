@@ -327,7 +327,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _startControlsTimer();
   }
 
-  // 🔥 DEEP LOGIC: Episode click hone par 10 Second ka Skippable Ad chalega
+  // 🔥 DEEP FIX: Episode switch karne par Skippable Ad chalega
   void _switchEpisode(int ep) {
     Navigator.pushReplacement(
       context,
@@ -386,12 +386,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🔥 DEEP FIX: Download Progress Bar (Asli download process jaisa experience)
+  // 🔥 DEEP FIX: Fake Fast Download Process jo 100% list me add karega
   void _downloadMovie() {
     bool alreadyExists = downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId);
     
     if (alreadyExists) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Already Downloaded! Check Downloads Folder.'), backgroundColor: Colors.orange));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Already Downloaded! Check Folder.'), backgroundColor: Colors.orange));
       return;
     }
 
@@ -402,35 +402,35 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         int progress = 0;
         return StatefulBuilder(
           builder: (context, setState) {
-            // Fake Fast Download Process for third party stream link
-            Timer.periodic(const Duration(milliseconds: 150), (timer) {
+            Timer.periodic(const Duration(milliseconds: 100), (timer) {
               if (progress >= 100) {
                 timer.cancel();
-                Navigator.pop(context);
+                Navigator.pop(context); 
                 
-                // Add to Global Download List
-                downloadedMoviesList.insert(0, {
-                  'id': widget.tmdbId,
-                  'title': widget.movieTitle,
-                  'year': widget.year,
-                  'type': widget.mediaType,
-                });
-                
+                // Add to Global List
+                if (!downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId)) {
+                   downloadedMoviesList.insert(0, {
+                    'id': widget.tmdbId,
+                    'title': widget.movieTitle,
+                    'year': widget.year,
+                    'type': widget.mediaType,
+                  });
+                }
                 ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download Complete! Saved to Folder.'), backgroundColor: Colors.green));
               } else {
-                if (mounted) setState(() { progress += 4; });
+                if (mounted) setState(() { progress += 5; });
               }
             });
 
             return AlertDialog(
               backgroundColor: const Color(0xFF151515),
-              title: const Text("Downloading Media...", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
+              title: const Text("Downloading...", style: TextStyle(color: Colors.white)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  LinearProgressIndicator(value: progress / 100, backgroundColor: Colors.white24, color: Colors.redAccent, minHeight: 8,),
-                  const SizedBox(height: 15),
-                  Text("$progress% Complete", style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18))
+                  LinearProgressIndicator(value: progress / 100, color: Colors.redAccent),
+                  const SizedBox(height: 10),
+                  Text("$progress% Complete", style: const TextStyle(color: Colors.greenAccent))
                 ],
               ),
             );
@@ -795,7 +795,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           itemBuilder: (context, index) {
                             final m = similarMovies[index];
                             return _buildFocusableItem(
-                              // 🔥 SUGGESTED VIDEOS PAR BHI AD
                               onTap: () { 
                                 Navigator.pushReplacement(
                                   context, 

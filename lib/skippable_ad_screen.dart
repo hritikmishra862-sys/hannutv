@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:url_launcher/url_launcher.dart'; 
+import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'dart:math';
 
@@ -22,89 +22,102 @@ class SkippableAdScreen extends StatefulWidget {
 class _SkippableAdScreenState extends State<SkippableAdScreen> {
   late int timeLeft;
   Timer? timer;
+  Timer? fallbackTimer;
   bool canSkip = false;
   late WebViewController _adController;
   
   bool isAdLoading = true;
   bool isTimerStarted = false; 
 
-  // 🔥 DEEP CODING: Tere Monetag aur Adsterra ke links
-  final List<String> adLinks = [
-    'https://omg10.com/4/11914244', 
-    'https://omg10.com/4/11914245',
-    'https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js' 
+  // 🔥 MONETAG & ADSTERRA DEEP INTEGRATION
+  final List<String> adNetworks = [
+    'https://omg10.com/4/11914244', // Monetag 1
+    'https://omg10.com/4/11914245', // Monetag 2
   ];
 
-  late String currentAdUrl;
+  // Adsterra ka Full Screen Banner Bypass
+  final String adsterraHtml = '''
+    <!DOCTYPE html>
+    <html>
+    <head>
+      <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+      <style>body{margin:0;padding:0;background:#000;display:flex;justify-content:center;align-items:center;height:100vh;}</style>
+    </head>
+    <body>
+      <script type="text/javascript">
+        atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 250, 'width' : 300, 'params' : {} };
+      </script>
+      <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
+    </body>
+    </html>
+  ''';
 
   @override
   void initState() {
     super.initState();
     timeLeft = widget.adDuration; 
-    currentAdUrl = adLinks[Random().nextInt(adLinks.length)];
+    _initWebView();
+  }
 
-    // 🔥 DEEP SHIELD HTML: Ye code ad ko apne aap redirect hone se rokega, 
-    // aur jab koi touch karega tabhi AdClick channel ke zariye Chrome khulega.
-    final String secureAdHtml = '''
-      <!DOCTYPE html>
-      <html>
-      <head>
-        <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-        <style>
-          body, html { margin: 0; padding: 0; background-color: #050505; height: 100vh; overflow: hidden; display: flex; align-items: center; justify-content: center;}
-          .ad-wrapper { position: relative; width: 100%; height: 100%; }
-          iframe { width: 100%; height: 100%; border: none; }
-          /* Transparent layer to catch clicks and stop aggressive ads */
-          .click-shield { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 99999; cursor: pointer; }
-        </style>
-      </head>
-      <body>
-        <div class="ad-wrapper">
-          <!-- iframe sandbox auto-redirects block karta hai -->
-          <iframe src="$currentAdUrl" sandbox="allow-scripts allow-same-origin allow-forms"></iframe>
-          <!-- User jab screen touch karega toh ye div click pakad lega -->
-          <div class="click-shield" onclick="AdClick.postMessage('clicked')"></div>
-        </div>
-        <script>
-          // Ad load hone ke 2.5 second baad Flutter ko timer start karne ka signal
-          setTimeout(() => AdReady.postMessage('start_timer'), 2500);
-        </script>
-      </body>
-      </html>
-    ''';
+  void _initWebView() {
+    // 50% chance Monetag, 50% Adsterra taaki fill rate 100% rahe
+    bool useHtml = Random().nextBool(); 
 
     _adController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
-      ..addJavaScriptChannel('AdReady', onMessageReceived: (message) {
-         if (message.message == 'start_timer' && !isTimerStarted) {
-            if(mounted) setState(() { isAdLoading = false; isTimerStarted = true; });
-            startStrictTimer();
-         }
-      })
-      ..addJavaScriptChannel('AdClick', onMessageReceived: (message) {
-         // 🔥 Jab user screen par touch karega, seedha Chrome khulega
-         if (message.message == 'clicked') {
-            _launchInExternalBrowser(currentAdUrl);
-         }
-      })
-      ..loadHtmlString(secureAdHtml); 
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onPageStarted: (String url) {
+            if(mounted) setState(() { isAdLoading = true; });
+            
+            // 🔥 FAIL-SAFE: Agar Monetag 6 second me load nahi hua, toh Adsterra thok do!
+            fallbackTimer?.cancel();
+            fallbackTimer = Timer(const Duration(seconds: 6), () {
+               if(mounted && isAdLoading && !useHtml) {
+                 _adController.loadHtmlString(adsterraHtml); 
+               }
+            });
+          },
+          onPageFinished: (String url) {
+            if(mounted) {
+              setState(() { isAdLoading = false; });
+              fallbackTimer?.cancel();
+
+              // 🔥 STRICT LOGIC: Jab page 100% load hoga TABHI timer chalega!
+              if (!isTimerStarted) {
+                isTimerStarted = true;
+                startStrictTimer();
+              }
+            }
+          },
+          onNavigationRequest: (NavigationRequest request) {
+            final url = request.url.toLowerCase();
+            
+            // 🔥 DEEP FIX: Redirect hone do taaki black screen na aaye (WebView ke andar)
+            if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('about:blank')) {
+               return NavigationDecision.navigate;
+            } else {
+               // 🔥 Agar link Play Store (market://) ya Telegram ka hai toh external Chrome me kholo!
+               _launchInExternalBrowser(request.url);
+               return NavigationDecision.prevent; 
+            }
+          },
+        ),
+      );
 
     if (_adController.platform is AndroidWebViewController) {
       (_adController.platform as AndroidWebViewController)
           .setMediaPlaybackRequiresUserGesture(false);
     }
-    
-    // Backup timer in case HTML script fails to send message
-    Future.delayed(const Duration(seconds: 4), () {
-       if (!isTimerStarted && mounted) {
-          setState(() { isAdLoading = false; isTimerStarted = true; });
-          startStrictTimer();
-       }
-    });
+
+    if (useHtml) {
+      _adController.loadHtmlString(adsterraHtml);
+    } else {
+      _adController.loadRequest(Uri.parse(adNetworks[Random().nextInt(adNetworks.length)]));
+    }
   }
 
-  // 🔥 STRICT TIMER LOGIC: Ad chahe jaisa ho, Timer rukega nahi
   void startStrictTimer() {
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (timeLeft > 0) {
@@ -137,6 +150,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
 
   void goToNext() {
     timer?.cancel();
+    fallbackTimer?.cancel();
     if (mounted) {
       Navigator.pushReplacement(
         context, 
@@ -148,18 +162,19 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   @override
   void dispose() {
     timer?.cancel();
+    fallbackTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false, // 🔴 Back Button Strictly Blocked
+      canPop: false, 
       onPopInvoked: (didPop) {
         if (didPop) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Watch the Ad to support HANNUTV!'),
+            content: Text('Wait for the Ad to finish!'),
             backgroundColor: Colors.redAccent,
             duration: Duration(seconds: 2),
           ),
@@ -184,14 +199,13 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                         children: [
                           CircularProgressIndicator(color: Colors.redAccent),
                           SizedBox(height: 16),
-                          Text("Connecting to Secure Ad Server...", style: TextStyle(color: Colors.white70, fontSize: 13))
+                          Text("Loading Sponsored Ad...", style: TextStyle(color: Colors.white70, fontSize: 13))
                         ],
                       ),
                     ),
                   ),
                 ),
 
-              // Skip Button
               Positioned(
                 top: 20,
                 right: 20,
@@ -209,7 +223,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                     onPressed: canSkip ? goToNext : null, 
                     child: Text(
                       !isTimerStarted 
-                          ? "Loading..."  
+                          ? "Wait..."  
                           : (canSkip ? "Skip Ad >>" : "Skip in $timeLeft s"), 
                       style: TextStyle(
                         color: canSkip ? Colors.white : Colors.white54, 
@@ -220,7 +234,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 ),
               ),
 
-              // AD Badge
               Positioned(
                 bottom: 20, left: 20,
                 child: Container(
