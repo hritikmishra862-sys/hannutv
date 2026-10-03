@@ -218,7 +218,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void _initStream() {
     setState(() { isPageLoading = true; isVideoPlaying = false; showIntroAnimation = false; });
 
-    // 🔥 PURE PLAYER LOGIC: Bina kisi external Google/Browser kachre ke 🔥
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
@@ -265,9 +264,16 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             ''';
             _controller.runJavaScript(jsCode);
           },
-          // 🔥 DEEP FIX: Pura URL launcher yaha se hata diya gaya hai
+          // 🚀 DEEP FIX: Ye tera original blocker hai jo player ko Google par jaane se rokega!
           onNavigationRequest: (NavigationRequest request) {
-            return NavigationDecision.navigate;
+            final url = request.url.toLowerCase();
+            if (url.contains('doubleclick') || url.contains('popads') || url.contains('1xbet') || url.contains('bet365') || url.contains('onclick') || url.contains('adult') || url.contains('telegram') || url.contains('t.me') || url.contains('adsterra') || url.contains('captcha') || url.contains('verify')) {
+                return NavigationDecision.prevent;
+            }
+            if (url.contains('pantyflix.com') || url.contains('vidbolt') || url.contains('vidsrc') || url.contains('vidlink') || url.contains('multiembed') || url.contains('autoembed') || url.startsWith('about:blank') || url.startsWith('data:')) {
+                return NavigationDecision.navigate;
+            }
+            return NavigationDecision.prevent; // Kisi aur site pe player ko mat jaane do!
           },
         ),
       );
