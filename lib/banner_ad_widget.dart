@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:url_launcher/url_launcher.dart'; // 🚀 BROWSER/PLAY STORE ME KHOLNE KE LIYE
 
 class CustomBannerAd extends StatefulWidget {
   final String htmlBannerCode;
@@ -20,6 +21,28 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
+      // 🚀 DEEP LOGIC: NAVIGATION DELEGATE FOR CLICKS 🚀
+      ..setNavigationDelegate(
+        NavigationDelegate(
+          onNavigationRequest: (NavigationRequest request) {
+            final url = request.url.toLowerCase();
+
+            // 1. Initial banner load aur Adsterra ke scripts ko chalne do taaki ad dikhe
+            if (url.startsWith('data:') || 
+                url.startsWith('about:blank') || 
+                url.contains('hannutv.blogspot.com') || 
+                url.contains('highrevenueformat.com')) {
+              return NavigationDecision.navigate;
+            }
+
+            // 2. 🔥 KOI BHI DOOSRA LINK AAYE (Yani ad pe click hua hai) TOH SEEDHA BROWSER ME KHOLO 🔥
+            _launchExternalBrowser(request.url);
+            
+            // Banner ke chhote se dabbe me website mat khulne do!
+            return NavigationDecision.prevent; 
+          },
+        ),
+      )
       ..loadHtmlString('''
         <!DOCTYPE html>
         <html>
@@ -31,9 +54,27 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
           </head>
           <body>
             ${widget.htmlBannerCode}
+            <script>
+              // 🔥 DEEP HACK: Adsterra click karne par naya tab (window.open) kholta hai jo WebView me block ho jata hai. 
+              // Is code se wo naya tab pakda jayega aur NavigationDelegate me bhej diya jayega!
+              window.open = function(url, windowName, windowFeatures) {
+                window.location.href = url;
+                return null;
+              };
+            </script>
           </body>
         </html>
       ''', baseUrl: 'https://hannutv.blogspot.com');
+  }
+
+  // 🚀 CHROME YA PLAY STORE ME KHOLNE KA FUNCTION 🚀
+  Future<void> _launchExternalBrowser(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    try {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint("Could not launch banner link");
+    }
   }
 
   @override
