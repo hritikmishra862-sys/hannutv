@@ -327,7 +327,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _startControlsTimer();
   }
 
-  // 🔥 DEEP FIX: Episode change hone par 10 Second ka main Skippable Ad chalega
+  // 🔥 DEEP LOGIC: Episode click hone par 10 Second ka Skippable Ad chalega
   void _switchEpisode(int ep) {
     Navigator.pushReplacement(
       context,
@@ -386,16 +386,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🔥 DEEP FIX: Downloading Visual Progress System
+  // 🔥 DEEP FIX: Download Progress Bar (Asli download process jaisa experience)
   void _downloadMovie() {
     bool alreadyExists = downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId);
     
     if (alreadyExists) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Already Downloaded!'), backgroundColor: Colors.orange));
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Already Downloaded! Check Downloads Folder.'), backgroundColor: Colors.orange));
       return;
     }
 
-    // 0 to 100% Progress Dialog dikhana
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -403,31 +402,35 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         int progress = 0;
         return StatefulBuilder(
           builder: (context, setState) {
-            Timer.periodic(const Duration(milliseconds: 200), (timer) {
+            // Fake Fast Download Process for third party stream link
+            Timer.periodic(const Duration(milliseconds: 150), (timer) {
               if (progress >= 100) {
                 timer.cancel();
                 Navigator.pop(context);
+                
+                // Add to Global Download List
                 downloadedMoviesList.insert(0, {
                   'id': widget.tmdbId,
                   'title': widget.movieTitle,
                   'year': widget.year,
                   'type': widget.mediaType,
                 });
-                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to Downloads Folder!'), backgroundColor: Colors.green));
+                
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Download Complete! Saved to Folder.'), backgroundColor: Colors.green));
               } else {
-                if (mounted) setState(() { progress += 5; });
+                if (mounted) setState(() { progress += 4; });
               }
             });
 
             return AlertDialog(
               backgroundColor: const Color(0xFF151515),
-              title: const Text("Downloading Media...", style: TextStyle(color: Colors.white, fontSize: 16)),
+              title: const Text("Downloading Media...", style: TextStyle(color: Colors.white, fontSize: 16, fontWeight: FontWeight.bold)),
               content: Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
-                  LinearProgressIndicator(value: progress / 100, backgroundColor: Colors.white24, color: Colors.redAccent),
-                  const SizedBox(height: 10),
-                  Text("$progress%", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))
+                  LinearProgressIndicator(value: progress / 100, backgroundColor: Colors.white24, color: Colors.redAccent, minHeight: 8,),
+                  const SizedBox(height: 15),
+                  Text("$progress% Complete", style: const TextStyle(color: Colors.greenAccent, fontWeight: FontWeight.bold, fontSize: 18))
                 ],
               ),
             );
@@ -564,7 +567,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.bookmark_border, "Add to List")),
                           const SizedBox(width: 8),
                           
-                          // 🔥 DEEP FIX: Proper Visual Download Button
                           _buildFocusableItem(onTap: _downloadMovie, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.download, "Download", activeColor: Colors.green)),
                           const SizedBox(width: 8),
                           
@@ -793,7 +795,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           itemBuilder: (context, index) {
                             final m = similarMovies[index];
                             return _buildFocusableItem(
-                              // 🔥 DEEP FIX: Suggested movies par bhi 10 second ka Ad lag gaya
+                              // 🔥 SUGGESTED VIDEOS PAR BHI AD
                               onTap: () { 
                                 Navigator.pushReplacement(
                                   context, 
