@@ -3,14 +3,14 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
-import 'package:app_links/app_links.dart'; // 🚀 ADDED: Deep Linking
+import 'package:app_links/app_links.dart'; 
+import 'package:package_info_plus/package_info_plus.dart'; // 🚀 NAYA ADD KIYA: Version check karne ke liye
+import 'package:url_launcher/url_launcher.dart'; // 🚀 NAYA ADD KIYA: Update link open karne ke liye
 import 'dashboard.dart';
 import 'video_player_page.dart';
 
-// 🚀 ADDED: Navigator Key
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-// 🚀 1. DEEP BACKGROUND HANDLER (Hardcoded System-Level Listener)
 @pragma('vm:entry-point')
 Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
   await Firebase.initializeApp();
@@ -20,13 +20,10 @@ Future<void> _firebaseMessagingBackgroundHandler(RemoteMessage message) async {
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
-  // 🚀 2. INITIALIZE FIREBASE CORE
   await Firebase.initializeApp();
 
-  // 🚀 3. REGISTER BACKGROUND LISTENER
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
-  // 🚀 4. AGGRESSIVE PERMISSION REQUEST (Badge, Sound, Alert)
   FirebaseMessaging messaging = FirebaseMessaging.instance;
   await messaging.requestPermission(
     alert: true,
@@ -38,14 +35,12 @@ void main() async {
     sound: true,
   );
 
-  // 🚀 5. FORCE FOREGROUND HEADS-UP POPUP
   await FirebaseMessaging.instance.setForegroundNotificationPresentationOptions(
     alert: true, 
     badge: true, 
     sound: true, 
   );
 
-  // 🚀 6. FOREGROUND MESSAGE LISTENER (App open hone par notification)
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     print('🔥 Foreground Notification Hit!');
     if (message.notification != null) {
@@ -53,7 +48,6 @@ void main() async {
     }
   });
 
-  // 🚀 7. FETCH DEVICE TOKEN (Connection Test)
   messaging.getToken().then((token) {
     print("📲 FIREBASE DEVICE TOKEN: $token");
   });
@@ -86,7 +80,6 @@ class _HannuTvAppWrapperState extends State<HannuTvAppWrapper> {
     _initDeepLinkListener(); 
   }
 
-  // 🚀 ADDED: CATCH DEEP LINKS 
   void _initDeepLinkListener() async {
     _appLinks = AppLinks();
     try {
@@ -127,7 +120,7 @@ class _HannuTvAppWrapperState extends State<HannuTvAppWrapper> {
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
-      navigatorKey: navigatorKey, // 🚀 ADDED
+      navigatorKey: navigatorKey,
       title: 'HANNUTV',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
@@ -140,7 +133,7 @@ class _HannuTvAppWrapperState extends State<HannuTvAppWrapper> {
   }
 }
 
-// ── SPLASH SCREEN (Deep Kill Switch Logic) ──────────────────────────
+// ── SPLASH SCREEN (Deep Kill Switch & Version Logic) ──────────────────────────
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
 
@@ -150,7 +143,9 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool isMaintenance = false;
+  bool isUpdateRequired = false; // 🚀 NAYA: Update check flag
   String maintenanceMsg = "System Upgrade in Progress. Please update HANNUTV.";
+  String updateLink = "https://hannutv.blogspot.com/"; // 🚀 NAYA: Default Link
   bool isLoading = true;
 
   @override
@@ -169,35 +164,68 @@ class _SplashScreenState extends State<SplashScreen> {
       ));
       await remoteConfig.fetchAndActivate();
 
+      // 1. Purana Maintenance Mode check
+      bool maintenance = remoteConfig.getBool('maintenance_mode');
+      
+      // 2. Naya Version Logic Check
+      String fbLatestVersion = remoteConfig.getString('latest_version');
+      String fbUpdateLink = remoteConfig.getString('update_link');
+      String fbMsg = remoteConfig.getString('maintenance_message');
+      
+      // App ka current version nikalna
+      PackageInfo packageInfo = await PackageInfo.fromPlatform();
+      String currentVersion = packageInfo.version;
+
+      bool needsUpdate = false;
+      if (fbLatestVersion.isNotEmpty && currentVersion != fbLatestVersion) {
+         needsUpdate = true; // Agar Firebase ka version app ke version se alag hai toh update chahiye
+      }
+
       setState(() {
-        isMaintenance = remoteConfig.getBool('maintenance_mode');
-        String msg = remoteConfig.getString('maintenance_message');
-        if (msg.isNotEmpty) {
-          maintenanceMsg = msg;
+        isMaintenance = maintenance;
+        isUpdateRequired = needsUpdate;
+        
+        if (fbUpdateLink.isNotEmpty) {
+           updateLink = fbUpdateLink;
+        }
+
+        if (fbMsg.isNotEmpty) {
+          maintenanceMsg = fbMsg;
         }
       });
     } catch (e) {
       print("⚠️ Remote Config Error: $e");
     }
 
-    if (!isMaintenance) {
+    // Agar maintenance ON hai YA Update chahiye, toh app block karo (isLoading false karke screen roko)
+    if (isMaintenance || isUpdateRequired) {
+      setState(() {
+        isLoading = false; 
+      });
+    } else {
+      // Sab theek hai, Dashboard par jao
       Timer(const Duration(milliseconds: 2500), () {
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => DashboardPage()), 
         );
       });
-    } else {
-      setState(() {
-        isLoading = false; 
-      });
     }
   }
+
+  // 🚀 NAYA: URL open karne ka function
+  Future<void> _launchUpdateURL() async {
+    final Uri url = Uri.parse(updateLink);
+    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+      print('Could not launch $url');
+    }
+  }
+
 
   @override
   Widget build(BuildContext context) {
     // 🔴 BLOCKED STATE
-    if (isMaintenance && !isLoading) {
+    if ((isMaintenance || isUpdateRequired) && !isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
         body: Center(
@@ -219,21 +247,21 @@ class _SplashScreenState extends State<SplashScreen> {
                   style: const TextStyle(color: Colors.white70, fontSize: 16, height: 1.5),
                 ),
                 const SizedBox(height: 45),
-                const Text(
-                  'Get the latest version here:',
-                  style: TextStyle(color: Colors.grey, fontSize: 13),
-                ),
-                const SizedBox(height: 8),
-                Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: Colors.red.withOpacity(0.1),
-                    border: Border.all(color: Colors.redAccent, width: 2),
-                    borderRadius: BorderRadius.circular(10)
+                
+                // 🚀 NAYA: Clickable Button jo seedha link par le jayega
+                ElevatedButton.icon(
+                  onPressed: _launchUpdateURL,
+                  icon: const Icon(Icons.download, color: Colors.white),
+                  label: const Text(
+                    "UPDATE NOW",
+                    style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 16),
                   ),
-                  child: const Text(
-                    'hannutv.blogspot.com', 
-                    style: TextStyle(color: Colors.redAccent, fontSize: 18, fontWeight: FontWeight.bold),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.redAccent,
+                    padding: const EdgeInsets.symmetric(horizontal: 40, vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
                   ),
                 ),
               ],
