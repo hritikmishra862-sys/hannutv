@@ -26,67 +26,6 @@ const String _adsterraBannerSnippet = '''
   <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
 ''';
 
-// 🔥 NAYA CHOTA AD (Popup Ads)
-class MiniAdScreen extends StatefulWidget {
-  final Widget nextScreen;
-  const MiniAdScreen({Key? key, required this.nextScreen}) : super(key: key);
-
-  @override
-  _MiniAdScreenState createState() => _MiniAdScreenState();
-}
-
-class _MiniAdScreenState extends State<MiniAdScreen> {
-  int timeLeft = 10;
-  Timer? timer;
-
-  @override
-  void initState() {
-    super.initState();
-    timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (mounted) {
-        setState(() {
-          timeLeft--;
-          if (timeLeft <= 0) {
-            t.cancel();
-            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => widget.nextScreen));
-          }
-        });
-      }
-    });
-  }
-
-  @override
-  void dispose() {
-    timer?.cancel();
-    super.dispose();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return PopScope(
-      canPop: false,
-      child: Scaffold(
-        backgroundColor: Colors.black,
-        body: Center(
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
-              const SizedBox(height: 20),
-              const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
-              const SizedBox(height: 30),
-              Text('Video will start in $timeLeft seconds...', style: const TextStyle(color: Colors.white, fontSize: 16)),
-              const SizedBox(height: 20),
-              const CircularProgressIndicator(color: Colors.redAccent)
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
   final String mediaType;
@@ -179,7 +118,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       _fetchSimilarMovies();
       _fetchTvDetails(); 
     } else {
-      // 🔥 DEEP LOGIC: Live TV mein har 8 minute mein ek ad aayega, jo exactly 60 seconds (1 minute) ka hoga
       _liveTvAdTimer = Timer.periodic(const Duration(minutes: 8), (timer) {
         if (mounted) {
           Navigator.pushReplacement(
@@ -245,11 +183,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _hideControlsTimer = Timer(const Duration(seconds: 5), () {
       if (mounted) setState(() => showControls = false);
     });
-  }
-
-  void _toggleControlPanel() {
-    if (showControls) { setState(() => showControls = false); _hideControlsTimer?.cancel(); } 
-    else { _startControlsTimer(); }
   }
 
   void _triggerCinematicPlayAnimation() {
@@ -332,10 +265,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             _controller.runJavaScript(jsCode);
           },
           onNavigationRequest: (NavigationRequest request) {
-            final url = request.url.toLowerCase();
-            if (url.contains('doubleclick') || url.contains('popads') || url.contains('1xbet') || url.contains('bet365') || url.contains('onclick') || url.contains('adult') || url.contains('telegram') || url.contains('t.me') || url.contains('adsterra') || url.contains('captcha') || url.contains('verify')) return NavigationDecision.prevent;
-            if (url.contains('pantyflix.com') || url.contains('vidbolt') || url.contains('vidsrc') || url.contains('vidlink') || url.contains('multiembed') || url.contains('autoembed') || url.startsWith('about:blank') || url.startsWith('data:')) return NavigationDecision.navigate;
-            return NavigationDecision.prevent;
+            return NavigationDecision.navigate;
           },
         ),
       );
@@ -397,12 +327,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _startControlsTimer();
   }
 
-  // 🔥 DEEP FIX: Episode change hone par mini ad zaroor aayega
+  // 🔥 DEEP FIX: Episode change hone par 10 Second ka main Skippable Ad chalega
   void _switchEpisode(int ep) {
-    Navigator.push(
+    Navigator.pushReplacement(
       context,
       MaterialPageRoute(
-        builder: (context) => MiniAdScreen(
+        builder: (context) => SkippableAdScreen(
+          adDuration: 10,
           nextScreen: VideoPlayerPage(
             tmdbId: widget.tmdbId,
             mediaType: widget.mediaType,
@@ -455,33 +386,55 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🔥 DEEP FIX: Proper download list handle karega
+  // 🔥 DEEP FIX: Downloading Visual Progress System
   void _downloadMovie() {
     bool alreadyExists = downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId);
     
-    if (!alreadyExists) {
-      downloadedMoviesList.insert(0, {
-        'id': widget.tmdbId,
-        'title': widget.movieTitle,
-        'year': widget.year,
-        'type': widget.mediaType,
-      });
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Downloading started... View in Downloads Folder!'),
-          backgroundColor: Colors.green,
-          duration: Duration(seconds: 2),
-        )
-      );
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Already Downloaded!'),
-          backgroundColor: Colors.orange,
-          duration: Duration(seconds: 2),
-        )
-      );
+    if (alreadyExists) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Already Downloaded!'), backgroundColor: Colors.orange));
+      return;
     }
+
+    // 0 to 100% Progress Dialog dikhana
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (BuildContext context) {
+        int progress = 0;
+        return StatefulBuilder(
+          builder: (context, setState) {
+            Timer.periodic(const Duration(milliseconds: 200), (timer) {
+              if (progress >= 100) {
+                timer.cancel();
+                Navigator.pop(context);
+                downloadedMoviesList.insert(0, {
+                  'id': widget.tmdbId,
+                  'title': widget.movieTitle,
+                  'year': widget.year,
+                  'type': widget.mediaType,
+                });
+                ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Saved to Downloads Folder!'), backgroundColor: Colors.green));
+              } else {
+                if (mounted) setState(() { progress += 5; });
+              }
+            });
+
+            return AlertDialog(
+              backgroundColor: const Color(0xFF151515),
+              title: const Text("Downloading Media...", style: TextStyle(color: Colors.white, fontSize: 16)),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  LinearProgressIndicator(value: progress / 100, backgroundColor: Colors.white24, color: Colors.redAccent),
+                  const SizedBox(height: 10),
+                  Text("$progress%", style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 18))
+                ],
+              ),
+            );
+          },
+        );
+      },
+    );
   }
 
   void _addComment() async {
@@ -611,6 +564,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.bookmark_border, "Add to List")),
                           const SizedBox(width: 8),
                           
+                          // 🔥 DEEP FIX: Proper Visual Download Button
                           _buildFocusableItem(onTap: _downloadMovie, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.download, "Download", activeColor: Colors.green)),
                           const SizedBox(width: 8),
                           
@@ -839,11 +793,15 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           itemBuilder: (context, index) {
                             final m = similarMovies[index];
                             return _buildFocusableItem(
-                              // 🔥 DEEP FIX: Naya chota ad yaha trigger hoga jab bhi koi click karega
+                              // 🔥 DEEP FIX: Suggested movies par bhi 10 second ka Ad lag gaya
                               onTap: () { 
-                                Navigator.push(context, MaterialPageRoute(builder: (context) => MiniAdScreen(
-                                  nextScreen: VideoPlayerPage(tmdbId: m['id'], mediaType: m['mediaType'], movieTitle: m['title'], rating: m['rating'], year: m['year'])
-                                ))); 
+                                Navigator.pushReplacement(
+                                  context, 
+                                  MaterialPageRoute(builder: (context) => SkippableAdScreen(
+                                    adDuration: 10,
+                                    nextScreen: VideoPlayerPage(tmdbId: m['id'], mediaType: m['mediaType'], movieTitle: m['title'], rating: m['rating'], year: m['year'])
+                                  ))
+                                ); 
                               },
                               borderRadius: BorderRadius.circular(8),
                               child: Container(

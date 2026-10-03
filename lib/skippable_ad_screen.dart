@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:url_launcher/url_launcher.dart'; // Naya add kiya hai click handling ke liye
+import 'package:url_launcher/url_launcher.dart'; 
 import 'dart:async';
 import 'dart:math';
 
@@ -29,17 +29,20 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   bool isAdLoading = true;
   bool isTimerStarted = false; 
 
-  final List<String> monetagLinks = [
-    'https://omg10.com/4/11914244',
-    'https://omg10.com/4/11914245'
+  // 🔥 DEEP CODING: Monetag + Adsterra Direct Links Mix
+  final List<String> adLinks = [
+    'https://omg10.com/4/11914244', // Monetag
+    'https://omg10.com/4/11914245', // Monetag
+    'https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js' // Adsterra Fallback
   ];
+
+  late String currentAdUrl;
 
   @override
   void initState() {
     super.initState();
     timeLeft = widget.adDuration; 
-
-    String selectedAdUrl = monetagLinks[Random().nextInt(monetagLinks.length)];
+    currentAdUrl = adLinks[Random().nextInt(adLinks.length)];
 
     _adController = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
@@ -49,21 +52,19 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
           onPageStarted: (String url) {
             if(mounted) setState(() { isAdLoading = true; });
             
-            // 🔥 DEEP FIX: Human verification ya popads ko bypass karne ke liye
-            fallbackTimer = Timer(const Duration(seconds: 4), () {
+            // 🔥 DEEP LOGIC: Agar 5 second tak page load na ho, toh Adsterra load kar do
+            fallbackTimer = Timer(const Duration(seconds: 5), () {
                if(mounted && isAdLoading) {
-                 _adController.reload(); 
+                 _adController.loadRequest(Uri.parse(adLinks.last)); 
                }
             });
           },
           onPageFinished: (String url) {
             if(mounted) {
-              setState(() { 
-                isAdLoading = false; 
-              });
+              setState(() { isAdLoading = false; });
               fallbackTimer?.cancel();
 
-              // 🔥 DEEP LOGIC: Ad poora load hone par hi strict timer shuru hoga
+              // 🔥 STRICT LOGIC: Ad poora load hone par hi timer start hoga
               if (!isTimerStarted) {
                 isTimerStarted = true;
                 startStrictTimer();
@@ -73,16 +74,16 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
             
-            // 🔥 DEEP FIX: Agar user Ad par click karta hai toh usko browser mein khol do
-            if (!url.contains('omg10.com')) {
-               _launchInBrowser(url);
-               return NavigationDecision.prevent; // Webview mein doosra ad mat khulne do
+            // 🔥 DEEP LOGIC: Ad pe CLICK karte hi Chrome Browser me khulega!
+            if (!url.contains(currentAdUrl.toLowerCase()) && !url.contains('about:blank')) {
+               _launchInBrowser(request.url);
+               return NavigationDecision.prevent; // App ke andar ad redirect block kiya
             }
             return NavigationDecision.navigate;
           },
         ),
       )
-      ..loadRequest(Uri.parse(selectedAdUrl));
+      ..loadRequest(Uri.parse(currentAdUrl));
 
     if (_adController.platform is AndroidWebViewController) {
       (_adController.platform as AndroidWebViewController)
@@ -90,7 +91,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     }
   }
 
-  // 🔥 DEEP LOGIC: Strict Timer
   void startStrictTimer() {
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (timeLeft > 0) {
@@ -111,11 +111,13 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     });
   }
 
-  // Browser mein ad kholne ka function
+  // 🔥 CLICK HONE PAR CHROME BROWSER KHOLNE KA CODE
   Future<void> _launchInBrowser(String urlString) async {
     final Uri url = Uri.parse(urlString);
-    if (await canLaunchUrl(url)) {
+    try {
       await launchUrl(url, mode: LaunchMode.externalApplication);
+    } catch (e) {
+      debugPrint("Browser launch error: $e");
     }
   }
 
@@ -139,14 +141,13 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 DEEP LOGIC: Back button band kiya gaya hai
     return PopScope(
-      canPop: false, 
+      canPop: false, // 🔴 BACK BUTTON STRICTLY BLOCKED
       onPopInvoked: (didPop) {
         if (didPop) return;
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Wait for the Ad to finish to continue!'),
+            content: Text('Please wait for the Ad to finish!'),
             backgroundColor: Colors.redAccent,
             duration: Duration(seconds: 2),
           ),
@@ -157,6 +158,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
         body: SafeArea(
           child: Stack(
             children: [
+              // 🔥 Ad Content Area (Touchable)
               Positioned.fill(
                 child: WebViewWidget(controller: _adController),
               ),
@@ -171,7 +173,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                         children: [
                           CircularProgressIndicator(color: Colors.redAccent),
                           SizedBox(height: 16),
-                          Text("Loading Ad...", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                          Text("Loading Sponsored Ad...", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
                         ],
                       ),
                     ),
@@ -192,12 +194,9 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                   onPressed: canSkip ? goToNext : null, 
                   child: Text(
                     !isTimerStarted 
-                        ? "Loading..."  
+                        ? "Wait..."  
                         : (canSkip ? "Skip Ad >>" : "Skip in $timeLeft s"), 
-                    style: const TextStyle(
-                      color: Colors.white, 
-                      fontWeight: FontWeight.bold
-                    ),
+                    style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -207,18 +206,8 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 left: 20,
                 child: Container(
                   padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.amber,
-                    borderRadius: BorderRadius.circular(4),
-                  ),
-                  child: const Text(
-                    "Ad",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12
-                    ),
-                  ),
+                  decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(4)),
+                  child: const Text("Ad", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
               )
             ],
