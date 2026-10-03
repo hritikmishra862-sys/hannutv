@@ -265,6 +265,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             ''';
             _controller.runJavaScript(jsCode);
           },
+          // Faltu URL redirect hata diya gaya hai. Ab app me hi chalega.
+          onNavigationRequest: (NavigationRequest request) {
+            return NavigationDecision.navigate;
+          },
         ),
       );
 
