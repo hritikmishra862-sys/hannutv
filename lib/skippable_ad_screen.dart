@@ -1,342 +1,131 @@
 import 'package:flutter/material.dart';
-import 'package:webview_flutter/webview_flutter.dart';
-import 'package:webview_flutter_android/webview_flutter_android.dart';
-import 'package:url_launcher/url_launcher.dart';
 import 'dart:async';
 import 'dart:math';
+import 'package:webview_flutter/webview_flutter.dart';
 
 class SkippableAdScreen extends StatefulWidget {
-  final int adDuration;
-  final Widget nextScreen;
+  final Widget nextScreen; 
+  final int adDuration; 
 
   const SkippableAdScreen({
-    super.key,
-    required this.adDuration,
+    Key? key, 
     required this.nextScreen,
-  });
+    this.adDuration = 30, 
+  }) : super(key: key);
 
   @override
   State<SkippableAdScreen> createState() => _SkippableAdScreenState();
 }
 
 class _SkippableAdScreenState extends State<SkippableAdScreen> {
-  late int timeLeft;
-  Timer? timer;
-  Timer? safetyTimer;
-  Timer? fallbackSwitchTimer;
-  bool canSkip = false;
-  late WebViewController _adController;
+  late final WebViewController _controller;
+  late int _timeLeft; 
+  bool _canSkip = false;
+  Timer? _timer;
 
-  bool isAdLoading = true;
-  bool isTimerStarted = false;
-  int currentAdSourceIndex = 0;
-
-  // 🚀 HIGH-CPM DIRECT SMARTLINKS (ADSTERRA + MONETAG)
-  final List<String> adUrls = [
-    'https://www.profitableratecpmnetwork.com/qftskbqkm?key=6a0072dfddbd45e6f448fa2a00d2df90', // Adsterra Smartlink 1
-    'https://omg10.com/4/11914244', // Monetag Lovey-dovey 11914244
-    'https://omg10.com/4/11914245', // Monetag Industrious 11914245
+  // 🚀 ORIGINAL LOGIC: Sirf Monetag ke Direct Links 🚀
+  final List<String> _fullScreenAdLinks = [
+    "https://omg10.com/4/11914244", // Lovey-dovey link
+    "https://omg10.com/4/11914245", // Industrious link
   ];
 
   @override
   void initState() {
     super.initState();
-    timeLeft = widget.adDuration;
-    currentAdSourceIndex = Random().nextInt(adUrls.length);
+    _timeLeft = widget.adDuration; 
+    
+    final _random = Random();
+    String selectedAd = _fullScreenAdLinks[_random.nextInt(_fullScreenAdLinks.length)];
 
-    _initAdEngine();
-  }
-
-  void _initAdEngine() {
-    final targetUrl = adUrls[currentAdSourceIndex];
-
-    _adController = WebViewController()
+    // 🚀 ORIGINAL WEBVIEW: Koi extra navigation block ya Chrome launcher nahi 🚀
+    _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(const Color(0xFF141414))
-      ..setUserAgent(
-        "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
-      )
-      ..addJavaScriptChannel(
-        'AdStateChannel',
-        onMessageReceived: (JavaScriptMessage message) {
-          if (message.message == 'ad_rendered' && mounted) {
-            _onAdSuccessfullyRendered();
-          }
-        },
-      )
-      ..setNavigationDelegate(
-        NavigationDelegate(
-          onPageStarted: (String url) {
-            if (mounted) {
-              setState(() {
-                isAdLoading = true;
-              });
-            }
+      ..setBackgroundColor(const Color(0xFF000000))
+      ..loadRequest(Uri.parse(selectedAd));
 
-            fallbackSwitchTimer?.cancel();
-            fallbackSwitchTimer = Timer(const Duration(seconds: 4), () {
-              if (mounted && isAdLoading) {
-                _tryAlternateAdNetwork();
-              }
-            });
-          },
-          onPageFinished: (String url) {
-            String detectJs = '''
-              (function() {
-                document.body.style.backgroundColor = '#141414';
-                function checkContent() {
-                  if (document.body && (document.body.innerText.length > 5 || document.images.length > 0 || document.getElementsByTagName('iframe').length > 0)) {
-                    AdStateChannel.postMessage('ad_rendered');
-                  }
-                }
-                checkContent();
-                setTimeout(checkContent, 1000);
-                setTimeout(checkContent, 2000);
-              })();
-            ''';
-            _adController.runJavaScript(detectJs);
-          },
-          onNavigationRequest: (NavigationRequest request) {
-            final url = request.url.toLowerCase();
-
-            if (url.startsWith('http://') ||
-                url.startsWith('https://') ||
-                url.startsWith('about:blank') ||
-                url.startsWith('data:')) {
-              return NavigationDecision.navigate;
-            }
-
-            _launchExternal(request.url);
-            return NavigationDecision.prevent;
-          },
-          onWebResourceError: (WebResourceError error) {
-            _tryAlternateAdNetwork();
-          },
-        ),
-      );
-
-    if (_adController.platform is AndroidWebViewController) {
-      final androidController = _adController.platform as AndroidWebViewController;
-      androidController.setMediaPlaybackRequiresUserGesture(false);
-    }
-
-    _adController.loadRequest(
-      Uri.parse(targetUrl),
-      headers: {
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8',
-        'Upgrade-Insecure-Requests': '1',
-      },
-    );
-
-    safetyTimer?.cancel();
-    safetyTimer = Timer(const Duration(seconds: 5), () {
-      if (mounted && !isTimerStarted) {
-        _onAdSuccessfullyRendered();
-      }
-    });
-  }
-
-  void _onAdSuccessfullyRendered() {
-    if (mounted) {
-      setState(() {
-        isAdLoading = false;
-      });
-      fallbackSwitchTimer?.cancel();
-
-      if (!isTimerStarted) {
-        isTimerStarted = true;
-        _startCountdown();
-      }
-    }
-  }
-
-  void _tryAlternateAdNetwork() {
-    if (!mounted || isTimerStarted) return;
-    currentAdSourceIndex = (currentAdSourceIndex + 1) % adUrls.length;
-    _adController.loadRequest(Uri.parse(adUrls[currentAdSourceIndex]));
-  }
-
-  void _startCountdown() {
-    timer?.cancel();
-    timer = Timer.periodic(const Duration(seconds: 1), (t) {
-      if (timeLeft > 0) {
-        if (mounted) {
-          setState(() {
-            timeLeft--;
-            if (timeLeft <= 0) {
-              canSkip = true;
-            }
-          });
-        }
+    // 🚀 ORIGINAL TIMER: Page open hote hi timer chalu 🚀
+    _timer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (_timeLeft > 0) {
+        if (mounted) setState(() => _timeLeft--);
       } else {
-        t.cancel();
-        if (mounted) {
-          setState(() {
-            canSkip = true;
-          });
-        }
+        if (mounted) setState(() => _canSkip = true);
+        _timer?.cancel();
       }
     });
-  }
-
-  Future<void> _launchExternal(String urlString) async {
-    try {
-      final Uri uri = Uri.parse(urlString);
-      await launchUrl(uri, mode: LaunchMode.externalApplication);
-    } catch (_) {}
-  }
-
-  void _goToDestination() {
-    timer?.cancel();
-    safetyTimer?.cancel();
-    fallbackSwitchTimer?.cancel();
-    if (mounted) {
-      Navigator.pushReplacement(
-        context,
-        MaterialPageRoute(builder: (context) => widget.nextScreen),
-      );
-    }
   }
 
   @override
   void dispose() {
-    timer?.cancel();
-    safetyTimer?.cancel();
-    fallbackSwitchTimer?.cancel();
+    _timer?.cancel();
     super.dispose();
+  }
+
+  void _skipAd() {
+    Navigator.pushReplacement(
+      context,
+      MaterialPageRoute(builder: (context) => widget.nextScreen),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return PopScope(
-      canPop: false,
-      onPopInvokedWithResult: (didPop, result) {
-        if (didPop) return;
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Please wait for the sponsored ad to finish!'),
-            backgroundColor: Colors.redAccent,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      },
+      canPop: false, // Back button band kiya hai taki ad miss na ho
       child: Scaffold(
-        backgroundColor: const Color(0xFF0F0F0F),
+        backgroundColor: Colors.black,
         body: SafeArea(
           child: Stack(
             children: [
-              Positioned.fill(
-                child: WebViewWidget(controller: _adController),
-              ),
-              if (isAdLoading)
-                Positioned.fill(
+              // WebView jisme Full Screen Ad chalega
+              WebViewWidget(controller: _controller),
+              
+              // Skip Button Overlay
+              Positioned(
+                top: 15,
+                right: 15,
+                child: GestureDetector(
+                  onTap: _canSkip ? _skipAd : null,
                   child: Container(
-                    color: const Color(0xFF0F0F0F),
-                    child: Center(
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Container(
-                            padding: const EdgeInsets.all(16),
-                            decoration: BoxDecoration(
-                              color: Colors.black54,
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.redAccent, width: 2),
-                            ),
-                            child: const SizedBox(
-                              width: 38,
-                              height: 38,
-                              child: CircularProgressIndicator(
-                                color: Colors.redAccent,
-                                strokeWidth: 3,
-                              ),
-                            ),
-                          ),
-                          const SizedBox(height: 18),
-                          const Text(
-                            "Loading Sponsored Offer...",
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 15,
-                              fontWeight: FontWeight.bold,
-                              letterSpacing: 0.5,
-                            ),
-                          ),
-                          const SizedBox(height: 6),
-                          const Text(
-                            "Connecting high-speed ad servers",
-                            style: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 12,
-                            ),
-                          ),
-                        ],
-                      ),
+                    padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
+                    decoration: BoxDecoration(
+                      color: _canSkip ? Colors.white : Colors.black.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(30),
+                      border: Border.all(color: _canSkip ? Colors.white : Colors.grey),
                     ),
-                  ),
-                ),
-              Positioned(
-                top: 18,
-                right: 18,
-                child: IgnorePointer(
-                  ignoring: !canSkip,
-                  child: ElevatedButton(
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: canSkip ? Colors.redAccent : Colors.black.withOpacity(0.75),
-                      padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(30),
-                        side: BorderSide(
-                          color: canSkip ? Colors.redAccent : Colors.white30,
-                          width: 1.5,
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _canSkip ? "Skip Ad" : "Skip in $_timeLeft",
+                          style: TextStyle(
+                            color: _canSkip ? Colors.black : Colors.white,
+                            fontWeight: FontWeight.bold,
+                            fontSize: 14,
+                          ),
                         ),
-                      ),
-                      elevation: canSkip ? 6 : 0,
-                    ),
-                    onPressed: canSkip ? _goToDestination : null,
-                    child: Text(
-                      !isTimerStarted
-                          ? "Loading Ad..."
-                          : (canSkip ? "Skip Ad >>" : "Skip in $timeLeft s"),
-                      style: TextStyle(
-                        color: canSkip ? Colors.white : Colors.white70,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 13,
-                        letterSpacing: 0.5,
-                      ),
+                        if (_canSkip) ...[
+                          const SizedBox(width: 8),
+                          const Icon(Icons.skip_next, color: Colors.black, size: 20),
+                        ]
+                      ],
                     ),
                   ),
                 ),
               ),
+
+              // Ad Badge
               Positioned(
-                bottom: 18,
-                left: 18,
+                bottom: 20, left: 20,
                 child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: Colors.amber,
-                    borderRadius: BorderRadius.circular(4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
-                        blurRadius: 4,
-                      ),
-                    ],
-                  ),
-                  child: const Text(
-                    "Ad",
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 12,
-                    ),
-                  ),
+                  padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(color: Colors.amber, borderRadius: BorderRadius.circular(4)),
+                  child: const Text("Ad", style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 12)),
                 ),
-              ),
+              )
             ],
           ),
         ),
       ),
     );
-  }
+  } 
 }

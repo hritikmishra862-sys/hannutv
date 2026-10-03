@@ -218,6 +218,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void _initStream() {
     setState(() { isPageLoading = true; isVideoPlaying = false; showIntroAnimation = false; });
 
+    // 🚀 ORIGINAL WEBVIEW: Jisme external browser ka faltu code nahi hai 🚀
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
@@ -263,9 +264,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               }, 200);
             ''';
             _controller.runJavaScript(jsCode);
-          },
-          onNavigationRequest: (NavigationRequest request) {
-            return NavigationDecision.navigate;
           },
         ),
       );
@@ -327,7 +325,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _startControlsTimer();
   }
 
-  // 🔥 DEEP FIX: Episode switch karne par Skippable Ad chalega
   void _switchEpisode(int ep) {
     Navigator.pushReplacement(
       context,
@@ -386,7 +383,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🔥 DEEP FIX: Fake Fast Download Process jo 100% list me add karega
   void _downloadMovie() {
     bool alreadyExists = downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId);
     
@@ -407,7 +403,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                 timer.cancel();
                 Navigator.pop(context); 
                 
-                // Add to Global List
                 if (!downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId)) {
                    downloadedMoviesList.insert(0, {
                     'id': widget.tmdbId,
