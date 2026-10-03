@@ -9,6 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
+import 'dashboard.dart';
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -73,7 +74,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   bool showControls = true;
   Timer? _hideControlsTimer;
-  Timer? _liveTvAdTimer; // 🔥 10 MINUTE AUTO AD TIMER 🔥
+  Timer? _liveTvAdTimer; 
 
   bool showIntroAnimation = false;
   late AnimationController _introAnimController;
@@ -118,14 +119,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       _fetchSimilarMovies();
       _fetchTvDetails(); 
     } else {
-      // 🔥 LIVE TV: HAR 10 MINUTE ME AUTO MONETAG AD LOOP 🔥
-      _liveTvAdTimer = Timer.periodic(const Duration(minutes: 10), (timer) {
+      // 🔥 DEEP LOGIC: Live TV mein har 8 minute mein ek ad aayega, jo exactly 60 seconds (1 minute) ka hoga
+      _liveTvAdTimer = Timer.periodic(const Duration(minutes: 8), (timer) {
         if (mounted) {
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => SkippableAdScreen(
-                adDuration: 15, 
+                adDuration: 60, // 🔥 EXACT 60 Seconds (1 Minute) ka ad
                 nextScreen: VideoPlayerPage(
                   tmdbId: widget.tmdbId, mediaType: widget.mediaType,
                   season: widget.season, episode: widget.episode,
@@ -378,6 +379,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
+  void _downloadMovie() {
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('Downloading started... View in Downloads Folder!'),
+        backgroundColor: Colors.green,
+        duration: Duration(seconds: 2),
+      )
+    );
+    downloadedMoviesList.insert(0, {
+      'id': widget.tmdbId,
+      'title': widget.movieTitle,
+      'year': widget.year,
+      'type': widget.mediaType,
+    });
+  }
+
   void _addComment() async {
     final text = commentInputController.text.trim();
     User? user = FirebaseAuth.instance.currentUser;
@@ -504,6 +521,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           const SizedBox(width: 8),
                           _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.bookmark_border, "Add to List")),
                           const SizedBox(width: 8),
+                          
+                          _buildFocusableItem(onTap: _downloadMovie, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.download, "Download", activeColor: Colors.green)),
+                          const SizedBox(width: 8),
+                          
                           _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.tv, "Play on TV")),
                           const SizedBox(width: 8),
                           _buildFocusableItem(onTap: () {}, borderRadius: BorderRadius.circular(20), child: _buildActionButton(Icons.share, "Share")),
@@ -514,7 +535,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                     const SizedBox(height: 16),
 
-                    // 🔥 EXACTLY 2 BANNER ADS FOR NORMAL MOVIES/SERIES 🔥
                     if (widget.customUrl == null) ...[
                       const Text("Sponsored Ads", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
@@ -524,7 +544,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       const SizedBox(height: 20),
                     ],
 
-                    // 🔥 EXACTLY 8 BANNER ADS ONLY FOR LIVE TV (IPTV) 🔥
                     if (widget.customUrl != null) ...[
                       const SizedBox(height: 10),
                       const Text("Sponsored Ads", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),

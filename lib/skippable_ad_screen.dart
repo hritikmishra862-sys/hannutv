@@ -25,7 +25,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   late WebViewController _adController;
   
   bool isAdLoading = true;
-  bool isTimerStarted = false; 
+  bool isTimerStarted = false; // 🔥 NAYA: Timer ko rokne ke liye flag
 
   // 🔥 TERE DONO MONETAG LINKS 🔥
   final List<String> monetagLinks = [
@@ -36,8 +36,8 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   @override
   void initState() {
     super.initState();
-    timeLeft = widget.adDuration;
-    
+    timeLeft = widget.adDuration; // Original time set (10s, 30s ya 60s)
+
     String selectedAdUrl = monetagLinks[Random().nextInt(monetagLinks.length)];
 
     _adController = WebViewController()
@@ -53,9 +53,10 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
               setState(() { 
                 isAdLoading = false; 
               });
+              // 🔥 DEEP LOGIC: Ad poora load hone ke baad hi Timer shuru hoga!
               if (!isTimerStarted) {
                 isTimerStarted = true;
-                startTimer();
+                startStrictTimer();
               }
             }
           },
@@ -72,20 +73,24 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     }
   }
 
-  void startTimer() {
+  // 🔥 DEEP LOGIC: Strict Timer jo poora time lega
+  void startStrictTimer() {
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (timeLeft > 0) {
         if(mounted){
           setState(() {
             timeLeft--;
-            if (timeLeft <= 2) {
+            // Jab time exactly 0 hoga, tabhi skip button on hoga
+            if (timeLeft <= 0) {
               canSkip = true;
             }
           });
         }
       } else {
         t.cancel();
-        goToNext();
+        if (!canSkip) {
+          setState(() { canSkip = true; });
+        }
       }
     });
   }
@@ -108,13 +113,15 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 🔥 DEEP LOGIC: PopScope se Back Button 1000% blocked
     return PopScope(
       canPop: false, 
       onPopInvoked: (didPop) {
         if (didPop) return;
+        // User ko forcefully message dikhega
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Please watch or skip the ad to continue!'),
+            content: Text('Wait for the Ad to finish to continue!'),
             backgroundColor: Colors.redAccent,
             duration: Duration(seconds: 2),
           ),
@@ -129,9 +136,22 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 child: WebViewWidget(controller: _adController),
               ),
               
+              // Jab tak ad load na ho, loading screen ghoomti rahegi
               if(isAdLoading)
-                const Center(
-                  child: CircularProgressIndicator(color: Colors.redAccent),
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black,
+                    child: const Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(color: Colors.redAccent),
+                          SizedBox(height: 16),
+                          Text("Loading Ad...", style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold))
+                        ],
+                      ),
+                    ),
+                  ),
                 ),
 
               Positioned(
@@ -145,10 +165,10 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                       side: BorderSide(color: canSkip ? Colors.redAccent : Colors.white30),
                     ),
                   ),
-                  onPressed: canSkip ? goToNext : null,
+                  onPressed: canSkip ? goToNext : null, // Click tabhi hoga jab canSkip true ho
                   child: Text(
                     !isTimerStarted 
-                        ? "Loading Ad..."  
+                        ? "Loading..."  
                         : (canSkip ? "Skip Ad >>" : "Skip in $timeLeft s"), 
                     style: const TextStyle(
                       color: Colors.white, 

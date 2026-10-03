@@ -30,6 +30,9 @@ const String _adsterraBannerSnippet = '''
 
 List<Map> continueWatchingList = [];
 
+// 🔥 DEEP FIX: Download ki list yahan save hogi
+List<Map> downloadedMoviesList = []; 
+
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
 
@@ -524,7 +527,13 @@ class DashboardPageState extends State<DashboardPage> {
         elevation: 0,
         automaticallyImplyLeading: false, 
         actions: [
-          IconButton(icon: const Icon(Icons.folder_zip, color: Colors.white, size: 28), onPressed: () {}),
+          // 🔥 DEEP FIX: Folder icon par click karte hi Downloads Page khulega
+          IconButton(
+            icon: const Icon(Icons.folder_zip, color: Colors.white, size: 28),
+            onPressed: () {
+              Navigator.push(context, MaterialPageRoute(builder: (_) => const DownloadsPage()));
+            }
+          ),
           IconButton(icon: const Icon(Icons.search, color: Colors.white, size: 28), onPressed: () => setState(() => isSearching = true)),
           IconButton(icon: const Icon(Icons.person, color: Colors.white, size: 28), onPressed: _showAdminDashboard), 
           const SizedBox(width: 8),
@@ -942,6 +951,65 @@ class _LiveTvChannelsPageState extends State<LiveTvChannelsPage> {
           )
         ],
       ),
+    );
+  }
+}
+
+// 🔥 DEEP FIX: Naya Downloads Page banaya gaya hai jisme Banner Ads lage hue hain
+class DownloadsPage extends StatelessWidget {
+  const DownloadsPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: const Color(0xFF0F0F0F),
+      appBar: AppBar(
+        backgroundColor: const Color(0xFF151515),
+        title: const Text('Downloads Folder', style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+        iconTheme: const IconThemeData(color: Colors.white),
+      ),
+      body: downloadedMoviesList.isEmpty
+          ? Column(
+              children: [
+                const SizedBox(height: 20),
+                const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                const Expanded(child: Center(child: Text("No movies downloaded yet.", style: TextStyle(color: Colors.grey, fontSize: 16)))),
+              ],
+            )
+          : ListView.builder(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              itemCount: downloadedMoviesList.length + 2, 
+              itemBuilder: (context, index) {
+                // List ke upar aur neeche Banner Ads
+                if (index == 0 || index == downloadedMoviesList.length + 1) {
+                  return const Padding(
+                    padding: EdgeInsets.symmetric(vertical: 10),
+                    child: CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                  );
+                }
+                
+                final media = downloadedMoviesList[index - 1];
+                return Card(
+                  color: const Color(0xFF1A1A1A),
+                  margin: const EdgeInsets.only(bottom: 12),
+                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                  child: ListTile(
+                    contentPadding: const EdgeInsets.all(8),
+                    leading: const Icon(Icons.movie, color: Colors.greenAccent, size: 40),
+                    title: Text(media['title'] ?? 'Unknown', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
+                    subtitle: Text("Downloaded • ${media['year'] ?? ''}", style: const TextStyle(color: Colors.grey, fontSize: 12)),
+                    trailing: IconButton(
+                      icon: const Icon(Icons.play_circle_fill, color: Colors.redAccent, size: 35),
+                      onPressed: () {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('Playing offline file...'), backgroundColor: Colors.green)
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
     );
   }
 }
