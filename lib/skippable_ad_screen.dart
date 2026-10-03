@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
+import 'package:url_launcher/url_launcher.dart'; // Naya add kiya hai click handling ke liye
 import 'dart:async';
 import 'dart:math';
 
@@ -21,13 +22,13 @@ class SkippableAdScreen extends StatefulWidget {
 class _SkippableAdScreenState extends State<SkippableAdScreen> {
   late int timeLeft;
   Timer? timer;
+  Timer? fallbackTimer;
   bool canSkip = false;
   late WebViewController _adController;
   
   bool isAdLoading = true;
-  bool isTimerStarted = false; // 🔥 NAYA: Timer ko rokne ke liye flag
+  bool isTimerStarted = false; 
 
-  // 🔥 TERE DONO MONETAG LINKS 🔥
   final List<String> monetagLinks = [
     'https://omg10.com/4/11914244',
     'https://omg10.com/4/11914245'
@@ -36,7 +37,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   @override
   void initState() {
     super.initState();
-    timeLeft = widget.adDuration; // Original time set (10s, 30s ya 60s)
+    timeLeft = widget.adDuration; 
 
     String selectedAdUrl = monetagLinks[Random().nextInt(monetagLinks.length)];
 
@@ -47,13 +48,22 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
         NavigationDelegate(
           onPageStarted: (String url) {
             if(mounted) setState(() { isAdLoading = true; });
+            
+            // 🔥 DEEP FIX: Human verification ya popads ko bypass karne ke liye
+            fallbackTimer = Timer(const Duration(seconds: 4), () {
+               if(mounted && isAdLoading) {
+                 _adController.reload(); 
+               }
+            });
           },
           onPageFinished: (String url) {
             if(mounted) {
               setState(() { 
                 isAdLoading = false; 
               });
-              // 🔥 DEEP LOGIC: Ad poora load hone ke baad hi Timer shuru hoga!
+              fallbackTimer?.cancel();
+
+              // 🔥 DEEP LOGIC: Ad poora load hone par hi strict timer shuru hoga
               if (!isTimerStarted) {
                 isTimerStarted = true;
                 startStrictTimer();
@@ -61,6 +71,13 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
             }
           },
           onNavigationRequest: (NavigationRequest request) {
+            final url = request.url.toLowerCase();
+            
+            // 🔥 DEEP FIX: Agar user Ad par click karta hai toh usko browser mein khol do
+            if (!url.contains('omg10.com')) {
+               _launchInBrowser(url);
+               return NavigationDecision.prevent; // Webview mein doosra ad mat khulne do
+            }
             return NavigationDecision.navigate;
           },
         ),
@@ -73,14 +90,13 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     }
   }
 
-  // 🔥 DEEP LOGIC: Strict Timer jo poora time lega
+  // 🔥 DEEP LOGIC: Strict Timer
   void startStrictTimer() {
     timer = Timer.periodic(const Duration(seconds: 1), (t) {
       if (timeLeft > 0) {
         if(mounted){
           setState(() {
             timeLeft--;
-            // Jab time exactly 0 hoga, tabhi skip button on hoga
             if (timeLeft <= 0) {
               canSkip = true;
             }
@@ -95,8 +111,17 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     });
   }
 
+  // Browser mein ad kholne ka function
+  Future<void> _launchInBrowser(String urlString) async {
+    final Uri url = Uri.parse(urlString);
+    if (await canLaunchUrl(url)) {
+      await launchUrl(url, mode: LaunchMode.externalApplication);
+    }
+  }
+
   void goToNext() {
     timer?.cancel();
+    fallbackTimer?.cancel();
     if (mounted) {
       Navigator.pushReplacement(
         context, 
@@ -108,17 +133,17 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   @override
   void dispose() {
     timer?.cancel();
+    fallbackTimer?.cancel();
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    // 🔥 DEEP LOGIC: PopScope se Back Button 1000% blocked
+    // 🔥 DEEP LOGIC: Back button band kiya gaya hai
     return PopScope(
       canPop: false, 
       onPopInvoked: (didPop) {
         if (didPop) return;
-        // User ko forcefully message dikhega
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
             content: Text('Wait for the Ad to finish to continue!'),
@@ -136,7 +161,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 child: WebViewWidget(controller: _adController),
               ),
               
-              // Jab tak ad load na ho, loading screen ghoomti rahegi
               if(isAdLoading)
                 Positioned.fill(
                   child: Container(
@@ -165,7 +189,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                       side: BorderSide(color: canSkip ? Colors.redAccent : Colors.white30),
                     ),
                   ),
-                  onPressed: canSkip ? goToNext : null, // Click tabhi hoga jab canSkip true ho
+                  onPressed: canSkip ? goToNext : null, 
                   child: Text(
                     !isTimerStarted 
                         ? "Loading..."  

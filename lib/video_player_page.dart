@@ -9,7 +9,7 @@ import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
-import 'dashboard.dart';
+import 'dashboard.dart'; 
 
 const String kTmdbToken =
     'eyJhbGciOiJIUzI1NiJ9.eyJhdWQiOiIzZDJkOTExNmM5ZGU3MjA5ZWUyNzdiYjhjYzlhZWVkOCIsIm5iZiI6MTc5MDI2OTE4NC42MjksInN1YiI6IjZhYjU1NzAwNzZiMTg1ODU3MGFjNDM4NSIsInNjb3BlcyI6WyJhcGlfcmVhZCJdLCJ2ZXJzaW9uIjoxfQ.xZJX8fowhVhVJsgl-5wOW6Y7ZfUr9Zu_Ey1qMkhnPd0';
@@ -19,13 +19,73 @@ const Map<String, String> kApiHeaders = {
   'accept': 'application/json',
 };
 
-// 🔥 TERA ADSTERRA BANNER SCRIPT 🔥
 const String _adsterraBannerSnippet = '''
   <script type="text/javascript">
     atOptions = { 'key' : 'a39df283f6ad10c34e229e5715bceff5', 'format' : 'iframe', 'height' : 50, 'width' : 320, 'params' : {} };
   </script>
   <script type="text/javascript" src="https://www.highrevenueformat.com/a39df283f6ad10c34e229e5715bceff5/invoke.js"></script>
 ''';
+
+// 🔥 NAYA CHOTA AD (Popup Ads)
+class MiniAdScreen extends StatefulWidget {
+  final Widget nextScreen;
+  const MiniAdScreen({Key? key, required this.nextScreen}) : super(key: key);
+
+  @override
+  _MiniAdScreenState createState() => _MiniAdScreenState();
+}
+
+class _MiniAdScreenState extends State<MiniAdScreen> {
+  int timeLeft = 10;
+  Timer? timer;
+
+  @override
+  void initState() {
+    super.initState();
+    timer = Timer.periodic(const Duration(seconds: 1), (t) {
+      if (mounted) {
+        setState(() {
+          timeLeft--;
+          if (timeLeft <= 0) {
+            t.cancel();
+            Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => widget.nextScreen));
+          }
+        });
+      }
+    });
+  }
+
+  @override
+  void dispose() {
+    timer?.cancel();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: false,
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+              const SizedBox(height: 20),
+              const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+              const SizedBox(height: 30),
+              Text('Video will start in $timeLeft seconds...', style: const TextStyle(color: Colors.white, fontSize: 16)),
+              const SizedBox(height: 20),
+              const CircularProgressIndicator(color: Colors.redAccent)
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
 
 class VideoPlayerPage extends StatefulWidget {
   final int tmdbId;
@@ -126,7 +186,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             context,
             MaterialPageRoute(
               builder: (context) => SkippableAdScreen(
-                adDuration: 60, // 🔥 EXACT 60 Seconds (1 Minute) ka ad
+                adDuration: 60, 
                 nextScreen: VideoPlayerPage(
                   tmdbId: widget.tmdbId, mediaType: widget.mediaType,
                   season: widget.season, episode: widget.episode,
@@ -337,15 +397,31 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     _startControlsTimer();
   }
 
+  // 🔥 DEEP FIX: Episode change hone par mini ad zaroor aayega
   void _switchEpisode(int ep) {
-    setState(() { currentEpisode = ep; });
-    _initStream();
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => MiniAdScreen(
+          nextScreen: VideoPlayerPage(
+            tmdbId: widget.tmdbId,
+            mediaType: widget.mediaType,
+            season: currentSeason,
+            episode: ep,
+            movieTitle: widget.movieTitle,
+            overview: widget.overview,
+            rating: widget.rating,
+            year: widget.year,
+          )
+        )
+      )
+    );
   }
   
   void _switchSeason(int seasonNum) {
     setState(() { currentSeason = seasonNum; currentEpisode = 1; episodesList.clear(); });
     _fetchEpisodes(seasonNum);
-    _initStream();
+    _switchEpisode(1);
   }
 
   void _showSeasonPicker() {
@@ -379,20 +455,33 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
+  // 🔥 DEEP FIX: Proper download list handle karega
   void _downloadMovie() {
-    ScaffoldMessenger.of(context).showSnackBar(
-      const SnackBar(
-        content: Text('Downloading started... View in Downloads Folder!'),
-        backgroundColor: Colors.green,
-        duration: Duration(seconds: 2),
-      )
-    );
-    downloadedMoviesList.insert(0, {
-      'id': widget.tmdbId,
-      'title': widget.movieTitle,
-      'year': widget.year,
-      'type': widget.mediaType,
-    });
+    bool alreadyExists = downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId);
+    
+    if (!alreadyExists) {
+      downloadedMoviesList.insert(0, {
+        'id': widget.tmdbId,
+        'title': widget.movieTitle,
+        'year': widget.year,
+        'type': widget.mediaType,
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Downloading started... View in Downloads Folder!'),
+          backgroundColor: Colors.green,
+          duration: Duration(seconds: 2),
+        )
+      );
+    } else {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Already Downloaded!'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 2),
+        )
+      );
+    }
   }
 
   void _addComment() async {
@@ -750,7 +839,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                           itemBuilder: (context, index) {
                             final m = similarMovies[index];
                             return _buildFocusableItem(
-                              onTap: () { Navigator.pushReplacement(context, MaterialPageRoute(builder: (context) => SkippableAdScreen(adDuration: 30, nextScreen: VideoPlayerPage(tmdbId: m['id'], mediaType: m['mediaType'], movieTitle: m['title'], rating: m['rating'], year: m['year'])))); },
+                              // 🔥 DEEP FIX: Naya chota ad yaha trigger hoga jab bhi koi click karega
+                              onTap: () { 
+                                Navigator.push(context, MaterialPageRoute(builder: (context) => MiniAdScreen(
+                                  nextScreen: VideoPlayerPage(tmdbId: m['id'], mediaType: m['mediaType'], movieTitle: m['title'], rating: m['rating'], year: m['year'])
+                                ))); 
+                              },
                               borderRadius: BorderRadius.circular(8),
                               child: Container(
                                 width: 110, margin: const EdgeInsets.only(right: 10),
