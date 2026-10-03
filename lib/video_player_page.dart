@@ -218,7 +218,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   void _initStream() {
     setState(() { isPageLoading = true; isVideoPlaying = false; showIntroAnimation = false; });
 
-    // 🚀 ORIGINAL WEBVIEW: Jisme external browser ka faltu code nahi hai 🚀
+    // 🔥 PURE PLAYER LOGIC: Bina kisi external Google/Browser kachre ke 🔥
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(Colors.black)
@@ -265,7 +265,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             ''';
             _controller.runJavaScript(jsCode);
           },
-          // Faltu URL redirect hata diya gaya hai. Ab app me hi chalega.
+          // 🔥 DEEP FIX: Pura URL launcher yaha se hata diya gaya hai
           onNavigationRequest: (NavigationRequest request) {
             return NavigationDecision.navigate;
           },
