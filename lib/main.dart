@@ -3,9 +3,10 @@ import 'dart:async';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:firebase_messaging/firebase_messaging.dart';
 import 'package:firebase_remote_config/firebase_remote_config.dart';
+import 'package:firebase_analytics/firebase_analytics.dart'; // 🚀 ADDED: Live Real-time Analytics
 import 'package:app_links/app_links.dart'; 
-import 'package:package_info_plus/package_info_plus.dart'; // 🚀 NAYA ADD KIYA: Version check karne ke liye
-import 'package:url_launcher/url_launcher.dart'; // 🚀 NAYA ADD KIYA: Update link open karne ke liye
+import 'package:package_info_plus/package_info_plus.dart'; 
+import 'package:url_launcher/url_launcher.dart'; 
 import 'dashboard.dart';
 import 'video_player_page.dart';
 
@@ -21,6 +22,10 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
   
   await Firebase.initializeApp();
+
+  // 🚀 LIVE ANALYTICS INITIALIZATION
+  FirebaseAnalytics analytics = FirebaseAnalytics.instance;
+  analytics.logEvent(name: 'app_open_hannutv_v1_0_1');
 
   FirebaseMessaging.onBackgroundMessage(_firebaseMessagingBackgroundHandler);
 
@@ -43,9 +48,6 @@ void main() async {
 
   FirebaseMessaging.onMessage.listen((RemoteMessage message) {
     print('🔥 Foreground Notification Hit!');
-    if (message.notification != null) {
-      print('Title: ${message.notification?.title}');
-    }
   });
 
   messaging.getToken().then((token) {
@@ -133,7 +135,7 @@ class _HannuTvAppWrapperState extends State<HannuTvAppWrapper> {
   }
 }
 
-// ── SPLASH SCREEN (Deep Kill Switch & Version Logic) ──────────────────────────
+// ── SPLASH SCREEN (Deep Kill Switch, Anti-Space Bug & Version Logic) ──
 class SplashScreen extends StatefulWidget {
   const SplashScreen({Key? key}) : super(key: key);
 
@@ -143,9 +145,9 @@ class SplashScreen extends StatefulWidget {
 
 class _SplashScreenState extends State<SplashScreen> {
   bool isMaintenance = false;
-  bool isUpdateRequired = false; // 🚀 NAYA: Update check flag
+  bool isUpdateRequired = false; 
   String maintenanceMsg = "System Upgrade in Progress. Please update HANNUTV.";
-  String updateLink = "https://hannutv.blogspot.com/"; // 🚀 NAYA: Default Link
+  String updateLink = "https://hannutv.blogspot.com/"; 
   bool isLoading = true;
 
   @override
@@ -157,28 +159,25 @@ class _SplashScreenState extends State<SplashScreen> {
   Future<void> checkMaintenance() async {
     try {
       final remoteConfig = FirebaseRemoteConfig.instance;
-      // Hardcoded Fast Fetch (0 seconds cache for instant kill switch action)
       await remoteConfig.setConfigSettings(RemoteConfigSettings(
         fetchTimeout: const Duration(seconds: 15),
-        minimumFetchInterval: const Duration(seconds: 0),
+        minimumFetchInterval: const Duration(seconds: 0), // Instant Kill Switch
       ));
       await remoteConfig.fetchAndActivate();
 
-      // 1. Purana Maintenance Mode check
+      // 🚀 DEEP FIX: Added .trim() so accidental spaces in Firebase don't break the app
       bool maintenance = remoteConfig.getBool('maintenance_mode');
+      String fbLatestVersion = remoteConfig.getString('latest_version').trim();
+      String fbUpdateLink = remoteConfig.getString('update_link').trim();
+      String fbMsg = remoteConfig.getString('maintenance_message').trim();
       
-      // 2. Naya Version Logic Check
-      String fbLatestVersion = remoteConfig.getString('latest_version');
-      String fbUpdateLink = remoteConfig.getString('update_link');
-      String fbMsg = remoteConfig.getString('maintenance_message');
-      
-      // App ka current version nikalna
       PackageInfo packageInfo = await PackageInfo.fromPlatform();
-      String currentVersion = packageInfo.version;
+      String currentVersion = packageInfo.version.trim();
 
       bool needsUpdate = false;
+      // Exact Version Match Logic Check
       if (fbLatestVersion.isNotEmpty && currentVersion != fbLatestVersion) {
-         needsUpdate = true; // Agar Firebase ka version app ke version se alag hai toh update chahiye
+         needsUpdate = true; 
       }
 
       setState(() {
@@ -197,13 +196,11 @@ class _SplashScreenState extends State<SplashScreen> {
       print("⚠️ Remote Config Error: $e");
     }
 
-    // Agar maintenance ON hai YA Update chahiye, toh app block karo (isLoading false karke screen roko)
     if (isMaintenance || isUpdateRequired) {
       setState(() {
         isLoading = false; 
       });
     } else {
-      // Sab theek hai, Dashboard par jao
       Timer(const Duration(milliseconds: 2500), () {
         Navigator.pushReplacement(
           context,
@@ -213,18 +210,20 @@ class _SplashScreenState extends State<SplashScreen> {
     }
   }
 
-  // 🚀 NAYA: URL open karne ka function
+  // 🚀 DEEP FIX: Try-Catch applied to URL Launcher to prevent silent crashes
   Future<void> _launchUpdateURL() async {
-    final Uri url = Uri.parse(updateLink);
-    if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
-      print('Could not launch $url');
+    try {
+      final Uri url = Uri.parse(updateLink);
+      if (!await launchUrl(url, mode: LaunchMode.externalApplication)) {
+        print('Could not launch $url');
+      }
+    } catch (e) {
+      print('URL Launch Error: $e');
     }
   }
 
-
   @override
   Widget build(BuildContext context) {
-    // 🔴 BLOCKED STATE
     if ((isMaintenance || isUpdateRequired) && !isLoading) {
       return Scaffold(
         backgroundColor: const Color(0xFF0F0F0F),
@@ -248,7 +247,6 @@ class _SplashScreenState extends State<SplashScreen> {
                 ),
                 const SizedBox(height: 45),
                 
-                // 🚀 NAYA: Clickable Button jo seedha link par le jayega
                 ElevatedButton.icon(
                   onPressed: _launchUpdateURL,
                   icon: const Icon(Icons.download, color: Colors.white),
@@ -271,7 +269,6 @@ class _SplashScreenState extends State<SplashScreen> {
       );
     }
 
-    // 🟢 APP STARTING STATE
     return Scaffold(
       backgroundColor: const Color(0xFF0F0F0F),
       body: Center(
