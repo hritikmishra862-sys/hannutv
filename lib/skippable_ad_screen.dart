@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
+import 'dart:io'; // 🚀 DEEP OS-LEVEL DNS TRAP KE LIYE
 import 'package:webview_flutter/webview_flutter.dart';
-import 'package:url_launcher/url_launcher.dart'; // 🚀 CLICK HANDLE KARNE KE LIYE
+import 'package:url_launcher/url_launcher.dart'; 
 
 class SkippableAdScreen extends StatefulWidget {
   final Widget nextScreen; 
@@ -27,7 +28,6 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   // 🔥 DEEP LOGIC: ANTI-ADBLOCK FLAG 🔥
   bool _isAdblockDetected = false;
 
-  // 🚀 TERE ORIGINAL DIRECT LINKS 🚀
   final List<String> _fullScreenAdLinks = [
     "https://omg10.com/4/11914244", 
     "https://omg10.com/4/11914245", 
@@ -42,16 +42,17 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     final _random = Random();
     String selectedAd = _fullScreenAdLinks[_random.nextInt(_fullScreenAdLinks.length)];
 
+    // 🚀 TRAP 1: APP START HOTE HI DNS CHECK KAREGA (WORLD CLASS CATCHER) 🚀
+    _checkAdGuardDNS(selectedAd);
+
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF000000))
-      // 🚀 TERA FILTER FOR CLICKS + MERA FILTER FOR ADBLOCK/DNS 🚀
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
             
-            // 🔥 Agar link Play Store, WhatsApp, Telegram ya Market Intent ka hai, toh seedha bahar (Phone me) kholo
             if (url.startsWith('intent://') || 
                 url.startsWith('market://') || 
                 url.contains('play.google.com') ||
@@ -59,28 +60,15 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 url.startsWith('tg://')) {
               
               _launchExternalBrowser(request.url);
-              return NavigationDecision.prevent; // App me error aane se roko aur app ko browser mat banne do
+              return NavigationDecision.prevent; 
             }
-            
-            // Baaki Monetag ke normal background loading links ko aaram se chalne do (No Google auto-open)
             return NavigationDecision.navigate;
           },
-          // 🚀 WORLD CLASS ANTI-ADBLOCK SENSOR (Private DNS / AdGuard Catcher) 🚀
+          // 🚀 TRAP 2: AGAR WEBVIEW MEIN KOI BHI ERROR AAYA TOH BHI BLOCK KAREGA 🚀
           onWebResourceError: (WebResourceError error) {
             final desc = error.description.toLowerCase();
-            // Agar Private DNS ne domain resolve hone se roka, ya AdGuard ne connection close kiya
-            if (desc.contains('err_name_not_resolved') || 
-                desc.contains('err_blocked_by_client') || 
-                desc.contains('err_connection_refused') ||
-                desc.contains('err_address_unreachable') ||
-                desc.contains('err_connection_closed')) {
-              
-              if (mounted) {
-                setState(() {
-                  _isAdblockDetected = true; // Error screen trigger
-                  _timer?.cancel(); // 🔥 TIMER HAMESHA KE LIYE CANCEL 🔥
-                });
-              }
+            if (desc.contains('net::err_') || desc.contains('blocked') || desc.contains('refused') || desc.contains('resolved') || desc.contains('closed')) {
+              _triggerBlock();
             }
           },
         ),
@@ -98,7 +86,40 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     });
   }
 
-  // 🚀 BAHAR PLAY STORE YA CHROME ME KHOLNE KA FUNCTION 🚀
+  // 🚀 DEEP CODING: NATIVE DNS SCANNER 🚀
+  Future<void> _checkAdGuardDNS(String adUrl) async {
+    try {
+      final uri = Uri.parse(adUrl);
+      // Ye seedha OS se puchega ki domain block toh nahi hai
+      final addresses = await InternetAddress.lookup(uri.host);
+      bool blocked = false;
+      for (var addr in addresses) {
+        // AdGuard hamesha ads ko 0.0.0.0 ya localhost par bhej kar block karta hai
+        if (addr.address == '0.0.0.0' || addr.address == '127.0.0.1' || addr.address == '::1') {
+          blocked = true;
+          break;
+        }
+      }
+      if (blocked || addresses.isEmpty) {
+        _triggerBlock(); // DNS TRAP FASI
+      }
+    } catch (e) {
+      // Agar DNS ne pura network hi block kar diya ad ke liye (SocketException)
+      _triggerBlock(); 
+    }
+  }
+
+  // 🔥 ACTION: JAB ADBLOCK PAKDA JAYE TOH KYA KARE 🔥
+  void _triggerBlock() {
+    if (mounted) {
+      setState(() {
+        _isAdblockDetected = true;
+        _timer?.cancel(); // TIMER ZINDAGI BHAR KE LIYE DEAD
+        _canSkip = false; // SKIP BUTTON ZINDAGI BHAR KE LIYE DEAD
+      });
+    }
+  }
+
   Future<void> _launchExternalBrowser(String urlString) async {
     final Uri url = Uri.parse(urlString);
     try {
@@ -130,28 +151,27 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
         body: SafeArea(
           child: Stack(
             children: [
-              // WebView jisme Full Screen Ad chalega
               WebViewWidget(controller: _controller),
               
-              // 🔥 AD-BLOCKER/DNS ERROR SCREEN OVERLAY 🔥
+              // 🔥 CRASH/ERROR SCREEN OVERLAY 🔥
               if (_isAdblockDetected)
                 Positioned.fill(
                   child: Container(
-                    color: Colors.black.withOpacity(0.95), // Ad screen ko block kar dega
+                    color: Colors.black.withOpacity(0.98), // Puri screen black/block
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
                       children: const [
-                        Icon(Icons.security, color: Colors.redAccent, size: 80),
+                        Icon(Icons.gpp_bad_rounded, color: Colors.redAccent, size: 80),
                         SizedBox(height: 20),
                         Text(
                           "AdBlocker Detected!", 
-                          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)
+                          style: TextStyle(color: Colors.white, fontSize: 24, fontWeight: FontWeight.bold)
                         ),
                         SizedBox(height: 12),
                         Text(
                           "Please off pvtdns / adguard\nto continue watching.", 
                           textAlign: TextAlign.center, 
-                          style: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.w600)
+                          style: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.bold)
                         ),
                       ],
                     ),
@@ -163,7 +183,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 top: 15,
                 right: 15,
                 child: GestureDetector(
-                  // 🔥 AGAR DNS BLOCK HAI TOH BUTTON DEAD HO JAYEGA (NULL) 🔥
+                  // 🔥 AGAR PVTDNS ON HAI TOH BUTTON KA CLICK DISABLE (null) HO JAYEGA 🔥
                   onTap: (_canSkip && !_isAdblockDetected) ? _skipAd : null,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
@@ -176,7 +196,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          // 🔥 DNS ON TOH "Loading..." PE ATAK JAYEGA 🔥
+                          // 🔥 DNS ON HOTE HI BUTTON "Loading..." PE ATAK JAYEGA 🔥
                           _isAdblockDetected 
                               ? "Loading..." 
                               : (_canSkip ? "Skip Ad" : "Skip in $_timeLeft"),
