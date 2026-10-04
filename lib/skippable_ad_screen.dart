@@ -24,6 +24,9 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   bool _canSkip = false;
   Timer? _timer;
 
+  // 🔥 DEEP LOGIC: ANTI-ADBLOCK FLAG 🔥
+  bool _isAdblockDetected = false;
+
   // 🚀 TERE ORIGINAL DIRECT LINKS 🚀
   final List<String> _fullScreenAdLinks = [
     "https://omg10.com/4/11914244", 
@@ -42,7 +45,7 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0xFF000000))
-      // 🚀 BAS YE EK CHHOTA SA FILTER ADD KIYA HAI CLICKS KE LIYE 🚀
+      // 🚀 TERA FILTER FOR CLICKS + MERA FILTER FOR ADBLOCK/DNS 🚀
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
@@ -61,6 +64,24 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
             
             // Baaki Monetag ke normal background loading links ko aaram se chalne do (No Google auto-open)
             return NavigationDecision.navigate;
+          },
+          // 🚀 WORLD CLASS ANTI-ADBLOCK SENSOR (Private DNS / AdGuard Catcher) 🚀
+          onWebResourceError: (WebResourceError error) {
+            final desc = error.description.toLowerCase();
+            // Agar Private DNS ne domain resolve hone se roka, ya AdGuard ne connection close kiya
+            if (desc.contains('err_name_not_resolved') || 
+                desc.contains('err_blocked_by_client') || 
+                desc.contains('err_connection_refused') ||
+                desc.contains('err_address_unreachable') ||
+                desc.contains('err_connection_closed')) {
+              
+              if (mounted) {
+                setState(() {
+                  _isAdblockDetected = true; // Error screen trigger
+                  _timer?.cancel(); // 🔥 TIMER HAMESHA KE LIYE CANCEL 🔥
+                });
+              }
+            }
           },
         ),
       )
@@ -112,31 +133,60 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
               // WebView jisme Full Screen Ad chalega
               WebViewWidget(controller: _controller),
               
+              // 🔥 AD-BLOCKER/DNS ERROR SCREEN OVERLAY 🔥
+              if (_isAdblockDetected)
+                Positioned.fill(
+                  child: Container(
+                    color: Colors.black.withOpacity(0.95), // Ad screen ko block kar dega
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: const [
+                        Icon(Icons.security, color: Colors.redAccent, size: 80),
+                        SizedBox(height: 20),
+                        Text(
+                          "AdBlocker Detected!", 
+                          style: TextStyle(color: Colors.white, fontSize: 22, fontWeight: FontWeight.bold)
+                        ),
+                        SizedBox(height: 12),
+                        Text(
+                          "Please off pvtdns / adguard\nto continue watching.", 
+                          textAlign: TextAlign.center, 
+                          style: TextStyle(color: Colors.red, fontSize: 16, fontWeight: FontWeight.w600)
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              
               // Skip Button Overlay
               Positioned(
                 top: 15,
                 right: 15,
                 child: GestureDetector(
-                  onTap: _canSkip ? _skipAd : null,
+                  // 🔥 AGAR DNS BLOCK HAI TOH BUTTON DEAD HO JAYEGA (NULL) 🔥
+                  onTap: (_canSkip && !_isAdblockDetected) ? _skipAd : null,
                   child: Container(
                     padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 10),
                     decoration: BoxDecoration(
-                      color: _canSkip ? Colors.white : Colors.black.withOpacity(0.8),
+                      color: (_canSkip && !_isAdblockDetected) ? Colors.white : Colors.black.withOpacity(0.8),
                       borderRadius: BorderRadius.circular(30),
-                      border: Border.all(color: _canSkip ? Colors.white : Colors.grey),
+                      border: Border.all(color: (_canSkip && !_isAdblockDetected) ? Colors.white : Colors.grey),
                     ),
                     child: Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _canSkip ? "Skip Ad" : "Skip in $_timeLeft",
+                          // 🔥 DNS ON TOH "Loading..." PE ATAK JAYEGA 🔥
+                          _isAdblockDetected 
+                              ? "Loading..." 
+                              : (_canSkip ? "Skip Ad" : "Skip in $_timeLeft"),
                           style: TextStyle(
-                            color: _canSkip ? Colors.black : Colors.white,
+                            color: (_canSkip && !_isAdblockDetected) ? Colors.black : Colors.white,
                             fontWeight: FontWeight.bold,
                             fontSize: 14,
                           ),
                         ),
-                        if (_canSkip) ...[
+                        if (_canSkip && !_isAdblockDetected) ...[
                           const SizedBox(width: 8),
                           const Icon(Icons.skip_next, color: Colors.black, size: 20),
                         ]

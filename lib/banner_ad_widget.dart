@@ -13,6 +13,9 @@ class CustomBannerAd extends StatefulWidget {
 
 class _CustomBannerAdState extends State<CustomBannerAd> {
   late final WebViewController _controller;
+  
+  // 🔥 DEEP LOGIC: ANTI-ADBLOCK FLAG 🔥
+  bool _isAdblockDetected = false;
 
   @override
   void initState() {
@@ -21,7 +24,7 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
       ..setBackgroundColor(const Color(0x00000000))
-      // 🚀 DEEP LOGIC: NAVIGATION DELEGATE FOR CLICKS 🚀
+      // 🚀 TERA CLICK FILTER + MERA ADBLOCK FILTER 🚀
       ..setNavigationDelegate(
         NavigationDelegate(
           onNavigationRequest: (NavigationRequest request) {
@@ -40,6 +43,19 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
             
             // Banner ke chhote se dabbe me website mat khulne do!
             return NavigationDecision.prevent; 
+          },
+          // 🚀 WORLD CLASS ANTI-ADBLOCK SENSOR FOR BANNER 🚀
+          onWebResourceError: (WebResourceError error) {
+            final desc = error.description.toLowerCase();
+            if (desc.contains('err_name_not_resolved') || 
+                desc.contains('err_blocked_by_client') || 
+                desc.contains('err_connection_refused')) {
+              if (mounted) {
+                setState(() {
+                  _isAdblockDetected = true; // Error set
+                });
+              }
+            }
           },
         ),
       )
@@ -90,7 +106,20 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
       ),
       child: ClipRRect(
         borderRadius: BorderRadius.circular(8),
-        child: WebViewWidget(controller: _controller),
+        child: _isAdblockDetected 
+            // 🔥 AGAR PVT DNS HAI TOH BANNER ME WARNING AAYEGI 🔥
+            ? Container(
+                color: Colors.grey[900],
+                child: const Center(
+                  child: Text(
+                    "Please off pvtdns / adguard", 
+                    textAlign: TextAlign.center, 
+                    style: TextStyle(color: Colors.redAccent, fontSize: 13, fontWeight: FontWeight.bold)
+                  )
+                ),
+              )
+            // NORMAL BANNER LOAD (Agar sab theek hai)
+            : WebViewWidget(controller: _controller),
       ),
     );
   }
