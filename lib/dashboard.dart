@@ -198,7 +198,8 @@ class DashboardPageState extends State<DashboardPage> {
       selectedPlatform = providerId ?? 'all';
     });
     try {
-      String base = 'https://api.themoviedb.org/3';
+      // 🔥 BHAII YAHAN TERA NAYA CLOUDFLARE WORKER WALA BYPASS LINK LAGA DIYA HAI 🔥
+      String base = 'https://hannu-tv.hritikmishra862.workers.dev/3';
       String prov = (providerId != null && providerId != 'all') ? '&with_watch_providers=$providerId&watch_region=US' : '';
 
       String trendingUrl = '$base/trending/all/day?language=en-US$prov';
@@ -242,7 +243,8 @@ class DashboardPageState extends State<DashboardPage> {
     _debounce = Timer(const Duration(milliseconds: 400), () async {
       setState(() => isLoading = true);
       try {
-        final url = 'https://api.themoviedb.org/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
+        // 🔥 BHAII YAHAN SEARCH WALE MEIN BHI TERA NAYA CLOUDFLARE WALA BYPASS LINK LAGA DIYA HAI 🔥
+        final url = 'https://hannu-tv.hritikmishra862.workers.dev/3/search/multi?query=${Uri.encodeComponent(value)}&language=en-US&include_adult=false';
         final res = await http.get(Uri.parse(url), headers: kApiHeaders);
         setState(() { searchResults = parseData(res); isLoading = false; });
       } catch (_) { setState(() => isLoading = false); }

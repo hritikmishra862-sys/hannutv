@@ -144,7 +144,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Future<void> _fetchTvDetails() async {
     if (widget.mediaType != 'tv' && widget.mediaType != 'series') return;
     try {
-      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.tmdbId}?language=en-US'), headers: kApiHeaders);
+      // 🔥 CLOUDFLARE BYPASS LINK APPLIED HERE 🔥
+      final res = await http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}?language=en-US'), headers: kApiHeaders);
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         if (mounted) setState(() { totalSeasons = data['number_of_seasons'] ?? 1; });
@@ -156,7 +157,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
   Future<void> _fetchEpisodes(int seasonNum) async {
     if (widget.mediaType != 'tv' && widget.mediaType != 'series') return;
     try {
-      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/tv/${widget.tmdbId}/season/$seasonNum?language=en-US'), headers: kApiHeaders);
+      // 🔥 CLOUDFLARE BYPASS LINK APPLIED HERE 🔥
+      final res = await http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}/season/$seasonNum?language=en-US'), headers: kApiHeaders);
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         if (mounted) setState(() { episodesList = data['episodes'] ?? []; });
@@ -195,7 +197,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     setState(() => isLoadingSimilar = true);
     try {
       final type = widget.mediaType == 'tv' || widget.mediaType == 'series' ? 'tv' : 'movie';
-      final res = await http.get(Uri.parse('https://api.themoviedb.org/3/$type/${widget.tmdbId}/recommendations?language=en-US'), headers: kApiHeaders);
+      // 🔥 CLOUDFLARE BYPASS LINK APPLIED HERE 🔥
+      final res = await http.get(Uri.parse('https://hannu-tv.hritikmishra862.workers.dev/3/$type/${widget.tmdbId}/recommendations?language=en-US'), headers: kApiHeaders);
       if (res.statusCode == 200) {
         final data = json.decode(res.body);
         final List results = data['results'] ?? [];
@@ -264,7 +267,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             ''';
             _controller.runJavaScript(jsCode);
           },
-          // 🚀 DEEP FIX: Ye tera original blocker hai jo player ko Google par jaane se rokega!
           onNavigationRequest: (NavigationRequest request) {
             final url = request.url.toLowerCase();
             if (url.contains('doubleclick') || url.contains('popads') || url.contains('1xbet') || url.contains('bet365') || url.contains('onclick') || url.contains('adult') || url.contains('telegram') || url.contains('t.me') || url.contains('adsterra') || url.contains('captcha') || url.contains('verify')) {
@@ -273,7 +275,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             if (url.contains('pantyflix.com') || url.contains('vidbolt') || url.contains('vidsrc') || url.contains('vidlink') || url.contains('multiembed') || url.contains('autoembed') || url.startsWith('about:blank') || url.startsWith('data:')) {
                 return NavigationDecision.navigate;
             }
-            return NavigationDecision.prevent; // Kisi aur site pe player ko mat jaane do!
+            return NavigationDecision.prevent;
           },
         ),
       );
@@ -801,7 +803,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             final m = similarMovies[index];
                             return _buildFocusableItem(
                               onTap: () { 
-                                Navigator.pushReplacement(
+                                Navigator.replace(
                                   context, 
                                   MaterialPageRoute(builder: (context) => SkippableAdScreen(
                                     adDuration: 10,
