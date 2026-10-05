@@ -299,12 +299,47 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
+  // 🚀 JIO / AIRTEL AUTOMATIC BYPASS TUNNEL
+  String _buildStreamUrl() {
+    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
+      return widget.customUrl!;
+    }
+
+    final id = widget.tmdbId;
+    final s = currentSeason;
+    final e = currentEpisode;
+    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+
+    String rawUrl = '';
+
+    if (activeServer == 'vidrift' || activeServer == 'server-1') {
+      rawUrl = isTv ? 'https://vidlink.pro/tv/$id/$s/$e' : 'https://vidlink.pro/movie/$id';
+    } else if (activeServer == 'fast' || activeServer == 'alpha' || activeServer == 'server-2') {
+      rawUrl = isTv ? 'https://vidsrc.pm/embed/tv?tmdb=$id&season=$s&episode=$e' : 'https://vidsrc.pm/embed/movie/$id';
+    } else if (activeServer == 'vidbolt') {
+      rawUrl = isTv ? 'https://vidbolt.xyz/tv/$id/$s/$e' : 'https://vidbolt.xyz/movie/$id';
+    } else if (activeServer == 'hindi-new' || activeServer == 'hindi') {
+      rawUrl = isTv ? 'https://multiembed.mov/?video_id=$id&tmdb=1&s=$s&e=$e' : 'https://multiembed.mov/?video_id=$id&tmdb=1';
+    } else if (activeServer == 'cinezo' || activeServer == 'orion') {
+      rawUrl = isTv ? 'https://player.autoembed.cc/embed/tv/$id/$s/$e' : 'https://player.autoembed.cc/embed/movie/$id';
+    } else {
+      rawUrl = isTv
+          ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
+          : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
+    }
+
+    // Tunneling through Cloudflare Worker
+    return 'https://hannutvpn.hritikmishra862.workers.dev/stream?url=${Uri.encodeComponent(rawUrl)}';
+  }
+
   void _initStream() {
     setState(() {
       isPageLoading = true;
       isVideoPlaying = false;
       showIntroAnimation = false;
     });
+
+    final targetUrl = _buildStreamUrl();
 
     _controller =
         WebViewController()
@@ -313,7 +348,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           ..setUserAgent(
             isTvDevice
                 ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
-                : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+                : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
           )
           ..addJavaScriptChannel(
             'VideoState',
@@ -396,12 +431,13 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   return NavigationDecision.prevent;
                 }
 
-                if (url.contains('pantyflix.com') ||
-                    url.contains('vidbolt') ||
-                    url.contains('vidsrc') ||
+                if (url.contains('workers.dev') ||
                     url.contains('vidlink') ||
+                    url.contains('vidsrc') ||
+                    url.contains('vidbolt') ||
                     url.contains('multiembed') ||
                     url.contains('autoembed') ||
+                    url.contains('pantyflix') ||
                     url.startsWith('about:blank') ||
                     url.startsWith('data:')) {
                   return NavigationDecision.navigate;
@@ -412,47 +448,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
             ),
           );
 
-    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
-      if (widget.customUrl!.contains('.m3u8')) {
-        String hlsHtml = '''
-          <!DOCTYPE html><html><head><meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-          <script src="https://cdn.jsdelivr.net/npm/hls.js@latest"></script>
-          <style>body, html { margin: 0; padding: 0; background: black; height: 100%; width: 100%; overflow: hidden; } video { width: 100%; height: 100%; object-fit: contain; }</style>
-          </head><body><video id="video" autoplay controls></video>
-          <script>
-            var video = document.getElementById('video');
-            if (Hls.isSupported()) {
-              var hls = new Hls();
-              hls.loadSource('${widget.customUrl}');
-              hls.attachMedia(video);
-              hls.on(Hls.Events.MANIFEST_PARSED, function() { video.play(); VideoState.postMessage('playing'); });
-            } else if (video.canPlayType('application/vnd.apple.mpegurl')) {
-              video.src = '${widget.customUrl}';
-              video.addEventListener('loadedmetadata', function() { video.play(); VideoState.postMessage('playing'); });
-            }
-          </script></body></html>
-        ''';
-        _controller.loadHtmlString(hlsHtml);
-      } else {
-        _controller.loadRequest(Uri.parse(widget.customUrl!));
-      }
-    } else {
-      final id = widget.tmdbId;
-      final isTv =
-          widget.mediaType == 'tv' || widget.mediaType == 'series';
-      String targetUrl =
-          isTv
-              ? 'https://pantyflix.com/watch/play/tv/$id?season=$currentSeason&episode=$currentEpisode&server=$activeServer'
-              : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
-
-      _controller.loadRequest(
-        Uri.parse(targetUrl),
-        headers: {
-          'Referer': 'https://pantyflix.com',
-          'Origin': 'https://pantyflix.com',
-        },
-      );
-    }
+    _controller.loadRequest(Uri.parse(targetUrl));
   }
 
   void _cycleAspectRatio() {
@@ -595,7 +591,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🚀 FIXED: MULTI-SERVER DIRECT DOWNLOAD ENGINE
+  // 🚀 FIXED: DIRECT HIGH SPEED DOWNLOADER WITH JIO/AIRTEL TUNNEL
   Future<void> _downloadMovie() async {
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
     final id = widget.tmdbId;
