@@ -227,6 +227,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
+  // 🚀 JIO / AIRTEL 100% IN-APP TUNNEL URL RESOLVER
   String _buildStreamUrl() {
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
       return widget.customUrl!;
@@ -237,9 +238,12 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     final e = currentEpisode;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
 
-    return isTv
+    final rawPantyflixUrl = isTv
         ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
+
+    // Cloudflare Tunnel Gateway Call (Bypasses Jio / Airtel ISP filters completely)
+    return 'https://hannutvpn.hritikmishra862.workers.dev/play?url=${Uri.encodeComponent(rawPantyflixUrl)}';
   }
 
   void _initStream() {
@@ -258,7 +262,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           ..setUserAgent(
             isTvDevice
                 ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
-                : "Mozilla/5.0 (Linux; Android 13; SM-S918B Build/TP1A.220624.014) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
+                : "Mozilla/5.0 (Linux; Android 14; SM-S918B Build/UP1A.231005.007) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Mobile Safari/537.36",
           )
           ..addJavaScriptChannel(
             'VideoState',
@@ -375,7 +379,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   return NavigationDecision.prevent;
                 }
 
-                if (url.contains('pantyflix.com') ||
+                if (url.contains('workers.dev') ||
+                    url.contains('pantyflix.com') ||
                     url.contains('vidbolt') ||
                     url.contains('vidsrc') ||
                     url.contains('vidlink') ||
