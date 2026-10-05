@@ -167,7 +167,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     try {
       final res = await http.get(
         Uri.parse(
-          'https://hannu-tv.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}?language=en-US',
+          'https://hannutvpn.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}?language=en-US',
         ),
         headers: kApiHeaders,
       );
@@ -188,7 +188,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     try {
       final res = await http.get(
         Uri.parse(
-          'https://hannu-tv.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}/season/$seasonNum?language=en-US',
+          'https://hannutvpn.hritikmishra862.workers.dev/3/tv/${widget.tmdbId}/season/$seasonNum?language=en-US',
         ),
         headers: kApiHeaders,
       );
@@ -259,7 +259,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               : 'movie';
       final res = await http.get(
         Uri.parse(
-          'https://hannu-tv.hritikmishra862.workers.dev/3/$type/${widget.tmdbId}/recommendations?language=en-US',
+          'https://hannutvpn.hritikmishra862.workers.dev/3/$type/${widget.tmdbId}/recommendations?language=en-US',
         ),
         headers: kApiHeaders,
       );
@@ -595,50 +595,66 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
+  // 🚀 FIXED: MULTI-SERVER DIRECT DOWNLOAD ENGINE
   Future<void> _downloadMovie() async {
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
     final id = widget.tmdbId;
 
-    String directDownloadUrl = '';
+    List<String> downloadSources = [];
 
     if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
-      directDownloadUrl = widget.customUrl!;
+      downloadSources.add(widget.customUrl!);
     } else {
-      directDownloadUrl = isTv
-          ? 'https://vidlink.pro/download/tv/$id/$currentSeason/$currentEpisode'
-          : 'https://vidlink.pro/download/movie/$id';
+      if (isTv) {
+        downloadSources = [
+          'https://vidlink.pro/download/tv/$id/$currentSeason/$currentEpisode',
+          'https://dl.vidsrc.pm/tv/$id/$currentSeason/$currentEpisode',
+          'https://autoembed.cc/download/tv/$id/$currentSeason/$currentEpisode',
+        ];
+      } else {
+        downloadSources = [
+          'https://vidlink.pro/download/movie/$id',
+          'https://dl.vidsrc.pm/movie/$id',
+          'https://autoembed.cc/download/movie/$id',
+        ];
+      }
     }
 
-    try {
-      final uri = Uri.parse(directDownloadUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+    bool started = false;
 
-        if (!downloadedMoviesList.any((m) => m['id'] == widget.tmdbId)) {
-          downloadedMoviesList.insert(0, {
-            'id': widget.tmdbId,
-            'title': widget.movieTitle,
-            'year': widget.year,
-            'type': widget.mediaType,
-          });
+    for (String url in downloadSources) {
+      try {
+        final uri = Uri.parse(url);
+        if (await canLaunchUrl(uri)) {
+          await launchUrl(uri, mode: LaunchMode.externalApplication);
+          started = true;
+          break;
         }
+      } catch (_) {}
+    }
 
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(
-              content: Text('⚡ High-Speed Download Started! Check Notifications.'),
-              backgroundColor: Colors.green,
-            ),
-          );
-        }
-      } else {
-        throw Exception('Could not launch URL');
+    if (started) {
+      if (!downloadedMoviesList.any((m) => m['id'] == widget.tmdbId)) {
+        downloadedMoviesList.insert(0, {
+          'id': widget.tmdbId,
+          'title': widget.movieTitle,
+          'year': widget.year,
+          'type': widget.mediaType,
+        });
       }
-    } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
-            content: Text('Download stream busy. Please try another Server.'),
+            content: Text('⚡ High-Speed Direct Download Started! Check Notification Bar.'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      }
+    } else {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Download servers busy. Please switch to another server and try.'),
             backgroundColor: Colors.redAccent,
           ),
         );
@@ -1059,6 +1075,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             ),
                           ),
                           const SizedBox(width: 8),
+                          // 🚀 DOWNLOAD BUTTON TRIGGER
                           _buildFocusableItem(
                             onTap: _downloadMovie,
                             borderRadius: BorderRadius.circular(20),
@@ -1706,14 +1723,15 @@ class _TvFocusButtonState extends State<_TvFocusButton> {
               color: hasFocus ? Colors.redAccent : Colors.transparent,
               width: hasFocus ? 3.5 : 0,
             ),
-            boxShadow: hasFocus
-                ? [
-                    BoxShadow(
-                      color: Colors.redAccent.withOpacity(0.65),
-                      blurRadius: 10,
-                    ),
-                  ]
-                : [],
+            boxShadow:
+                hasFocus
+                    ? [
+                      BoxShadow(
+                        color: Colors.redAccent.withOpacity(0.65),
+                        blurRadius: 10,
+                      ),
+                    ]
+                    : [],
           ),
           child: widget.child,
         ),
