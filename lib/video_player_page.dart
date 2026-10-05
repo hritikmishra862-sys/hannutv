@@ -595,7 +595,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🚀 10000000000% DEEP REAL DOWNLOAD LOGIC (HIGH SPEED DOWNLOADING)
   Future<void> _downloadMovie() async {
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
     final id = widget.tmdbId;
@@ -1060,7 +1059,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // 🚀 REAL WORKING DOWNLOAD TRIGGER
                           _buildFocusableItem(
                             onTap: _downloadMovie,
                             borderRadius: BorderRadius.circular(20),
@@ -1708,6 +1706,18 @@ class _TvFocusButtonState extends State<_TvFocusButton> {
               color: hasFocus ? Colors.redAccent : Colors.transparent,
               width: hasFocus ? 3.5 : 0,
             ),
-            boxShadow:
-                hasFocus
-                    ? [
+            boxShadow: hasFocus
+                ? [
+                    BoxShadow(
+                      color: Colors.redAccent.withOpacity(0.65),
+                      blurRadius: 10,
+                    ),
+                  ]
+                : [],
+          ),
+          child: widget.child,
+        ),
+      ),
+    );
+  }
+}
