@@ -84,7 +84,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'vidsrc', 'name': 'Fast'}, // YAHAN FIX KIYA HAI: 'fast' ki jagah actual 'vidsrc' server daal diya hai
+    {'key': 'vidsrc', 'name': 'Fast'},
     {'key': 'vidbolt', 'name': 'Bolt'},
     {'key': 'cinezo', 'name': 'Cinezo'},
     {'key': 'hindi-new', 'name': 'Hindi New'},
@@ -232,7 +232,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           onPageFinished: (String url) {
             if (mounted) setState(() => isPageLoading = false);
 
-            // YAHAN FIX KIYA HAI: Purani wali aggressive iframe aur hide logic wapas daal di hai
             String jsCode = '''
               document.documentElement.style.backgroundColor = '#000000';
               document.body.style.backgroundColor = '#000000';
@@ -258,7 +257,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     width: 100vw !important; 
                     height: 100vh !important; 
                 }
-                /* MAIN MAGIC: IFRAME KO FULL SCREEN KARNA JAISE PURANI SETTING MEIN THA */
                 iframe:not([src*="ads"]) {
                     position: fixed !important;
                     top: 0 !important;
@@ -280,7 +278,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   v.style.objectFit = '$currentAspectRatio';
                   v.style.position = 'fixed';
                   v.style.top = '0'; v.style.left = '0'; v.style.width = '100vw'; v.style.height = '100vh'; v.style.zIndex = '999999';
-                  if (v.currentTime > 0.5 && !v.paused) VideoState.postMessage('playing');
+                  if (v.currentTime > 0.1 && !v.paused) VideoState.postMessage('playing');
                 }
                 var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .play-icon, #play-button');
                 playBtns.forEach(function(b) { b.click(); });
@@ -531,6 +529,22 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               Positioned(top: 20, right: 20, child: SafeArea(child: _buildFocusableItem(onTap: () { SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]); SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); Navigator.pop(context); }, borderRadius: BorderRadius.circular(22), child: const CircleAvatar(backgroundColor: Colors.black87, radius: 22, child: Icon(Icons.close, color: Colors.white, size: 28))))),
               Positioned(bottom: 20, right: 20, child: SafeArea(child: _buildFocusableItem(onTap: _toggleFullScreen, borderRadius: BorderRadius.circular(22), child: const CircleAvatar(backgroundColor: Colors.black87, radius: 22, child: Icon(Icons.fullscreen_exit, color: Colors.white, size: 28))))),
             ],
+            if (!isVideoPlaying)
+              Positioned.fill(
+                child: Container(
+                  color: Colors.black,
+                  child: Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: const [
+                        SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)),
+                        SizedBox(height: 10),
+                        Text("Connecting to Server...", style: TextStyle(color: Colors.white, fontSize: 14, fontWeight: FontWeight.bold))
+                      ]
+                    )
+                  )
+                )
+              ),
           ],
         ),
       );
@@ -565,7 +579,24 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     Positioned(bottom: 8, right: 48, child: _buildFocusableItem(onTap: _cycleAspectRatio, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.aspect_ratio, color: Colors.white, size: 18)))),
                     Positioned(bottom: 8, right: 8, child: _buildFocusableItem(onTap: _toggleFullScreen, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.fullscreen, color: Colors.white, size: 22)))),
                   ],
-                  if (isPageLoading && !isVideoPlaying) Positioned.fill(child: Container(color: Colors.black87, child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: const [SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)), SizedBox(height: 10), Text("Connecting to Server...", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])))),
+                  if (!isVideoPlaying)
+                    Positioned.fill(
+                      child: Container(
+                        color: Colors.black,
+                        child: Center(
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Image.asset('assets/logo.png', height: 50, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 20))),
+                              const SizedBox(height: 16),
+                              const SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)),
+                              const SizedBox(height: 10),
+                              const Text("Connecting to Server...", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
+                            ]
+                          )
+                        )
+                      )
+                    ),
                 ],
               ),
             ),
