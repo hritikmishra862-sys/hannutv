@@ -299,12 +299,33 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     }
   }
 
+  String _buildStreamUrl() {
+    if (widget.customUrl != null && widget.customUrl!.isNotEmpty) {
+      return widget.customUrl!;
+    }
+
+    final id = widget.tmdbId;
+    final s = currentSeason;
+    final e = currentEpisode;
+    final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
+
+    String originalTargetUrl = isTv
+        ? 'https://pantyflix.com/watch/play/tv/$id?season=$s&episode=$e&server=$activeServer'
+        : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
+
+    // 🚀 VERCEL SECURE EDGE PROXY
+    String vercelProxyBase = "https://hannutv-proxy-1.vercel.app/api/proxy?stream=";
+    return vercelProxyBase + Uri.encodeComponent(originalTargetUrl);
+  }
+
   void _initStream() {
     setState(() {
       isPageLoading = true;
       isVideoPlaying = false;
       showIntroAnimation = false;
     });
+
+    final targetUrl = _buildStreamUrl();
 
     _controller =
         WebViewController()
@@ -438,17 +459,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         _controller.loadRequest(Uri.parse(widget.customUrl!));
       }
     } else {
-      final id = widget.tmdbId;
-      final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
-      String originalTargetUrl = isTv
-          ? 'https://pantyflix.com/watch/play/tv/$id?season=$currentSeason&episode=$currentEpisode&server=$activeServer'
-          : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
-
-      // 🚀 VERCEL SECURE EDGE PROXY
-      String vercelProxyBase = "https://hannutv-proxy-1.vercel.app/api/proxy?stream=";
-      String safeFinalUrl = vercelProxyBase + Uri.encodeComponent(originalTargetUrl);
-
-      _controller.loadRequest(Uri.parse(safeFinalUrl));
+      _controller.loadRequest(Uri.parse(targetUrl));
     }
   }
 
@@ -677,6 +688,35 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       commentInputController.clear();
       FocusScope.of(context).unfocus();
     }
+  }
+
+  Widget _buildActionButton(
+    IconData icon,
+    String title, {
+    Color activeColor = Colors.white,
+  }) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.grey[900],
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, color: activeColor, size: 16),
+          const SizedBox(width: 6),
+          Text(
+            title,
+            style: TextStyle(
+              color: activeColor,
+              fontSize: 12,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -1056,7 +1096,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             ),
                           ),
                           const SizedBox(width: 8),
-                          // 🚀 DOWNLOAD BUTTON TRIGGER
                           _buildFocusableItem(
                             onTap: _downloadMovie,
                             borderRadius: BorderRadius.circular(20),
@@ -1613,3 +1652,70 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                                     const SizedBox(height: 4),
                                     Text(
                                       m['title'],
+                                      style: const TextStyle(
+                                        color: Colors.white,
+                                        fontSize: 12,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _TvFocusButton extends StatefulWidget {
+  final Widget child;
+  final VoidCallback onTap;
+  final BorderRadius borderRadius;
+
+  const _TvFocusButton({
+    required this.child,
+    required this.onTap,
+    required this.borderRadius,
+  });
+
+  @override
+  State<_TvFocusButton> createState() => _TvFocusButtonState();
+}
+
+class _TvFocusButtonState extends State<_TvFocusButton> {
+  bool hasFocus = false;
+
+  @override
+  Widget build(BuildContext context) {
+    return Focus(
+      onFocusChange: (focus) {
+        if (mounted) setState(() => hasFocus = focus);
+      },
+      child: InkWell(
+        onTap: widget.onTap,
+        borderRadius: widget.borderRadius,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 150),
+          decoration: BoxDecoration(
+            borderRadius: widget.borderRadius,
+            border: Border.all(
+              color: hasFocus ? Colors.redAccent : Colors.transparent,
+              width: hasFocus ? 3.5 : 0,
+            ),
+            boxShadow:
+                hasFocus
+                    ? [
+                      BoxShadow(
+                        color: Colors.redAccent.withOpacity(0.65),
