@@ -17,6 +17,13 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
   // 🔥 DEEP LOGIC: ANTI-ADBLOCK FLAG 🔥
   bool _isAdblockDetected = false;
 
+  // 🛡️ AUTO-OPEN FIX: browser / Play Store sirf tab khulega jab user ne banner pe REAL tap kiya ho
+  Offset? _tapDownPos;
+  DateTime? _lastTapTime;
+  bool get _userTappedRecently =>
+      _lastTapTime != null &&
+      DateTime.now().difference(_lastTapTime!) < const Duration(seconds: 2);
+
   @override
   void initState() {
     super.initState();
@@ -38,11 +45,17 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
               return NavigationDecision.navigate;
             }
 
-            // 2. 🔥 KOI BHI DOOSRA LINK AAYE (Yani ad pe click hua hai) TOH SEEDHA BROWSER ME KHOLO 🔥
-            _launchExternalBrowser(request.url);
-            
-            // Banner ke chhote se dabbe me website mat khulne do!
-            return NavigationDecision.prevent; 
+            // 2. 🔥 USER NE AD PE REAL TAP KIYA HAI TOH BROWSER ME KHOLO (pehle jaisa) 🔥
+            if (_userTappedRecently) {
+              _launchExternalBrowser(request.url);
+              // Banner ke chhote se dabbe me website mat khulne do!
+              return NavigationDecision.prevent;
+            }
+
+            // 3. 🛡️ BINA TAP KE AUTO REDIRECT: browser / Play Store KABHI nahi khulega
+            //    - ad ke andar (iframe) ka load ad ke andar hi chalne do taaki ad screen pe dikhe
+            //    - poore banner ko apne aap kahin le jaane wala redirect rok do
+            return request.isMainFrame ? NavigationDecision.prevent : NavigationDecision.navigate;
           },
           // 🚀 WORLD CLASS ANTI-ADBLOCK SENSOR FOR BANNER 🚀
           onWebResourceError: (WebResourceError error) {
@@ -119,7 +132,17 @@ class _CustomBannerAdState extends State<CustomBannerAd> {
                 ),
               )
             // NORMAL BANNER LOAD (Agar sab theek hai)
-            : WebViewWidget(controller: _controller),
+            : Listener(
+                // real tap pakadne ke liye (WebView ke upar, touch ko disturb nahi karta)
+                onPointerDown: (e) => _tapDownPos = e.position,
+                onPointerUp: (e) {
+                  final down = _tapDownPos;
+                  if (down != null && (e.position - down).distance < 30) {
+                    _lastTapTime = DateTime.now();
+                  }
+                },
+                child: WebViewWidget(controller: _controller),
+              ),
       ),
     );
   }

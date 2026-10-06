@@ -302,10 +302,15 @@ class DashboardPageState extends State<DashboardPage> {
   }
 
   Future<void> signInWithGoogle(StateSetter setModalState) async {
+    UserCredential? userCred;
     try {
       final GoogleSignIn googleSignIn = GoogleSignIn();
       final GoogleSignInAccount? googleUser = await googleSignIn.signIn();
-      if (googleUser == null) return;
+      if (googleUser == null) {
+        // account chooser band hua / email select ke baad bina result ke wapas aa gaya
+        _showLoginError('sign_in_canceled');
+        return;
+      }
 
       final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
       final AuthCredential credential = GoogleAuthProvider.credential(
@@ -313,29 +318,74 @@ class DashboardPageState extends State<DashboardPage> {
         idToken: googleAuth.idToken,
       );
 
-      if (FirebaseAuth.instance.currentUser?.isAnonymous == true) {
-        await FirebaseAuth.instance.signOut();
-      }
-
-      UserCredential userCred = await FirebaseAuth.instance.signInWithCredential(credential);
-      if (userCred.user != null) {
-        await FirebaseFirestore.instance.collection('users').doc(userCred.user!.uid).set({
-          'name': userCred.user!.displayName,
-          'email': userCred.user!.email,
-          'photoUrl': userCred.user!.photoURL,
-          'last_login': FieldValue.serverTimestamp(),
-        }, SetOptions(merge: true));
-
-        initPresenceTracking();
-        setModalState(() {});
-        setState(() {});
-        ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('Login Successful!'), backgroundColor: Colors.green));
-      }
-    } catch (_) {
-      ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('Login Failed'), backgroundColor: Colors.red));
+      // NOTE: guest (anonymous) user ko pehle sign-out nahi karte. Agar login fail ho
+      // to user guest hi rahe; login success hone par Firebase khud guest ki jagah le leta hai.
+      userCred = await FirebaseAuth.instance.signInWithCredential(credential);
+    } on FirebaseAuthException catch (e) {
+      _showLoginError('${e.code} ${e.message ?? ''}');
+      return;
+    } catch (e) {
+      _showLoginError(e.toString());
+      return;
     }
+
+    final user = userCred?.user;
+    if (user == null) {
+      _showLoginError('no-user');
+      return;
+    }
+
+    // Login ho chuka hai. Profile save / presence fail ho to bhi "Login Failed" nahi dikhana.
+    try {
+      await FirebaseFirestore.instance.collection('users').doc(user.uid).set({
+        'name': user.displayName,
+        'email': user.email,
+        'photoUrl': user.photoURL,
+        'last_login': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+    } catch (e) {
+      debugPrint('Profile save failed (login ok): $e');
+    }
+    try {
+      initPresenceTracking();
+    } catch (e) {
+      debugPrint('Presence start failed (login ok): $e');
+    }
+
+    if (!mounted) return;
+    setModalState(() {});
+    setState(() {});
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Login Successful!'), backgroundColor: Colors.green));
+  }
+
+  // Login error ka asli reason dikhata hai (pehle sab kuch sirf "Login Failed" ban jata tha)
+  void _showLoginError(String raw) {
+    debugPrint('GOOGLE LOGIN ERROR: $raw');
+    if (!mounted) return;
+    String msg;
+    if (raw.contains('sign_in_canceled') || RegExp(r'(ApiException|\.api\.\w+): ?12501\b').hasMatch(raw)) {
+      // user ne khud cancel kiya ho sakta hai, ya email select ke baad Google ne silently wapas bhej diya
+      // (wrong SHA-1 / OAuth config me aksar yahi hota hai)
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('Login cancelled. Email select karke bhi yahi aaye to Firebase me SHA-1 / SHA-256 add karo'),
+          backgroundColor: Colors.orange,
+          duration: Duration(seconds: 6)));
+      return;
+    }
+    if (RegExp(r'(ApiException|\.api\.\w+): ?10\b').hasMatch(raw)) {
+      msg = 'Login Failed (code 10): Firebase me app ka SHA-1 / SHA-256 add karo';
+    } else if (raw.contains('12500')) {
+      msg = 'Login Failed (12500): Firebase me support email set karo';
+    } else if (raw.contains('operation-not-allowed')) {
+      msg = 'Login Failed: Firebase Authentication me Google sign-in enable karo';
+    } else if (raw.contains('network')) {
+      msg = 'Login Failed: internet check karo';
+    } else {
+      msg = 'Login Failed: ${raw.length > 90 ? raw.substring(0, 90) : raw}';
+    }
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(msg), backgroundColor: Colors.red, duration: const Duration(seconds: 6)));
   }
 
   Future<void> signOut(StateSetter setModalState) async {
@@ -1007,6 +1057,11 @@ class LiveTvChannelsPageState extends State<LiveTvChannelsPage> {
   bool isLoading = true;
   final TextEditingController tvSearchController = TextEditingController();
 
+  // 📂 CATEGORIES: kaunsi category me kitne / konse channels hain
+  List<String> categories = ['All'];
+  Map<String, int> categoryCounts = {};
+  String selectedCategory = 'All';
+
   @override
   void initState() {
     super.initState();
@@ -1015,31 +1070,70 @@ class LiveTvChannelsPageState extends State<LiveTvChannelsPage> {
 
   Future<void> fetchIptvData() async {
     try {
-      final response = await http.get(Uri.parse('https://iptv-org.github.io/iptv/index.m3u'));
+      // index.category.m3u = har channel ke saath uski category (group-title) aati hai
+      final response = await http.get(Uri.parse('https://iptv-org.github.io/iptv/index.category.m3u'));
       if (response.statusCode == 200) {
         List<String> lines = response.body.split('\n');
-        List<Map<String, String>> parsed = [];
+        final Map<String, Map<String, String>> byUrl = {}; // ek channel ek hi baar
+        final Map<String, Set<String>> catsByUrl = {};
         String currentName = '';
         String currentLogo = '';
+        String currentGroup = '';
 
-        for (String line in lines) {
+        for (String rawLine in lines) {
+          final String line = rawLine.trim();
           if (line.startsWith('#EXTINF:')) {
             RegExp logoRegex = RegExp(r'tvg-logo="([^"]*)"');
             var match = logoRegex.firstMatch(line);
             currentLogo = match != null ? match.group(1)! : '';
+            var groupMatch = RegExp(r'group-title="([^"]*)"').firstMatch(line);
+            currentGroup = groupMatch != null ? groupMatch.group(1)!.trim() : '';
             List<String> splitComma = line.split(',');
             if (splitComma.length > 1) {
               currentName = splitComma.last.trim();
             }
           } else if (line.startsWith('http')) {
             if (currentName.isNotEmpty) {
-              parsed.add({'name': currentName, 'logo': currentLogo, 'url': line.trim()});
+              final cats = currentGroup
+                  .split(';')
+                  .map((c) => c.trim())
+                  .where((c) => c.isNotEmpty)
+                  .map((c) => c.toLowerCase() == 'undefined' ? 'Other' : c)
+                  .toList();
+              if (cats.isEmpty) cats.add('Other');
+              // adult (XXX) channels app me nahi dikhane
+              if (!cats.any((c) => c.toLowerCase() == 'xxx')) {
+                byUrl.putIfAbsent(line, () => {'name': currentName, 'logo': currentLogo, 'url': line});
+                catsByUrl.putIfAbsent(line, () => <String>{}).addAll(cats);
+              }
             }
           }
         }
+
+        final List<Map<String, String>> parsed = [];
+        final Map<String, int> counts = {};
+        byUrl.forEach((url, ch) {
+          final cats = catsByUrl[url]!;
+          ch['group'] = cats.join(';');
+          for (final c in cats) {
+            counts[c] = (counts[c] ?? 0) + 1;
+          }
+          parsed.add(ch);
+        });
+
+        // zyada channels wali category pehle, 'Other' sabse last
+        final List<String> sortedCats = counts.keys.toList()
+          ..sort((a, b) {
+            if (a == 'Other') return 1;
+            if (b == 'Other') return -1;
+            return counts[b]!.compareTo(counts[a]!);
+          });
+
         setState(() {
           allChannels = parsed;
           filteredChannels = parsed;
+          categoryCounts = counts;
+          categories = ['All', ...sortedCats];
           isLoading = false;
         });
       }
@@ -1050,9 +1144,12 @@ class LiveTvChannelsPageState extends State<LiveTvChannelsPage> {
 
   void filterChannels(String query) {
     setState(() {
-      filteredChannels = allChannels
-          .where((c) => c['name']!.toLowerCase().contains(query.toLowerCase()))
-          .toList();
+      filteredChannels = allChannels.where((c) {
+        final matchesName = c['name']!.toLowerCase().contains(query.toLowerCase());
+        final matchesCategory = selectedCategory == 'All' ||
+            (c['group'] ?? '').split(';').contains(selectedCategory);
+        return matchesName && matchesCategory;
+      }).toList();
     });
   }
 
@@ -1081,6 +1178,37 @@ class LiveTvChannelsPageState extends State<LiveTvChannelsPage> {
                 prefixIcon: const Icon(Icons.search, color: Colors.redAccent),
               ),
               onChanged: filterChannels,
+            ),
+          ),
+          // 📂 CATEGORY CHIPS: tap karo to sirf us category ke channels dikhenge
+          SizedBox(
+            height: 44,
+            child: ListView.separated(
+              scrollDirection: Axis.horizontal,
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              itemCount: categories.length,
+              separatorBuilder: (_, __) => const SizedBox(width: 8),
+              itemBuilder: (context, i) {
+                final cat = categories[i];
+                final bool selected = cat == selectedCategory;
+                final int count = cat == 'All' ? allChannels.length : (categoryCounts[cat] ?? 0);
+                return ChoiceChip(
+                  label: Text('$cat ($count)'),
+                  selected: selected,
+                  selectedColor: Colors.redAccent,
+                  backgroundColor: const Color(0xFF1A1A1A),
+                  side: const BorderSide(color: Colors.white12),
+                  labelStyle: TextStyle(
+                    color: Colors.white,
+                    fontSize: 12,
+                    fontWeight: selected ? FontWeight.bold : FontWeight.normal,
+                  ),
+                  onSelected: (_) {
+                    selectedCategory = cat;
+                    filterChannels(tvSearchController.text);
+                  },
+                );
+              },
             ),
           ),
           Expanded(

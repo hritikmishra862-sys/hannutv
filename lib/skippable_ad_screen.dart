@@ -28,6 +28,13 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
   // 🔥 DEEP LOGIC: ANTI-ADBLOCK FLAG 🔥
   bool _isAdblockDetected = false;
 
+  // 🛡️ AUTO-OPEN FIX: Chrome / Play Store / app sirf tab khulega jab user ne screen pe REAL tap kiya ho
+  Offset? _tapDownPos;
+  DateTime? _lastTapTime;
+  bool get _userTappedRecently =>
+      _lastTapTime != null &&
+      DateTime.now().difference(_lastTapTime!) < const Duration(seconds: 4);
+
   final List<String> _fullScreenAdLinks = [
     "https://omg10.com/4/11914244", 
     "https://omg10.com/4/11914245", 
@@ -59,7 +66,8 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
                 url.startsWith('whatsapp://') ||
                 url.startsWith('tg://')) {
               
-              _launchExternalBrowser(request.url);
+              // 🛡️ bina real tap ke auto-redirect pe kuch nahi khulega
+              if (_userTappedRecently) _launchExternalBrowser(request.url);
               return NavigationDecision.prevent; 
             }
             return NavigationDecision.navigate;
@@ -151,7 +159,17 @@ class _SkippableAdScreenState extends State<SkippableAdScreen> {
         body: SafeArea(
           child: Stack(
             children: [
-              WebViewWidget(controller: _controller),
+              Listener(
+                // real tap pakadne ke liye (WebView ke upar, touch ko disturb nahi karta)
+                onPointerDown: (e) => _tapDownPos = e.position,
+                onPointerUp: (e) {
+                  final down = _tapDownPos;
+                  if (down != null && (e.position - down).distance < 30) {
+                    _lastTapTime = DateTime.now();
+                  }
+                },
+                child: WebViewWidget(controller: _controller),
+              ),
               
               // 🔥 CRASH/ERROR SCREEN OVERLAY 🔥
               if (_isAdblockDetected)
