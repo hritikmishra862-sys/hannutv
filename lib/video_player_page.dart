@@ -806,7 +806,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                             final m = similarMovies[index];
                             return _buildFocusableItem(
                               onTap: () { 
-                                Navigator.replace(
+                                // YAHAN FIX KIYA HAI 🚀 Navigator.replace ki jagah pushReplacement
+                                Navigator.pushReplacement(
                                   context, 
                                   MaterialPageRoute(builder: (context) => SkippableAdScreen(
                                     adDuration: 10,
