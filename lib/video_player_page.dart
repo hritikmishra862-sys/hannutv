@@ -230,8 +230,9 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         NavigationDelegate(
           onPageStarted: (String url) { if (mounted) setState(() => isPageLoading = true); },
           onPageFinished: (String url) {
-            // IMPORTANT: Keep the HANNUTV loading overlay visible until the actual
-            // video reports "playing". Do not expose the source page while it loads.
+            // Keep the native HANNUTV loading screen visible until the actual video
+            // reports that playback has started. This prevents the source page/logo
+            // from ever being exposed to the user during server/iframe connection.
 
             // YAHAN FIX KIYA HAI: Purani wali aggressive iframe aur hide logic wapas daal di hai
             String jsCode = '''
@@ -532,6 +533,37 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               Positioned(top: 20, right: 20, child: SafeArea(child: _buildFocusableItem(onTap: () { SystemChrome.setPreferredOrientations([DeviceOrientation.portraitUp]); SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge); Navigator.pop(context); }, borderRadius: BorderRadius.circular(22), child: const CircleAvatar(backgroundColor: Colors.black87, radius: 22, child: Icon(Icons.close, color: Colors.white, size: 28))))),
               Positioned(bottom: 20, right: 20, child: SafeArea(child: _buildFocusableItem(onTap: _toggleFullScreen, borderRadius: BorderRadius.circular(22), child: const CircleAvatar(backgroundColor: Colors.black87, radius: 22, child: Icon(Icons.fullscreen_exit, color: Colors.white, size: 28))))),
             ],
+            // Same protection in fullscreen: the source page stays completely
+            // covered until the real video playback signal arrives.
+            if (!isVideoPlaying) Positioned.fill(
+              child: Container(
+                color: Colors.black,
+                child: Center(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: const [
+                      SizedBox(
+                        width: 30,
+                        height: 30,
+                        child: CircularProgressIndicator(
+                          color: Colors.redAccent,
+                          strokeWidth: 2.5,
+                        ),
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        "Connecting to Server...",
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 12,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
           ],
         ),
       );
@@ -566,7 +598,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     Positioned(bottom: 8, right: 48, child: _buildFocusableItem(onTap: _cycleAspectRatio, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.aspect_ratio, color: Colors.white, size: 18)))),
                     Positioned(bottom: 8, right: 8, child: _buildFocusableItem(onTap: _toggleFullScreen, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.fullscreen, color: Colors.white, size: 22)))),
                   ],
-                  if (isPageLoading && !isVideoPlaying) Positioned.fill(
+                  if (!isVideoPlaying) Positioned.fill(
                     child: Container(
                       color: Colors.black,
                       child: Center(
