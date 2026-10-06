@@ -84,7 +84,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'vidsrc', 'name': 'Fast'}, // TERA EXACT PURANA SERVER CODE
+    {'key': 'vidsrc', 'name': 'Fast'}, // YAHAN FIX KIYA HAI: 'fast' ki jagah actual 'vidsrc' server daal diya hai
     {'key': 'vidbolt', 'name': 'Bolt'},
     {'key': 'cinezo', 'name': 'Cinezo'},
     {'key': 'hindi-new', 'name': 'Hindi New'},
@@ -220,29 +220,23 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
-      ..setBackgroundColor(Colors.transparent) // Transparent background for opacity effect
+      ..setBackgroundColor(Colors.black)
       ..setUserAgent(
         isTvDevice ? "Mozilla/5.0 (SMART-TV; Linux; Tizen 5.0) AppleWebKit/538.1 (KHTML, like Gecko) Version/5.0 TV Safari/538.1"
                    : "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
       )
-      ..addJavaScriptChannel('VideoState', onMessageReceived: (JavaScriptMessage message) { 
-        if (message.message == 'playing' && mounted && !isVideoPlaying) {
-             setState(() {
-                 isVideoPlaying = true;
-             });
-            _triggerCinematicPlayAnimation(); 
-        }
-      })
+      ..addJavaScriptChannel('VideoState', onMessageReceived: (JavaScriptMessage message) { if (message.message == 'playing' && mounted) _triggerCinematicPlayAnimation(); })
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (String url) { if (mounted) setState(() => isPageLoading = true); },
           onPageFinished: (String url) {
-            if (mounted) setState(() => isPageLoading = false);
+            // IMPORTANT: Keep the HANNUTV loading overlay visible until the actual
+            // video reports "playing". Do not expose the source page while it loads.
 
-            // BHAII YEH WAHI EXACT TERA PURANA CODE HAI JO TUNE BHEJA THA DEEP SENSOR KE SATH
+            // YAHAN FIX KIYA HAI: Purani wali aggressive iframe aur hide logic wapas daal di hai
             String jsCode = '''
-              document.documentElement.style.backgroundColor = 'transparent';
-              document.body.style.backgroundColor = 'transparent';
+              document.documentElement.style.backgroundColor = '#000000';
+              document.body.style.backgroundColor = '#000000';
               window.open = function() { return null; };
               window.alert = function() { return true; }; 
               window.confirm = function() { return true; }; 
@@ -258,13 +252,14 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     visibility: hidden !important; 
                 }
                 body, html { 
-                    background-color: transparent !important; 
+                    background-color: #000000 !important; 
                     overflow: hidden !important; 
                     margin: 0 !important; 
                     padding: 0 !important; 
                     width: 100vw !important; 
                     height: 100vh !important; 
                 }
+                /* MAIN MAGIC: IFRAME KO FULL SCREEN KARNA JAISE PURANI SETTING MEIN THA */
                 iframe:not([src*="ads"]) {
                     position: fixed !important;
                     top: 0 !important;
@@ -273,12 +268,11 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     height: 100vh !important;
                     z-index: 99999 !important;
                     border: none !important;
-                    background-color: transparent !important;
+                    background-color: #000000 !important;
                 }
               `;
               document.head.appendChild(style);
 
-              // SMART SENSOR: Checks if video is actually playing before notifying Flutter
               setInterval(function() {
                 var vids = document.getElementsByTagName('video');
                 if (vids.length > 0) {
@@ -287,12 +281,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                   v.style.objectFit = '$currentAspectRatio';
                   v.style.position = 'fixed';
                   v.style.top = '0'; v.style.left = '0'; v.style.width = '100vw'; v.style.height = '100vh'; v.style.zIndex = '999999';
-                  
-                  if (v.currentTime > 0.5 && !v.paused) {
-                    document.body.style.backgroundColor = '#000000'; 
-                    document.documentElement.style.backgroundColor = '#000000';
-                    VideoState.postMessage('playing');
-                  }
+                  if (v.currentTime > 0.5 && !v.paused) VideoState.postMessage('playing');
                 }
                 var playBtns = document.querySelectorAll('.play-btn, .vjs-big-play-button, .play-icon, #play-button');
                 playBtns.forEach(function(b) { b.click(); });
@@ -346,7 +335,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
           ? 'https://pantyflix.com/watch/play/tv/$id?season=$currentSeason&episode=$currentEpisode&server=$activeServer' 
           : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
       
-      // BHAII TERA EXACT VERCEL PROXY JO TUNE BHEJA THA
       String vercelProxyBase = "https://hannutv-proxy-1.vercel.app/api/proxy?stream=";
       String safeFinalUrl = vercelProxyBase + Uri.encodeComponent(originalTargetUrl);
       
@@ -435,7 +423,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // TERA PURANA WALA DOWNLOAD LOGIC (NO IDM)
   void _downloadMovie() {
     bool alreadyExists = downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId);
     
@@ -538,13 +525,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
         backgroundColor: Colors.black,
         body: Stack(
           children: [
-            Positioned.fill(
-              // TERA DEEP SENSOR (OPACITY TRICK)
-              child: Opacity(
-                opacity: isVideoPlaying ? 1.0 : 0.0,
-                child: WebViewWidget(controller: _controller)
-              ),
-            ),
+            Positioned.fill(child: WebViewWidget(controller: _controller)),
             Positioned(top: 14, right: 20, child: SafeArea(child: IgnorePointer(child: Opacity(opacity: 0.85, child: Image.asset('assets/logo.png', height: 38, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 16))))))),
             if (showControls) ...[
               Positioned.fill(child: IgnorePointer(child: Container(color: Colors.black38))),
@@ -570,37 +551,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
               onTap: _startControlsTimer,
               child: Stack(
                 children: [
-                  Container(
-                    width: double.infinity, 
-                    height: 230, 
-                    color: Colors.black, 
-                    child: Opacity(
-                      // OPACITY TRICK: Hidden until playing
-                      opacity: isVideoPlaying ? 1.0 : 0.0,
-                      child: WebViewWidget(controller: _controller)
-                    )
-                  ),
-
-                  // BLACK SCREEN LOADER (SHOWN UNTIL VIDEO PLAYS)
-                  if (!isVideoPlaying)
-                    Positioned.fill(
-                      child: Container(
-                        color: Colors.black,
-                        child: Center(
-                          child: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Image.asset('assets/logo.png', height: 50, errorBuilder: (_, __, ___) => const Text('HANNUTV', style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold, fontSize: 20))),
-                              const SizedBox(height: 16),
-                              const SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)),
-                              const SizedBox(height: 10),
-                              const Text("Connecting to Server...", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))
-                            ]
-                          )
-                        )
-                      )
-                    ),
-
+                  Container(width: double.infinity, height: 230, color: Colors.black, child: WebViewWidget(controller: _controller)),
                   Positioned(
                     top: 10, right: 14,
                     child: GestureDetector(
@@ -609,13 +560,41 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                     ),
                   ),
                   if (showIntroAnimation) Positioned.fill(child: IgnorePointer(child: Center(child: AnimatedBuilder(animation: _introAnimController, builder: (context, child) { return Opacity(opacity: _introOpacityAnimation.value, child: Transform.scale(scale: _introScaleAnimation.value, child: Image.asset('assets/logo.png', height: 60, errorBuilder: (_, __, ___) => const Icon(Icons.play_circle_fill, color: Colors.red, size: 60)))); })))),
-                  if (showControls && isVideoPlaying) ...[
+                  if (showControls) ...[
                     Positioned.fill(child: IgnorePointer(child: Container(color: Colors.black38))),
                     Positioned(top: 10, right: 10, child: _buildFocusableItem(onTap: () => Navigator.pop(context), borderRadius: BorderRadius.circular(18), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 18, child: Icon(Icons.chevron_left, color: Colors.white, size: 28)))),
                     Positioned(bottom: 8, right: 48, child: _buildFocusableItem(onTap: _cycleAspectRatio, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.aspect_ratio, color: Colors.white, size: 18)))),
                     Positioned(bottom: 8, right: 8, child: _buildFocusableItem(onTap: _toggleFullScreen, borderRadius: BorderRadius.circular(16), child: const CircleAvatar(backgroundColor: Colors.black54, radius: 16, child: Icon(Icons.fullscreen, color: Colors.white, size: 22)))),
                   ],
-                  if (isPageLoading && !isVideoPlaying) Positioned.fill(child: Container(color: Colors.black87, child: Center(child: Column(mainAxisSize: MainAxisSize.min, children: const [SizedBox(width: 30, height: 30, child: CircularProgressIndicator(color: Colors.redAccent, strokeWidth: 2.5)), SizedBox(height: 10), Text("Connecting to Server...", style: TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold))])))),
+                  if (isPageLoading && !isVideoPlaying) Positioned.fill(
+                    child: Container(
+                      color: Colors.black,
+                      child: Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: const [
+                            SizedBox(
+                              width: 30,
+                              height: 30,
+                              child: CircularProgressIndicator(
+                                color: Colors.redAccent,
+                                strokeWidth: 2.5,
+                              ),
+                            ),
+                            SizedBox(height: 10),
+                            Text(
+                              "Connecting to Server...",
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -677,6 +656,8 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                       const SizedBox(height: 10),
                       const Text("Sponsored Ads", style: TextStyle(color: Colors.white54, fontSize: 12, fontWeight: FontWeight.bold)),
                       const SizedBox(height: 10),
+                      const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
+                      const SizedBox(height: 16),
                       const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
                       const SizedBox(height: 16),
                       const CustomBannerAd(htmlBannerCode: _adsterraBannerSnippet),
