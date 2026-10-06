@@ -7,7 +7,7 @@ import 'package:webview_flutter/webview_flutter.dart';
 import 'package:webview_flutter_android/webview_flutter_android.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:url_launcher/url_launcher.dart'; // 🚀 DEEP DOWNLOAD KE LIYE ADD KIYA
+import 'package:url_launcher/url_launcher.dart'; // Deep download launcher
 import 'banner_ad_widget.dart';
 import 'skippable_ad_screen.dart';
 import 'dashboard.dart'; 
@@ -85,7 +85,7 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
 
   final List<Map<String, String>> servers = const [
     {'key': 'vidrift', 'name': 'Rift'},
-    {'key': 'binge', 'name': 'Fast'}, // 🚀 YAHAN FIX KIYA HAI: 'binge' based on your screenshot
+    {'key': 'binge', 'name': 'Fast'}, 
     {'key': 'vidbolt', 'name': 'Bolt'},
     {'key': 'cinezo', 'name': 'Cinezo'},
     {'key': 'hindi-new', 'name': 'Hindi New'},
@@ -421,7 +421,6 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
     );
   }
 
-  // 🚀 DEEP REAL DOWNLOAD MANAGER - QUALITY & SIZE OPTIONS
   void _downloadMovie() {
     bool alreadyExists = downloadedMoviesList.any((movie) => movie['id'] == widget.tmdbId);
     
@@ -463,38 +462,34 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
       subtitle: Text("Estimated size: $size", style: const TextStyle(color: Colors.grey, fontSize: 12)),
       trailing: const Icon(Icons.download, color: Colors.white),
       onTap: () {
-        Navigator.pop(context); // Close BottomSheet
+        Navigator.pop(context); 
         _startRealDownload(quality, size);
       }
     );
   }
 
-  // 🚀 ACTUAL DOWNLOAD TRIGGER VIA BROWSER
   void _startRealDownload(String quality, String size) async {
     final id = widget.tmdbId;
     final isTv = widget.mediaType == 'tv' || widget.mediaType == 'series';
     
-    // Generate original stream URL
     String originalTargetUrl = isTv 
         ? 'https://pantyflix.com/watch/play/tv/$id?season=$currentSeason&episode=$currentEpisode&server=$activeServer' 
         : 'https://pantyflix.com/watch/play/movie/$id?server=$activeServer';
     
-    // Pass to Vercel Proxy to bypass block and trigger download
     String safeFinalUrl = "https://hannutv-proxy-1.vercel.app/api/proxy?stream=" + Uri.encodeComponent(originalTargetUrl);
 
     try {
       final uri = Uri.parse(safeFinalUrl);
       if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication); // Opens browser/downloader
+        await launchUrl(uri, mode: LaunchMode.externalApplication); 
 
-        // Save metadata to global list so it appears in Dashboard Folder
         if (!downloadedMoviesList.any((m) => m['id'] == widget.tmdbId)) {
           downloadedMoviesList.insert(0, {
             'id': widget.tmdbId,
             'title': widget.movieTitle,
             'year': widget.year,
             'type': widget.mediaType,
-            'quality': quality, // Save selected quality
+            'quality': quality, 
           });
         }
 
@@ -593,11 +588,10 @@ class _VideoPlayerPageState extends State<VideoPlayerPage>
                 children: [
                   Container(width: double.infinity, height: 230, color: Colors.black, child: WebViewWidget(controller: _controller)),
                   
-                  // 🚀 YAHAN FIX KIYA HAI: PANTYFLIX KO HIDE KARNE KE LIYE SOLID BLACK COVER
                   if (!isVideoPlaying)
                     Positioned.fill(
                       child: Container(
-                        color: Colors.black, // 100% Solid Black taaki background websites na dikhe
+                        color: Colors.black, 
                         child: Center(
                           child: Column(
                             mainAxisSize: MainAxisSize.min,
